@@ -17,11 +17,13 @@ Add interactive charts to the portfolio detail page and dashboard: a performance
 
 ### Upgrade `/api/quote/route.ts`
 
-Replace `yahooFinance.quote(ticker)` with `yahooFinance.quoteSummary(ticker, { modules: ['price', 'summaryProfile'] })`. Map `summaryProfile.sector` into the response's `sector` field. All other response fields remain the same, mapped from the `price` module instead of the `quote` result.
+Replace `yahooFinance.quote(ticker)` with `yahooFinance.quoteSummary(ticker, { modules: ['price', 'assetProfile'] })`. Map `assetProfile.sector` into the response's `sector` field. All other response fields remain the same, mapped from the `price` module instead of the `quote` result.
+
+**Fallback**: If `quoteSummary` throws (e.g. for indices like `^GSPC` which lack `assetProfile`), fall back to `yahooFinance.quote(ticker)` and set `sector: undefined`. This ensures existing functionality isn't broken by the upgrade.
 
 ### Upgrade `/api/quotes/route.ts`
 
-Same change: use `quoteSummary` per ticker instead of `quote`. Each ticker in the batch gets the sector field populated.
+Same change: try `quoteSummary` per ticker, fall back to `quote` on failure. Each ticker in the batch gets the sector field populated when available.
 
 ### No changes to `/api/history` or `/api/search`
 
@@ -55,11 +57,13 @@ interface PortfolioChartPoint {
 - `totalCost: number` — total cost basis for the horizontal line
 
 **Behavior**:
-1. Fetch historical data for all holding tickers + the benchmark ticker in parallel via `Promise.allSettled` using `fetchHistory` from the yahoo finance service.
-2. Align dates across all tickers (use intersection of available dates).
-3. For each date: `portfolioValue = sum(holding.shares * historicalClose[ticker][date])`.
-4. Normalize benchmark: `benchmarkNormalized[date] = benchmarkClose[date] / benchmarkClose[firstDate] * portfolioValue[firstDate]`.
-5. Cost basis is a constant horizontal line at `totalCost`.
+1. If `holdings` is empty, return `{ data: [], loading: false, error: null }` immediately.
+2. Fetch historical data for all holding tickers + the benchmark ticker in parallel via `Promise.allSettled` using `fetchHistory` from the yahoo finance service. Tickers that fail are excluded (their contribution treated as 0 for those dates).
+3. Align dates: collect all dates present in at least one holding's history. For each date, sum the available holdings. This uses a union approach (not intersection) so that a newly-added ticker with limited history doesn't truncate the entire chart.
+4. For each date: `portfolioValue = sum(holding.shares * historicalClose[ticker][date])` (skipping tickers without data for that date).
+5. Normalize benchmark: `benchmarkNormalized[date] = benchmarkClose[date] / benchmarkClose[firstDate] * baseline`, where `baseline = portfolioValue[firstDate] > 0 ? portfolioValue[firstDate] : totalCost`. If benchmark data is unavailable, set `benchmarkValue: null` on all points.
+6. Cost basis is a constant horizontal line at `totalCost`.
+7. Validate period input: supported values are `1w`, `1m`, `3m`, `6m`, `1y`, `max`. Default to `1y` if invalid.
 
 **Returns**: `{ data: PortfolioChartPoint[], loading: boolean, error: string | null }`
 
@@ -89,7 +93,7 @@ Row of pill buttons for selecting time range: 1W | 1M | 3M | 6M | 1Y | ALL. Acti
 
 **Used on**: Portfolio detail page.
 
-Recharts `ComposedChart` inside `ResponsiveContainer` (width 100%, height 400px desktop / 250px mobile).
+Recharts `ComposedChart` inside `ResponsiveContainer` (width 100%, `h-[250px] md:h-[400px]`).
 
 Elements:
 - `<Area>` for portfolio value: `stroke: var(--green-primary)`, `strokeWidth: 2`, fill with `<linearGradient>` from green at 20% opacity to transparent.
@@ -113,7 +117,7 @@ Error state: centered "Unable to load chart data" with a retry button inside the
 
 **Used on**: Dashboard page.
 
-Same structure as PerformanceChart but simpler: single green `<Area>` only (no benchmark, no cost basis). Height 350px desktop / 250px mobile. Includes `TimeRangePicker`.
+Same structure as PerformanceChart but simpler: single green `<Area>` only (no benchmark, no cost basis). `h-[250px] md:h-[350px]`. Includes `TimeRangePicker`.
 
 **Props**: `data: { date: string; value: number }[]`, `period: string`, `onPeriodChange: (period: string) => void`, `loading: boolean`.
 
@@ -123,7 +127,7 @@ Same structure as PerformanceChart but simpler: single green `<Area>` only (no b
 
 Recharts `PieChart` with `<Pie innerRadius={60} outerRadius={100}>`. Each slice is a holding sized by `marketValue`.
 
-Color palette: generate N colors stepping from `var(--chart-1)` through `var(--chart-2)` to `var(--chart-5)` using the existing CSS chart variables, cycling if more holdings than colors.
+Color palette: cycle through the 5 discrete CSS chart variables (`var(--chart-1)` through `var(--chart-5)`). If more than 5 holdings, wrap around with `colors[index % 5]`.
 
 Labels outside each slice: `TICKER XX%` in `font-financial text-xs`.
 
@@ -166,7 +170,7 @@ New layout order:
 2. `PerformanceSummaryBar`
 3. `PerformanceChart` (full width) — fed by `usePortfolioHistory` with the portfolio's holdings, benchmark, and selected period
 4. "Holdings" heading + "Add Holding" button
-5. Two-column grid (desktop) / stacked (mobile):
+5. Two-column grid (`md:grid md:grid-cols-[3fr_2fr] gap-6`) / stacked on mobile:
    - Left (~60%): `HoldingsTable`
    - Right (~40%): `AllocationDonut` then `SectorBreakdown` stacked
 
@@ -183,7 +187,7 @@ For sparklines: the dashboard page fetches 1-month history for all tickers once.
 
 ### PortfolioCard changes
 
-Add a `sparklineData?: number[]` prop. When provided, render `<Sparkline data={sparklineData} />` at the bottom of the card, below the holdings count.
+Add a `sparklineData?: number[]` prop. When provided, render `<Sparkline data={sparklineData} />` at the bottom of the card, below the holdings count. When `sparklineData` is undefined (still loading or no data), the card renders as it does today — no skeleton for the sparkline area.
 
 ---
 
@@ -201,7 +205,7 @@ Add a `sparklineData?: number[]` prop. When provided, render `<Sparkline data={s
 | `src/components/charts/SectorBreakdown.tsx` | Sector allocation bar chart |
 | `src/components/charts/Sparkline.tsx` | Mini 30-day sparkline |
 
-### Modified Files (5)
+### Modified Files (6)
 | File | Change |
 |------|--------|
 | `src/app/api/quote/route.ts` | Use `quoteSummary` for sector data |

@@ -76,7 +76,7 @@ export function SectorBreakdown({
             <LabelList
               dataKey="percent"
               position="right"
-              formatter={(v: number) => `${v.toFixed(1)}%`}
+              formatter={(v) => `${Number(v).toFixed(1)}%`}
               style={{
                 fill: "var(--text-secondary)",
                 fontSize: 12,

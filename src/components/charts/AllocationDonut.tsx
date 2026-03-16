@@ -40,21 +40,16 @@ function DonutTooltip({
   );
 }
 
-function CustomLabel({
-  cx,
-  cy,
-  midAngle,
-  outerRadius,
-  ticker,
-  percent,
-}: {
-  cx: number;
-  cy: number;
-  midAngle: number;
-  outerRadius: number;
-  ticker: string;
-  percent: number;
+function CustomLabel(props: {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  outerRadius?: number;
+  payload?: { ticker: string; percent: number };
 }) {
+  const { cx = 0, cy = 0, midAngle = 0, outerRadius = 0, payload } = props;
+  if (!payload) return null;
+
   const RADIAN = Math.PI / 180;
   const radius = outerRadius + 20;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -69,7 +64,7 @@ function CustomLabel({
       className="text-xs font-financial"
       fill="var(--text-secondary)"
     >
-      {ticker} {percent.toFixed(0)}%
+      {payload.ticker} {payload.percent.toFixed(0)}%
     </text>
   );
 }

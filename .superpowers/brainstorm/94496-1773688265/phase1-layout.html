@@ -1,0 +1,72 @@
+<h2>Phase 1: Foundation — Layout Overview</h2>
+<p class="subtitle">What we're building in this first phase</p>
+
+<div class="mockup">
+  <div class="mockup-header">Oakstock — Phase 1 Shell</div>
+  <div class="mockup-body" style="background: #0C0C0C; color: #F0EDE8; font-family: system-ui; min-height: 500px;">
+
+    <!-- Navbar -->
+    <div style="background: #151512; border-bottom: 1px solid #2A2722; height: 56px; display: flex; align-items: center; padding: 0 24px; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #22C55E; font-size: 20px;">&#9752;</span>
+          <span style="font-weight: 700; letter-spacing: -0.03em; font-size: 16px;">OAKSTOCK</span>
+        </div>
+        <div style="display: flex; gap: 20px; font-size: 14px;">
+          <span style="color: #22C55E; border-bottom: 2px solid #22C55E; padding-bottom: 4px;">Dashboard</span>
+          <span style="color: #A09882;">Watchlist</span>
+          <span style="color: #A09882;">Rebalance</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="color: #A09882; font-size: 14px;">☀️</span>
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: #2A2722;"></div>
+      </div>
+    </div>
+
+    <!-- Market Overview Bar -->
+    <div style="background: #1E1D1A; height: 36px; display: flex; align-items: center; padding: 0 24px; gap: 32px; font-size: 12px; font-family: 'JetBrains Mono', monospace; border-bottom: 1px solid #2A2722;">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="color: #A09882;">S&P 500</span>
+        <span style="color: #F0EDE8;">5,892.34</span>
+        <span style="color: #22C55E;">+0.45%</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="color: #A09882;">NASDAQ</span>
+        <span style="color: #F0EDE8;">18,234.12</span>
+        <span style="color: #22C55E;">+0.72%</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="color: #A09882;">TSX</span>
+        <span style="color: #F0EDE8;">24,156.89</span>
+        <span style="color: #EF4444;">-0.18%</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="color: #A09882;">DOW</span>
+        <span style="color: #F0EDE8;">43,892.01</span>
+        <span style="color: #22C55E;">+0.33%</span>
+      </div>
+    </div>
+
+    <!-- Main Content Area (Empty State) -->
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; padding: 48px; text-align: center;">
+      <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.6;">🌳</div>
+      <h3 style="font-size: 24px; font-weight: 600; margin: 0 0 8px 0; letter-spacing: -0.03em;">Plant your first portfolio</h3>
+      <p style="color: #A09882; font-size: 14px; margin: 0 0 24px 0;">Start tracking your investments with Oakstock</p>
+      <button style="background: #22C55E; color: #0C0C0C; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer;">Create Portfolio</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>Phase 1 Deliverables</h3>
+  <ul>
+    <li><strong>Project scaffolding</strong> — Next.js 14+ / TypeScript / Tailwind v4 / Vercel-ready</li>
+    <li><strong>Design system</strong> — CSS variables (dark + light), typography (Instrument Sans + JetBrains Mono), shadcn/ui themed components</li>
+    <li><strong>Root layout</strong> — Navbar with logo, nav links, theme toggle</li>
+    <li><strong>Market overview bar</strong> — Static layout (live data wired in Phase 2)</li>
+    <li><strong>Zustand stores</strong> — Portfolio, watchlist, and theme stores with localStorage persistence</li>
+    <li><strong>Empty dashboard</strong> — The "Plant your first portfolio" empty state</li>
+  </ul>
+</div>

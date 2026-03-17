@@ -45,6 +45,13 @@ export interface HoldingWithQuote extends Holding {
 }
 
 // ─── Watchlist ───────────────────────────────────────
+export interface Watchlist {
+  id: string;
+  name: string;
+  createdAt: string;
+  items: WatchlistItem[];
+}
+
 export interface WatchlistItem {
   id: string;
   ticker: string;
@@ -67,8 +74,29 @@ export interface QuoteData {
   fiftyTwoWeekHigh?: number;
   fiftyTwoWeekLow?: number;
   sector?: string;
+  website?: string;
   currency: string;
 }
+
+export interface FinancialData {
+  ticker: string;
+  peRatio: number | null;
+  eps: number | null;
+  revenue: number | null;
+  profitMargin: number | null;
+  debtToEquity: number | null;
+  dividendYield: number | null;
+  volume: number | null;
+  fiftyTwoWeekHigh: number | null;
+  fiftyTwoWeekLow: number | null;
+  description: string | null;
+  analystRating: string | null;
+  targetPrice: number | null;
+  website: string | null;
+}
+
+export type PerformancePeriod = '1M' | '3M' | 'YTD' | '1Y' | '3Y' | '5Y';
+export type PerformanceReturns = Record<PerformancePeriod, number | null>;
 
 export interface HistoricalDataPoint {
   date: string; // ISO date

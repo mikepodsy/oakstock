@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         fiftyTwoWeekHigh: undefined,
         fiftyTwoWeekLow: undefined,
         sector: profile?.sector ?? undefined,
+        website: profile?.website ?? undefined,
         currency: price?.currency ?? "USD",
       });
     } catch {
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
         fiftyTwoWeekHigh: result.fiftyTwoWeekHigh ?? undefined,
         fiftyTwoWeekLow: result.fiftyTwoWeekLow ?? undefined,
         sector: undefined,
+        website: undefined,
         currency: result.currency ?? "USD",
       });
     }

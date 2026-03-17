@@ -17,6 +17,14 @@ import { TimeRangePicker } from "./TimeRangePicker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCompactNumber } from "@/utils/formatters";
 import { format } from "date-fns";
+import { ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 
 interface PerformanceChartProps {
   data: PortfolioChartPoint[];
@@ -26,6 +34,9 @@ interface PerformanceChartProps {
   loading: boolean;
   error?: string | null;
   onRetry?: () => void;
+  title?: string;
+  benchmarkOptions?: { label: string; value: string }[];
+  onBenchmarkChange?: (ticker: string) => void;
 }
 
 function CustomTooltip({
@@ -76,6 +87,9 @@ export function PerformanceChart({
   loading,
   error,
   onRetry,
+  title = "Performance",
+  benchmarkOptions,
+  onBenchmarkChange,
 }: PerformanceChartProps) {
   const costBasis = data.length > 0 ? data[0].costBasis : 0;
 
@@ -83,9 +97,31 @@ export function PerformanceChart({
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display text-base text-text-primary">
-          Performance
+          {title}
         </h3>
-        <TimeRangePicker selected={period} onSelect={onPeriodChange} />
+        <div className="flex items-center gap-2">
+          {benchmarkOptions && onBenchmarkChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                {benchmarkName}
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={benchmarkName}
+                  onValueChange={onBenchmarkChange}
+                >
+                  {benchmarkOptions.map((opt) => (
+                    <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <TimeRangePicker selected={period} onSelect={onPeriodChange} />
+        </div>
       </div>
 
       {loading ? (

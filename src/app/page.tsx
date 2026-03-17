@@ -15,12 +15,19 @@ import {
 import { CreatePortfolioDialog } from "@/components/dashboard/CreatePortfolioDialog";
 import { PortfolioSummaryCards } from "@/components/dashboard/PortfolioSummaryCards";
 import { PortfolioGrid } from "@/components/dashboard/PortfolioGrid";
-import { CombinedChart } from "@/components/charts/CombinedChart";
+import { PerformanceChart } from "@/components/charts/PerformanceChart";
+import { DEFAULT_BENCHMARKS } from "@/utils/constants";
 import { fetchHistory } from "@/services/yahooFinance";
+
+const BENCHMARK_OPTIONS = DEFAULT_BENCHMARKS.map((b) => ({
+  label: b,
+  value: b,
+}));
 
 export default function DashboardPage() {
   const portfolios = usePortfolioStore((s) => s.portfolios);
   const [period, setPeriod] = useState("1y");
+  const [benchmark, setBenchmark] = useState("SPY");
   const [sparklineMap, setSparklineMap] = useState<Record<string, number[]>>(
     {}
   );
@@ -72,19 +79,10 @@ export default function DashboardPage() {
   const { data: combinedChartData, loading: chartLoading } =
     usePortfolioHistory(
       combinedHistoryInputs,
-      "SPY", // Default benchmark for dashboard combined chart
+      benchmark,
       period,
       combinedCostBasis
     );
-
-  const combinedChartSimple = useMemo(
-    () =>
-      combinedChartData.map((p) => ({
-        date: p.date,
-        value: p.portfolioValue,
-      })),
-    [combinedChartData]
-  );
 
   // Sparkline data: fetch 1m history for all tickers, aggregate per portfolio
   useEffect(() => {
@@ -191,11 +189,15 @@ export default function DashboardPage() {
 
       <PortfolioSummaryCards data={summary} loading={loading} />
 
-      <CombinedChart
-        data={combinedChartSimple}
+      <PerformanceChart
+        data={combinedChartData}
+        benchmarkName={benchmark}
         period={period}
         onPeriodChange={setPeriod}
         loading={chartLoading}
+        title="Oakstock Performance"
+        benchmarkOptions={BENCHMARK_OPTIONS}
+        onBenchmarkChange={setBenchmark}
       />
 
       <PortfolioGrid

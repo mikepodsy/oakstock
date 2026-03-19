@@ -179,6 +179,7 @@ export function PerformanceChart({
                   tickLine={false}
                   axisLine={false}
                   width={70}
+                  domain={["auto", "auto"]}
                 />
                 <Tooltip
                   content={

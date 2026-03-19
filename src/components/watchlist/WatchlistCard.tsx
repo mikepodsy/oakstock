@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WatchlistCardDetail } from "./WatchlistCardDetail";
 import { EditWatchlistDialog } from "./EditWatchlistDialog";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { PerformancePills } from "@/components/shared/PerformancePills";
+import { useWatchlistStore } from "@/stores/watchlistStore";
 import { formatCurrency, formatPercent, formatCompactNumber } from "@/utils/formatters";
+import { toast } from "sonner";
 import type { WatchlistItem, QuoteData } from "@/types";
 
 interface WatchlistCardProps {
@@ -26,6 +30,8 @@ export function WatchlistCard({
   onToggle,
 }: WatchlistCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const removeItem = useWatchlistStore((s) => s.removeItem);
+  const router = useRouter();
 
   return (
     <>
@@ -53,8 +59,14 @@ export function WatchlistCard({
           {/* Top row: Logo + Info + Price */}
           <div className="flex items-center gap-4 mb-4">
             <CompanyLogo ticker={item.ticker} website={quote?.website} />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-financial text-lg text-text-primary">
+            <div
+              className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/stock/${item.ticker}`);
+              }}
+            >
+              <h3 className="font-financial text-lg text-text-primary hover:text-green-primary transition-colors">
                 {item.ticker}
               </h3>
               <p className="text-xs text-text-tertiary truncate">{item.name}</p>
@@ -101,6 +113,21 @@ export function WatchlistCard({
               />
             </div>
           )}
+        </div>
+
+        {/* Remove button */}
+        <div className="flex justify-end px-5 pb-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              removeItem(watchlistId, item.id);
+              toast.success(`Removed ${item.ticker} from watchlist`);
+            }}
+            className="p-1.5 rounded-md text-text-tertiary hover:text-red-primary hover:bg-red-muted transition-colors"
+            aria-label={`Remove ${item.ticker}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         {/* Expanded Detail (Accordion) */}

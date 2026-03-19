@@ -9,7 +9,7 @@ interface HoldingInput {
   shares: number;
 }
 
-const VALID_PERIODS = ["1w", "1m", "3m", "6m", "1y", "max"];
+const VALID_PERIODS = ["1d", "1w", "1m", "3m", "6m", "1y", "max"];
 
 export function usePortfolioHistory(
   holdings: HoldingInput[],

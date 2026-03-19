@@ -20,12 +20,10 @@ export function CompanyLogo({
   website?: string;
 }) {
   const [imgError, setImgError] = useState(false);
-  const token = process.env.NEXT_PUBLIC_LOGO_DEV_TOKEN;
   const domain = website
     ? website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]
     : null;
-  const logoUrl =
-    token && domain ? `https://img.logo.dev/${domain}?token=${token}&size=128` : null;
+  const logoUrl = domain ? `/api/logo?domain=${encodeURIComponent(domain)}` : null;
 
   if (!logoUrl || imgError) {
     return (

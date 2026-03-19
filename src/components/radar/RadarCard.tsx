@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -36,6 +38,7 @@ export function RadarCard({
   onToggle,
 }: RadarCardProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const router = useRouter();
   const watchlists = useWatchlistStore((s) => s.watchlists);
   const addItem = useWatchlistStore((s) => s.addItem);
 
@@ -77,8 +80,14 @@ export function RadarCard({
         {/* Top row: Logo + Info + Price */}
         <div className="flex items-center gap-4 mb-4">
           <CompanyLogo ticker={ticker} website={quote?.website} />
-          <div className="flex-1 min-w-0">
-            <h3 className="font-financial text-lg text-text-primary">
+          <div
+            className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/stock/${ticker}`);
+            }}
+          >
+            <h3 className="font-financial text-lg text-text-primary hover:text-green-primary transition-colors">
               {ticker}
             </h3>
             <p className="text-xs text-text-tertiary truncate">{name}</p>
@@ -158,25 +167,27 @@ export function RadarCard({
             Add to Watchlist
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" sideOffset={4}>
-            {watchlists.length === 0 ? (
-              <DropdownMenuLabel>No watchlists created</DropdownMenuLabel>
-            ) : (
-              <>
-                <DropdownMenuLabel>Add to...</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {watchlists.map((w) => (
-                  <DropdownMenuItem
-                    key={w.id}
-                    onClick={() => handleAddToWatchlist(w.id)}
-                  >
-                    {w.name}
-                    <span className="ml-auto text-xs text-text-tertiary">
-                      {w.items.length}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-              </>
-            )}
+            <DropdownMenuGroup>
+              {watchlists.length === 0 ? (
+                <DropdownMenuLabel>No watchlists created</DropdownMenuLabel>
+              ) : (
+                <>
+                  <DropdownMenuLabel>Add to...</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {watchlists.map((w) => (
+                    <DropdownMenuItem
+                      key={w.id}
+                      onClick={() => handleAddToWatchlist(w.id)}
+                    >
+                      {w.name}
+                      <span className="ml-auto text-xs text-text-tertiary">
+                        {w.items.length}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

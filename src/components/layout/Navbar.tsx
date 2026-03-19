@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Leaf, Menu } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,8 +61,9 @@ export function Navbar() {
         {/* Right side */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          {/* Avatar placeholder */}
-          <div className="hidden md:block h-8 w-8 rounded-full bg-bg-tertiary" />
+          <div className="hidden md:block">
+            <UserButton />
+          </div>
 
           {/* Mobile hamburger */}
           <Sheet>

@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
+import { quoteCache } from "@/lib/cache";
 
 const yf = new YahooFinance();
 
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=30, stale-while-revalidate=30",
+};
+
 async function fetchSingleQuote(ticker: string) {
+  const cached = quoteCache.get(ticker);
+  if (cached) return cached;
   try {
     const summary = await yf.quoteSummary(ticker, {
       modules: ["price", "assetProfile"],
@@ -12,7 +19,7 @@ async function fetchSingleQuote(ticker: string) {
     const price = summary.price;
     const profile = summary.assetProfile;
 
-    return {
+    const data = {
       ticker: price?.symbol ?? ticker,
       name: price?.shortName ?? price?.longName ?? ticker,
       currentPrice: price?.regularMarketPrice ?? 0,
@@ -26,12 +33,15 @@ async function fetchSingleQuote(ticker: string) {
       fiftyTwoWeekHigh: undefined,
       fiftyTwoWeekLow: undefined,
       sector: profile?.sector ?? undefined,
+      website: profile?.website ?? undefined,
       currency: price?.currency ?? "USD",
     };
+    quoteCache.set(ticker, data);
+    return data;
   } catch {
     // Fallback to quote() for indices and unsupported tickers
     const result = await yf.quote(ticker);
-    return {
+    const data = {
       ticker: result.symbol,
       name: result.shortName ?? result.longName ?? result.symbol,
       currentPrice: result.regularMarketPrice ?? 0,
@@ -45,6 +55,8 @@ async function fetchSingleQuote(ticker: string) {
       sector: undefined,
       currency: result.currency ?? "USD",
     };
+    quoteCache.set(ticker, data);
+    return data;
   }
 }
 
@@ -82,7 +94,7 @@ export async function GET(request: NextRequest) {
       )
       .map((r) => r.value);
 
-    return NextResponse.json(quotes);
+    return NextResponse.json(quotes, { headers: CACHE_HEADERS });
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch quotes" },

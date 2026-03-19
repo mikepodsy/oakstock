@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
+import { financialsCache } from "@/lib/cache";
 
 const yf = new YahooFinance();
+
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=900, stale-while-revalidate=900",
+};
 
 const RATING_MAP: Record<string, string> = {
   strong_buy: "Strong Buy",
@@ -36,6 +41,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const cached = financialsCache.get(ticker);
+  if (cached) {
+    return NextResponse.json(cached, { headers: CACHE_HEADERS });
+  }
+
   try {
     const summary = await yf.quoteSummary(ticker, {
       modules: ["defaultKeyStatistics", "financialData", "assetProfile"],
@@ -45,7 +55,7 @@ export async function GET(request: NextRequest) {
     const fin = summary.financialData;
     const profile = summary.assetProfile;
 
-    return NextResponse.json({
+    const data = {
       ticker,
       peRatio: stats?.trailingPE ?? null,
       eps: stats?.trailingEps ?? null,
@@ -60,7 +70,9 @@ export async function GET(request: NextRequest) {
       analystRating: formatRating(fin?.recommendationKey),
       targetPrice: fin?.targetMeanPrice ?? null,
       website: extractDomain(profile?.website),
-    });
+    };
+    financialsCache.set(ticker, data);
+    return NextResponse.json(data, { headers: CACHE_HEADERS });
   } catch {
     return NextResponse.json(
       { error: `Failed to fetch financials for ${ticker}` },

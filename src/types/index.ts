@@ -129,6 +129,29 @@ export interface RebalanceSuggestion {
   reasoning: string;
 }
 
+// ─── Fundamentals Time Series ────────────────────────
+export interface FinancialStatement {
+  date: string;
+  revenue: number | null;
+  ebitda: number | null;
+  freeCashFlow: number | null;
+  netIncome: number | null;
+  grossProfit: number | null;
+  operatingIncome: number | null;
+  costOfRevenue: number | null;
+  eps: number | null;
+  buybacks: number | null;
+  dividendsPaid: number | null;
+  totalDebt: number | null;
+  stockholdersEquity: number | null;
+}
+
+export interface FundamentalsData {
+  ticker: string;
+  quarterly: FinancialStatement[];
+  annual: FinancialStatement[];
+}
+
 // ─── Economic Calendar ───────────────────────────────
 export interface CalendarEvent {
   date: string;

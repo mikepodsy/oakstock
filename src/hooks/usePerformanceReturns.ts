@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchHistory } from "@/services/yahooFinance";
+import { fetchHistoryBatch } from "@/services/yahooFinance";
 import type { PerformanceReturns, PerformancePeriod } from "@/types";
 
 const PERIOD_API_MAP: Record<PerformancePeriod, string> = {
@@ -33,25 +33,27 @@ export function usePerformanceReturns(
     setLoading(true);
 
     async function compute() {
-      const results = await Promise.all(
-        PERIODS.map(async (period): Promise<[PerformancePeriod, number | null]> => {
-          try {
-            const data = await fetchHistory(ticker, PERIOD_API_MAP[period]);
-            if (!data || data.length === 0) return [period, null];
-            const firstClose = data[0].close;
-            if (!firstClose || firstClose <= 0) return [period, null];
-            return [period, ((currentPrice - firstClose) / firstClose) * 100];
-          } catch {
-            return [period, null];
-          }
-        })
-      );
+      try {
+        const apiPeriods = PERIODS.map((p) => PERIOD_API_MAP[p]);
+        const batchData = await fetchHistoryBatch(ticker, apiPeriods);
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      const map = Object.fromEntries(results) as PerformanceReturns;
-      setReturns(map);
-      setLoading(false);
+        const results: [PerformancePeriod, number | null][] = PERIODS.map((period) => {
+          const data = batchData[PERIOD_API_MAP[period]];
+          if (!data || data.length === 0) return [period, null];
+          const firstClose = data[0].close;
+          if (!firstClose || firstClose <= 0) return [period, null];
+          return [period, ((currentPrice - firstClose) / firstClose) * 100];
+        });
+
+        const map = Object.fromEntries(results) as PerformanceReturns;
+        setReturns(map);
+      } catch {
+        if (!cancelled) setReturns(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
     compute();

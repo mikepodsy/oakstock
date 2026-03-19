@@ -1,4 +1,4 @@
-import type { QuoteData, HistoricalDataPoint, FinancialData } from "@/types";
+import type { QuoteData, HistoricalDataPoint, FinancialData, FundamentalsData } from "@/types";
 
 export async function fetchQuote(ticker: string): Promise<QuoteData> {
   const res = await fetch(`/api/quote?ticker=${encodeURIComponent(ticker)}`);
@@ -37,8 +37,25 @@ export async function fetchHistory(
   return res.json();
 }
 
+export async function fetchHistoryBatch(
+  ticker: string,
+  periods: string[]
+): Promise<Record<string, HistoricalDataPoint[]>> {
+  const res = await fetch(
+    `/api/history/batch?ticker=${encodeURIComponent(ticker)}&periods=${periods.join(",")}`
+  );
+  if (!res.ok) throw new Error(`Failed to fetch batch history for ${ticker}`);
+  return res.json();
+}
+
 export async function fetchFinancials(ticker: string): Promise<FinancialData> {
   const res = await fetch(`/api/financials?ticker=${encodeURIComponent(ticker)}`);
   if (!res.ok) throw new Error(`Failed to fetch financials for ${ticker}`);
+  return res.json();
+}
+
+export async function fetchFundamentals(ticker: string): Promise<FundamentalsData> {
+  const res = await fetch(`/api/fundamentals?ticker=${encodeURIComponent(ticker)}`);
+  if (!res.ok) throw new Error(`Failed to fetch fundamentals for ${ticker}`);
   return res.json();
 }

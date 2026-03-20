@@ -152,10 +152,51 @@ export interface FundamentalsData {
   annual: FinancialStatement[];
 }
 
-// ─── Economic Calendar ───────────────────────────────
-export interface CalendarEvent {
+// ─── Calendar ───────────────────────────────────────
+export type CalendarType = 'earnings' | 'dividends' | 'economic' | 'ipo';
+
+export interface EarningsEvent {
   date: string;
-  title: string;
-  type: "earnings" | "rate_decision" | "economic_data";
-  relevantTicker?: string;
+  symbol: string;
+  company: string;
+  epsEstimated: number | null;
+  epsActual: number | null;
+  revenueEstimated: number | null;
+  revenueActual: number | null;
+  time: 'bmo' | 'amc' | null;
+  isPortfolioStock: boolean;
 }
+
+export interface DividendEvent {
+  date: string;
+  symbol: string;
+  company: string;
+  dividend: number;
+  yield: number | null;
+  paymentDate: string | null;
+  recordDate: string | null;
+  isPortfolioStock: boolean;
+}
+
+export interface EconomicEvent {
+  date: string;
+  event: string;
+  country: string;
+  previous: number | null;
+  forecast: number | null;
+  actual: number | null;
+  impact: 'High' | 'Medium' | 'Low';
+}
+
+export interface IpoEvent {
+  date: string;
+  symbol: string;
+  company: string;
+  exchange: string;
+  priceRange: string | null;
+  sharesOffered: number | null;
+  marketCap: number | null;
+  isPortfolioStock: boolean;
+}
+
+export type CalendarEvent = EarningsEvent | DividendEvent | EconomicEvent | IpoEvent;

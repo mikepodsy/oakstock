@@ -198,10 +198,17 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-aspekta), sans-serif;
   }
-  html {
-    @apply font-sans;
+  button, input, select, textarea {
+    font-family: inherit;
   }
+}
+
+/* ─── Force Aspekta on Recharts SVG text ─────────── */
+.recharts-wrapper text,
+.recharts-wrapper .recharts-text {
+  font-family: var(--font-aspekta), sans-serif;
 }
 
 /* ─── Typography utilities ────────────────────────── */

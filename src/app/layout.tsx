@@ -30,7 +30,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className="dark" suppressHydrationWarning>
         <body
-          className={`${aspekta.variable} antialiased`}
+          className={`${aspekta.variable} ${aspekta.className} antialiased`}
         >
           <ThemeProvider>
             <DataProvider>

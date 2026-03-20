@@ -6,6 +6,7 @@ import { DataProvider } from "@/components/layout/DataProvider";
 import { Navbar } from "@/components/layout/Navbar";
 import { MarketOverviewBar } from "@/components/layout/MarketOverviewBar";
 import { Toaster } from "@/components/ui/sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({
@@ -43,6 +44,7 @@ export default function RootLayout({
               <MarketOverviewBar />
               <main className="min-h-[calc(100vh-104px)]">{children}</main>
               <Toaster />
+              <SpeedInsights />
             </DataProvider>
           </ThemeProvider>
         </body>

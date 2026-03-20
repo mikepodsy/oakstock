@@ -6,8 +6,8 @@
 
 @theme inline {
   /* Font families */
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-inter);
+  --font-sans: var(--font-barlow);
+  --font-mono: var(--font-barlow);
 
   /* shadcn color mappings */
   --color-background: var(--background);
@@ -206,11 +206,11 @@
 
 /* ─── Typography utilities ────────────────────────── */
 .font-display {
-  font-family: var(--font-inter), sans-serif;
+  font-family: var(--font-barlow), sans-serif;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
 .font-financial {
-  font-family: var(--font-inter), sans-serif;
+  font-family: var(--font-barlow), sans-serif;
 }

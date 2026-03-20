@@ -36,7 +36,7 @@ export function Navbar() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <Leaf className="h-6 w-6 text-green-primary" />
-            <span className="font-display text-lg text-text-primary">
+            <span className="font-display text-xl text-text-primary">
               OAKSTOCK
             </span>
           </Link>
@@ -47,7 +47,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                className={`px-3 py-2 text-base font-medium transition-colors duration-150 ${
                   isActive(link.href)
                     ? "text-green-primary border-b-2 border-green-primary"
                     : "text-text-secondary hover:text-text-primary"
@@ -90,7 +90,7 @@ export function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    className={`px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                       isActive(link.href)
                         ? "text-green-primary bg-green-muted"
                         : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"

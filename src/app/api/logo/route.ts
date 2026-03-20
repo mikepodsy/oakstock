@@ -41,9 +41,10 @@ export async function GET(req: NextRequest) {
 
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    // Cache to disk
-    await fs.mkdir(CACHE_DIR, { recursive: true });
-    await fs.writeFile(cachePath, buffer);
+    // Best-effort cache to disk (fails silently on read-only filesystems like Vercel)
+    fs.mkdir(CACHE_DIR, { recursive: true })
+      .then(() => fs.writeFile(cachePath, buffer))
+      .catch(() => {});
 
     return new NextResponse(buffer, {
       headers: {

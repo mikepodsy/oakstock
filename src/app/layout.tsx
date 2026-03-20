@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
+import localFont from "next/font/local";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { DataProvider } from "@/components/layout/DataProvider";
@@ -9,6 +9,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
+const aspekta = localFont({
+  src: "../../public/fonts/AspektaVF.woff2",
+  variable: "--font-aspekta",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Oakstock — Portfolio Intelligence",
@@ -25,7 +30,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className="dark" suppressHydrationWarning>
         <body
-          className={`${GeistSans.variable} antialiased`}
+          className={`${aspekta.variable} antialiased`}
         >
           <ThemeProvider>
             <DataProvider>

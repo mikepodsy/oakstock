@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Leaf, Menu } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
+import { SearchBar } from "./SearchBar";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -60,6 +61,7 @@ export function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <SearchBar />
           <ThemeToggle />
           <div className="hidden md:block">
             <UserButton />

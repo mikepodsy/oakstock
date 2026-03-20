@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Barlow } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { DataProvider } from "@/components/layout/DataProvider";
@@ -9,11 +9,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
-const barlow = Barlow({
-  variable: "--font-barlow",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Oakstock — Portfolio Intelligence",
@@ -30,7 +25,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className="dark" suppressHydrationWarning>
         <body
-          className={`${barlow.variable} antialiased`}
+          className={`${GeistSans.variable} antialiased`}
         >
           <ThemeProvider>
             <DataProvider>

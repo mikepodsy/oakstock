@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import type { HoldingWithQuote } from "@/types";
 import { formatCurrency, formatPercent, formatDate } from "@/utils/formatters";
@@ -134,6 +135,7 @@ function HoldingRow({
   onRemoveHolding: () => void;
   onRemoveLot: (lotId: string) => void;
 }) {
+  const router = useRouter();
   const h = holding;
   const glColor = h.gainLoss >= 0 ? "text-green-primary" : "text-red-primary";
   const dcColor =
@@ -153,8 +155,14 @@ function HoldingRow({
           )}
         </td>
         <td className="px-3 py-3">
-          <div>
-            <span className="font-financial font-medium text-text-primary">
+          <div
+            className="cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/stock/${h.ticker}`);
+            }}
+          >
+            <span className="font-financial font-medium text-text-primary hover:text-green-primary transition-colors">
               {h.ticker}
             </span>
             <span className="block text-xs text-text-tertiary truncate max-w-[140px]">

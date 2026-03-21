@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { href: "/watchlist", label: "Watchlist" },
   { href: "/radar", label: "Radar" },
   { href: "/calendar", label: "Calendar" },
+  { href: "/dcf", label: "DCF" },
   { href: "/rebalance", label: "Rebalance" },
 ];
 

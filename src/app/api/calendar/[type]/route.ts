@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { calendarCache } from "@/lib/cache";
 
-const FMP_BASE = "https://financialmodelingprep.com/api/v3";
+const FMP_BASE = "https://financialmodelingprep.com/stable";
 const VALID_TYPES = ["earnings", "dividends", "economic", "ipo"] as const;
 
 const ENDPOINT_MAP: Record<string, string> = {
-  earnings: "earning_calendar",
-  dividends: "stock_dividend_calendar",
-  economic: "economic_calendar",
-  ipo: "ipo_calendar",
+  earnings: "earnings-calendar",
+  dividends: "dividends-calendar",
+  economic: "economic-calendar",
+  ipo: "ipos-calendar",
 };
 
 const CACHE_HEADERS = {
@@ -32,10 +32,10 @@ function normalizeEarnings(items: Record<string, unknown>[]) {
     symbol: item.symbol as string,
     company: (item.symbol as string) ?? "",
     epsEstimated: item.epsEstimated != null ? Number(item.epsEstimated) : null,
-    epsActual: item.eps != null ? Number(item.eps) : null,
+    epsActual: item.epsActual != null ? Number(item.epsActual) : null,
     revenueEstimated: item.revenueEstimated != null ? Number(item.revenueEstimated) : null,
-    revenueActual: item.revenue != null ? Number(item.revenue) : null,
-    time: item.updatedFromDate ? "bmo" : null,
+    revenueActual: item.revenueActual != null ? Number(item.revenueActual) : null,
+    time: null,
     isPortfolioStock: false,
   }));
 }
@@ -44,9 +44,9 @@ function normalizeDividends(items: Record<string, unknown>[]) {
   return items.map((item) => ({
     date: item.date as string,
     symbol: item.symbol as string,
-    company: (item.label as string) ?? (item.symbol as string) ?? "",
+    company: (item.symbol as string) ?? "",
     dividend: Number(item.dividend ?? item.adjDividend ?? 0),
-    yield: null,
+    yield: item.yield != null ? Number(item.yield) : null,
     paymentDate: (item.paymentDate as string) ?? null,
     recordDate: (item.recordDate as string) ?? null,
     isPortfolioStock: false,

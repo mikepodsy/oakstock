@@ -200,3 +200,29 @@ export interface IpoEvent {
 }
 
 export type CalendarEvent = EarningsEvent | DividendEvent | EconomicEvent | IpoEvent;
+
+// ─── DCF Calculator ──────────────────────────────────
+export interface DcfInputs {
+  startingFcf: number;
+  phase1Years: number;
+  phase1GrowthRate: number; // decimal (0.20 = 20%)
+  phase2Years: number;
+  phase2GrowthRate: number;
+  terminalGrowthRate: number;
+  discountRate: number; // WACC
+  totalDebt: number;
+  sharesOutstanding: number;
+}
+
+export interface DcfResult {
+  intrinsicValuePerShare: number;
+  enterpriseValue: number;
+  equityValue: number;
+  projectedFcf: Array<{ year: number; fcf: number }>;
+}
+
+export interface SensitivityCell {
+  growthRate: number;
+  discountRate: number;
+  intrinsicValue: number;
+}

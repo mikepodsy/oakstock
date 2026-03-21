@@ -3,11 +3,21 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const CHART_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
+  "#7c3aed", // violet
+  "#06b6d4", // cyan
+  "#10b981", // emerald
+  "#f43f5e", // rose
+  "#3b82f6", // blue
+  "#f59e0b", // amber
+  "#8b5cf6", // purple
+  "#14b8a6", // teal
+  "#ec4899", // pink
+  "#6366f1", // indigo
+  "#84cc16", // lime
+  "#0ea5e9", // sky
+  "#d946ef", // fuchsia
+  "#22d3ee", // cyan-light
+  "#a78bfa", // violet-light
 ];
 
 interface SectorBreakdownProps {
@@ -37,6 +47,36 @@ function SectorTooltip({
   );
 }
 
+function PieLabel(props: {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  percent?: number;
+}) {
+  const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 } = props;
+  if (percent < 0.03) return null;
+
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs font-financial"
+      fill="white"
+    >
+      {`${(percent * 100).toFixed(1)}%`}
+    </text>
+  );
+}
+
 export function SectorBreakdown({
   holdings,
   totalValue,
@@ -58,23 +98,27 @@ export function SectorBreakdown({
     }))
     .sort((a, b) => b.value - a.value);
 
+  const maxPercent = chartData[0]?.percent ?? 100;
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <h3 className="font-display text-base text-text-primary mb-4 text-center">
+    <div>
+      <h3 className="font-display text-base text-text-primary mb-4">
         Sectors
       </h3>
       <div className="flex items-center justify-center gap-10">
-        <div className="w-[280px] h-[280px] flex-shrink-0">
+        <div className="w-[320px] h-[320px] flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={70}
-                outerRadius={120}
+                innerRadius={75}
+                outerRadius={140}
                 dataKey="value"
                 nameKey="sector"
+                label={PieLabel}
+                labelLine={false}
                 isAnimationActive={true}
                 animationDuration={800}
               >
@@ -90,10 +134,10 @@ export function SectorBreakdown({
           </ResponsiveContainer>
         </div>
 
-        {/* Legend list */}
-        <div className="min-w-[140px] space-y-2 max-h-[280px] overflow-y-auto">
+        {/* Legend list with percentage bars */}
+        <div className="min-w-[240px] space-y-2.5 max-h-[320px] overflow-y-auto pr-2">
           {chartData.map((item, index) => (
-            <div key={item.sector} className="flex items-center gap-2 text-sm">
+            <div key={item.sector} className="flex items-center gap-2.5 text-sm">
               <span
                 className="w-3 h-3 rounded-full flex-shrink-0"
                 style={{
@@ -101,12 +145,22 @@ export function SectorBreakdown({
                     CHART_COLORS[index % CHART_COLORS.length],
                 }}
               />
-              <span className="text-text-primary font-financial truncate">
+              <span className="text-text-primary font-financial truncate min-w-0">
                 {item.sector}
               </span>
-              <span className="ml-auto text-text-secondary font-financial flex-shrink-0">
+              <span className="text-text-primary font-financial flex-shrink-0 tabular-nums w-[48px] text-right">
                 {item.percent.toFixed(1)}%
               </span>
+              <div className="w-[80px] h-2 bg-bg-tertiary rounded-full flex-shrink-0 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(item.percent / maxPercent) * 100}%`,
+                    backgroundColor:
+                      CHART_COLORS[index % CHART_COLORS.length],
+                  }}
+                />
+              </div>
             </div>
           ))}
         </div>

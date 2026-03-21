@@ -16,6 +16,7 @@ import { AddHoldingModal } from "@/components/portfolio/AddHoldingModal";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { AllocationDonut } from "@/components/charts/AllocationDonut";
 import { SectorBreakdown } from "@/components/charts/SectorBreakdown";
+import { PortfolioMetricsCard } from "@/components/portfolio/PortfolioMetricsCard";
 import { CreatePortfolioDialog } from "@/components/dashboard/CreatePortfolioDialog";
 import { DeletePortfolioDialog } from "@/components/dashboard/DeletePortfolioDialog";
 import { BenchmarkSelect } from "@/components/shared/BenchmarkSelect";
@@ -273,6 +274,11 @@ export default function PortfolioPage() {
           <HoldingsTable
             holdings={holdingsWithQuotes}
             portfolioId={portfolio.id}
+          />
+
+          <PortfolioMetricsCard
+            chartData={chartData}
+            loading={chartLoading}
           />
 
           {/* Allocation & Sectors below holdings */}

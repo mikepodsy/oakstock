@@ -1,4 +1,4 @@
-import type { Holding, Lot, HoldingWithQuote, QuoteData } from "@/types";
+import type { Holding, Lot, HoldingWithQuote, QuoteData, PortfolioChartPoint } from "@/types";
 
 export function totalShares(lots: Lot[]): number {
   return lots.reduce((sum, lot) => sum + lot.shares, 0);
@@ -66,4 +66,110 @@ export function portfolioTotals(holdings: HoldingWithQuote[]) {
     totalDayChange,
     totalDayChangePercent,
   };
+}
+
+// ─── Portfolio Metrics ──────────────────────────────
+
+export interface PortfolioMetrics {
+  beta: number | null;
+  sharpeRatio: number | null;
+  sortinoRatio: number | null;
+}
+
+function dailyReturns(values: number[]): number[] {
+  const returns: number[] = [];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i - 1] !== 0) {
+      returns.push((values[i] - values[i - 1]) / values[i - 1]);
+    }
+  }
+  return returns;
+}
+
+function mean(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  return arr.reduce((s, v) => s + v, 0) / arr.length;
+}
+
+function stdDev(arr: number[]): number {
+  if (arr.length < 2) return 0;
+  const m = mean(arr);
+  const variance = arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1);
+  return Math.sqrt(variance);
+}
+
+function covariance(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  if (n < 2) return 0;
+  const ma = mean(a.slice(0, n));
+  const mb = mean(b.slice(0, n));
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    sum += (a[i] - ma) * (b[i] - mb);
+  }
+  return sum / (n - 1);
+}
+
+const ANNUAL_RISK_FREE_RATE = 0.045; // ~4.5% (approx 3-month T-bill)
+const TRADING_DAYS_PER_YEAR = 252;
+
+export function calculatePortfolioMetrics(
+  chartData: PortfolioChartPoint[]
+): PortfolioMetrics {
+  if (chartData.length < 10) {
+    return { beta: null, sharpeRatio: null, sortinoRatio: null };
+  }
+
+  const portfolioValues = chartData.map((p) => p.portfolioValue);
+  const pReturns = dailyReturns(portfolioValues);
+
+  if (pReturns.length < 5) {
+    return { beta: null, sharpeRatio: null, sortinoRatio: null };
+  }
+
+  const dailyRf = ANNUAL_RISK_FREE_RATE / TRADING_DAYS_PER_YEAR;
+
+  // Beta: Cov(portfolio, benchmark) / Var(benchmark)
+  let beta: number | null = null;
+  const benchmarkValues = chartData
+    .map((p) => p.benchmarkValue)
+    .filter((v): v is number => v !== null);
+
+  if (benchmarkValues.length >= 10) {
+    const bReturns = dailyReturns(benchmarkValues);
+    const minLen = Math.min(pReturns.length, bReturns.length);
+    if (minLen >= 5) {
+      const pSlice = pReturns.slice(pReturns.length - minLen);
+      const bSlice = bReturns.slice(bReturns.length - minLen);
+      const bVar = stdDev(bSlice) ** 2;
+      if (bVar > 0) {
+        beta = covariance(pSlice, bSlice) / bVar;
+      }
+    }
+  }
+
+  // Sharpe: (annualized return - risk free) / annualized volatility
+  const meanReturn = mean(pReturns);
+  const vol = stdDev(pReturns);
+  let sharpeRatio: number | null = null;
+  if (vol > 0) {
+    const excessReturn = meanReturn - dailyRf;
+    sharpeRatio = (excessReturn / vol) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+  }
+
+  // Sortino: same as Sharpe but uses downside deviation
+  const downsideReturns = pReturns.filter((r) => r < dailyRf);
+  let sortinoRatio: number | null = null;
+  if (downsideReturns.length > 1) {
+    const downsideVar =
+      downsideReturns.reduce((s, r) => s + (r - dailyRf) ** 2, 0) /
+      (downsideReturns.length - 1);
+    const downsideDev = Math.sqrt(downsideVar);
+    if (downsideDev > 0) {
+      const excessReturn = meanReturn - dailyRf;
+      sortinoRatio = (excessReturn / downsideDev) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    }
+  }
+
+  return { beta, sharpeRatio, sortinoRatio };
 }

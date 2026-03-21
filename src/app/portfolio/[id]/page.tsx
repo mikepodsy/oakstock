@@ -18,6 +18,7 @@ import { AddHoldingModal } from "@/components/portfolio/AddHoldingModal";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { AllocationDonut } from "@/components/charts/AllocationDonut";
 import { SectorBreakdown } from "@/components/charts/SectorBreakdown";
+import { PortfolioMetricsCard } from "@/components/portfolio/PortfolioMetricsCard";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
@@ -145,6 +146,11 @@ export default function PortfolioDetailPage() {
       <HoldingsTable
         holdings={holdingsWithQuotes}
         portfolioId={portfolio.id}
+      />
+
+      <PortfolioMetricsCard
+        chartData={chartData}
+        loading={chartLoading}
       />
 
       <div className="space-y-6 mt-6 max-w-[660px] mx-auto">

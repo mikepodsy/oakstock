@@ -16,6 +16,7 @@ import {
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/watchlist", label: "Watchlist" },
   { href: "/radar", label: "Radar" },
   { href: "/calendar", label: "Calendar" },
@@ -28,6 +29,7 @@ export function Navbar() {
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
+    if (href === "/portfolio") return pathname === "/portfolio";
     return pathname.startsWith(href);
   }
 

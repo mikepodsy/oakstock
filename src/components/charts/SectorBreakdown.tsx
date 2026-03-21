@@ -69,7 +69,7 @@ function ChartTooltip({
   payload?: Array<{
     name: string;
     value: number;
-    payload: { label: string; value: number; percent: number };
+    payload: { label: string; value: number; pct: number };
   }>;
 }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -78,7 +78,7 @@ function ChartTooltip({
   return (
     <div className="rounded-lg border border-border-primary bg-bg-elevated px-3 py-2 shadow-lg">
       <p className="text-xs font-financial text-text-primary">{data.label}</p>
-      <p className="text-xs text-text-secondary">{data.percent.toFixed(1)}%</p>
+      <p className="text-xs text-text-secondary">{data.pct.toFixed(1)}%</p>
     </div>
   );
 }
@@ -132,7 +132,7 @@ function groupBy(
     .map(([label, value]) => ({
       label,
       value,
-      percent: (value / totalValue) * 100,
+      pct: (value / totalValue) * 100,
       holdings: (holdingsMap.get(label) ?? []).sort((a, b) => b.marketValue - a.marketValue),
     }))
     .sort((a, b) => b.value - a.value);
@@ -167,7 +167,7 @@ export function SectorBreakdown({
 
   if (holdings.length === 0 || totalValue === 0) return null;
 
-  const maxPercent = chartData[0]?.percent ?? 100;
+  const maxPct = chartData[0]?.pct ?? 100;
 
   return (
     <div>
@@ -236,7 +236,7 @@ export function SectorBreakdown({
                     {item.label}
                   </span>
                   <span className="text-text-primary font-financial flex-shrink-0 tabular-nums w-[48px] text-right">
-                    {item.percent.toFixed(1)}%
+                    {item.pct.toFixed(1)}%
                   </span>
                   <button
                     onClick={() => toggleGroup(item.label)}

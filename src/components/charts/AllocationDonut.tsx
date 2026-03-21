@@ -23,7 +23,7 @@ function DonutTooltip({
   payload?: Array<{
     name: string;
     value: number;
-    payload: { ticker: string; name: string; marketValue: number; percent: number };
+    payload: { ticker: string; name: string; marketValue: number; pct: number };
   }>;
 }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -35,7 +35,7 @@ function DonutTooltip({
         {data.ticker} &middot; {data.name}
       </p>
       <p className="text-xs text-text-secondary">
-        {formatCurrency(data.marketValue)} ({formatPercent(data.percent)})
+        {formatCurrency(data.marketValue)} ({formatPercent(data.pct)})
       </p>
     </div>
   );
@@ -84,7 +84,7 @@ export function AllocationDonut({
       name: h.name,
       website: h.website,
       marketValue: h.marketValue,
-      percent: (h.marketValue / totalValue) * 100,
+      pct: (h.marketValue / totalValue) * 100,
     }))
     .sort((a, b) => b.marketValue - a.marketValue);
 
@@ -142,7 +142,7 @@ export function AllocationDonut({
                 {item.name}
               </span>
               <span className="ml-auto text-sm text-text-primary font-financial flex-shrink-0 tabular-nums">
-                {item.percent.toFixed(2)}%
+                {item.pct.toFixed(2)}%
               </span>
             </div>
           ))}

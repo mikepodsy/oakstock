@@ -6,6 +6,7 @@ import {
   Cpu, ShoppingCart, Factory, Stethoscope, Banknote,
   Zap, MessageSquare, Building2, Pickaxe, Wheat,
   Globe, HelpCircle, Landmark, DollarSign, Coins,
+  ChevronDown,
 } from "lucide-react";
 
 const CHART_COLORS = [
@@ -47,8 +48,16 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "currencies", label: "Currencies" },
 ];
 
+interface HoldingItem {
+  ticker: string;
+  name: string;
+  sector: string | undefined;
+  currency: string;
+  marketValue: number;
+}
+
 interface SectorBreakdownProps {
-  holdings: { sector: string | undefined; currency: string; marketValue: number }[];
+  holdings: HoldingItem[];
   totalValue: number;
 }
 
@@ -105,26 +114,26 @@ function PieLabel(props: {
 }
 
 function groupBy(
-  holdings: SectorBreakdownProps["holdings"],
+  holdings: HoldingItem[],
   totalValue: number,
   key: TabKey
 ) {
-  const map = new Map<string, number>();
+  const valueMap = new Map<string, number>();
+  const holdingsMap = new Map<string, { ticker: string; name: string; marketValue: number }[]>();
   for (const h of holdings) {
-    let group: string;
-    if (key === "sectors") {
-      group = h.sector ?? "Unknown";
-    } else {
-      group = h.currency ?? "Unknown";
-    }
-    map.set(group, (map.get(group) ?? 0) + h.marketValue);
+    const group = key === "sectors" ? (h.sector ?? "Unknown") : (h.currency ?? "Unknown");
+    valueMap.set(group, (valueMap.get(group) ?? 0) + h.marketValue);
+    const list = holdingsMap.get(group) ?? [];
+    list.push({ ticker: h.ticker, name: h.name, marketValue: h.marketValue });
+    holdingsMap.set(group, list);
   }
 
-  return Array.from(map.entries())
+  return Array.from(valueMap.entries())
     .map(([label, value]) => ({
       label,
       value,
       percent: (value / totalValue) * 100,
+      holdings: (holdingsMap.get(label) ?? []).sort((a, b) => b.marketValue - a.marketValue),
     }))
     .sort((a, b) => b.value - a.value);
 }
@@ -140,6 +149,16 @@ export function SectorBreakdown({
   totalValue,
 }: SectorBreakdownProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sectors");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGroup(label: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
 
   const chartData = useMemo(
     () => groupBy(holdings, totalValue, activeTab),
@@ -199,37 +218,55 @@ export function SectorBreakdown({
         </div>
 
         {/* Legend list with icons and percentage bars */}
-        <div className="w-[280px] flex-shrink-0 space-y-2 max-h-[340px] overflow-y-auto pr-2">
-          {chartData.map((item, index) => (
-            <div key={item.label} className="flex items-center gap-2.5 text-sm">
-              <span
-                className="flex-shrink-0 text-text-secondary"
-              >
-                {getIcon(activeTab, item.label)}
-              </span>
-              <span
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{
-                  backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
-                }}
-              />
-              <span className="text-text-primary font-financial truncate min-w-0">
-                {item.label}
-              </span>
-              <span className="text-text-primary font-financial flex-shrink-0 tabular-nums w-[48px] text-right">
-                {item.percent.toFixed(1)}%
-              </span>
-              <div className="w-[80px] h-2 bg-bg-tertiary rounded-full flex-shrink-0 overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${(item.percent / maxPercent) * 100}%`,
-                    backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
-                  }}
-                />
+        <div className="w-[280px] flex-shrink-0 space-y-1 max-h-[340px] overflow-y-auto pr-2">
+          {chartData.map((item, index) => {
+            const isExpanded = expandedGroups.has(item.label);
+            const color = CHART_COLORS[index % CHART_COLORS.length];
+            return (
+              <div key={item.label}>
+                <div className="flex items-center gap-2.5 text-sm">
+                  <span className="flex-shrink-0 text-text-secondary">
+                    {getIcon(activeTab, item.label)}
+                  </span>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="text-text-primary font-financial truncate min-w-0">
+                    {item.label}
+                  </span>
+                  <span className="text-text-primary font-financial flex-shrink-0 tabular-nums w-[48px] text-right">
+                    {item.percent.toFixed(1)}%
+                  </span>
+                  <button
+                    onClick={() => toggleGroup(item.label)}
+                    className="flex-shrink-0 text-text-tertiary hover:text-text-primary transition-colors p-0.5"
+                  >
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </div>
+                {isExpanded && (
+                  <div className="ml-[26px] mt-1 mb-1 space-y-0.5">
+                    {item.holdings.map((h) => (
+                      <div
+                        key={h.ticker}
+                        className="flex items-center gap-2 text-xs text-text-secondary font-financial"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color, opacity: 0.5 }} />
+                        <span className="font-medium text-text-primary flex-shrink-0">{h.ticker}</span>
+                        <span className="truncate min-w-0">{h.name}</span>
+                        <span className="ml-auto flex-shrink-0 tabular-nums">
+                          {((h.marketValue / totalValue) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

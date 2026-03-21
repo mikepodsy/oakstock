@@ -56,20 +56,20 @@ export function AllocationDonut({
     .sort((a, b) => b.marketValue - a.marketValue);
 
   return (
-    <div>
-      <h3 className="font-display text-base text-text-primary mb-4">
+    <div className="max-w-2xl mx-auto">
+      <h3 className="font-display text-base text-text-primary mb-4 text-center">
         Allocation
       </h3>
-      <div className="flex items-center gap-6">
-        <div className="w-[200px] h-[200px] flex-shrink-0">
+      <div className="flex items-center justify-center gap-10">
+        <div className="w-[280px] h-[280px] flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={50}
-                outerRadius={85}
+                innerRadius={70}
+                outerRadius={120}
                 dataKey="marketValue"
                 nameKey="ticker"
                 isAnimationActive={true}
@@ -88,7 +88,7 @@ export function AllocationDonut({
                 y="50%"
                 textAnchor="middle"
                 dominantBaseline="central"
-                className="text-sm font-financial"
+                className="text-base font-financial"
                 fill="var(--text-primary)"
               >
                 {formatCurrency(totalValue)}
@@ -98,11 +98,11 @@ export function AllocationDonut({
         </div>
 
         {/* Legend list */}
-        <div className="flex-1 min-w-0 space-y-1.5 max-h-[200px] overflow-y-auto">
+        <div className="min-w-[140px] space-y-2 max-h-[280px] overflow-y-auto">
           {chartData.map((item, index) => (
             <div key={item.ticker} className="flex items-center gap-2 text-sm">
               <span
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                className="w-3 h-3 rounded-full flex-shrink-0"
                 style={{
                   backgroundColor:
                     CHART_COLORS[index % CHART_COLORS.length],

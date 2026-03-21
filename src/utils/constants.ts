@@ -6,6 +6,34 @@ export const DEFAULT_BENCHMARKS = [
   "^GSPTSE",
 ] as const;
 
+export const BENCHMARK_GROUPS = [
+  {
+    label: "US",
+    items: [
+      { ticker: "SPY", name: "S&P 500" },
+      { ticker: "QQQ", name: "NASDAQ 100" },
+      { ticker: "IWM", name: "Russell 2000" },
+    ],
+  },
+  {
+    label: "World",
+    items: [
+      { ticker: "ISF.L", name: "FTSE 100" },
+      { ticker: "^GSPTSE", name: "TSX Composite Total Return" },
+      { ticker: "CDZ.TO", name: "TSX Dividend Aristocrats" },
+      { ticker: "EXS1.DE", name: "DAX 40" },
+      { ticker: "EWQ", name: "CAC 40" },
+      { ticker: "1329.T", name: "Nikkei 225" },
+      { ticker: "MCHI", name: "SSE Composite" },
+      { ticker: "VT", name: "FTSE Global All Cap" },
+      { ticker: "URTH", name: "MSCI World" },
+      { ticker: "EEM", name: "MSCI Emerging" },
+      { ticker: "NSEI", name: "India Nifty 50" },
+      { ticker: "ARKK", name: "ARK Innovation" },
+    ],
+  },
+] as const;
+
 export const MARKET_INDICES = [
   { ticker: "^GSPC", name: "S&P 500" },
   { ticker: "^GSPTSE", name: "TSX" },

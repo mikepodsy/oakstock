@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePortfolioStore } from "@/stores/portfolioStore";
-import { DEFAULT_BENCHMARKS } from "@/utils/constants";
+import { BenchmarkSelect } from "@/components/shared/BenchmarkSelect";
 import {
   Dialog,
   DialogTrigger,
@@ -95,18 +95,12 @@ export function CreatePortfolioDialog({
               >
                 Benchmark
               </label>
-              <select
+              <BenchmarkSelect
                 id="portfolio-benchmark"
                 value={benchmark}
-                onChange={(e) => setBenchmark(e.target.value)}
+                onChange={setBenchmark}
                 className="h-8 rounded-lg border border-border-primary bg-bg-tertiary px-2.5 text-sm text-text-primary outline-none focus:border-green-primary"
-              >
-                {DEFAULT_BENCHMARKS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 

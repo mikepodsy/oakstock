@@ -18,7 +18,7 @@ import { AllocationDonut } from "@/components/charts/AllocationDonut";
 import { SectorBreakdown } from "@/components/charts/SectorBreakdown";
 import { CreatePortfolioDialog } from "@/components/dashboard/CreatePortfolioDialog";
 import { DeletePortfolioDialog } from "@/components/dashboard/DeletePortfolioDialog";
-import { DEFAULT_BENCHMARKS } from "@/utils/constants";
+import { BenchmarkSelect } from "@/components/shared/BenchmarkSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, FolderOpen, ChevronDown } from "lucide-react";
@@ -219,21 +219,15 @@ export default function PortfolioPage() {
               )}
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-xs text-text-tertiary">Benchmark:</span>
-                <select
+                <BenchmarkSelect
                   value={portfolio.benchmark}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     updatePortfolio(portfolio.id, {
-                      benchmark: e.target.value,
+                      benchmark: value,
                     })
                   }
                   className="text-xs rounded border border-border-primary bg-bg-tertiary px-2 py-1 text-text-primary outline-none"
-                >
-                  {DEFAULT_BENCHMARKS.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
 

@@ -5,7 +5,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import type { Portfolio } from "@/types";
 import { usePortfolioStore } from "@/stores/portfolioStore";
-import { DEFAULT_BENCHMARKS } from "@/utils/constants";
+import { BenchmarkSelect } from "@/components/shared/BenchmarkSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DeletePortfolioDialog } from "@/components/dashboard/DeletePortfolioDialog";
@@ -68,19 +68,13 @@ export function PortfolioHeader({ portfolio }: { portfolio: Portfolio }) {
           )}
           <div className="flex items-center gap-2 mt-2">
             <span className="text-xs text-text-tertiary">Benchmark:</span>
-            <select
+            <BenchmarkSelect
               value={portfolio.benchmark}
-              onChange={(e) =>
-                updatePortfolio(portfolio.id, { benchmark: e.target.value })
+              onChange={(value) =>
+                updatePortfolio(portfolio.id, { benchmark: value })
               }
               className="text-xs rounded border border-border-primary bg-bg-tertiary px-2 py-1 text-text-primary outline-none"
-            >
-              {DEFAULT_BENCHMARKS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 

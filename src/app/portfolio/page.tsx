@@ -282,7 +282,7 @@ export default function PortfolioPage() {
           />
 
           {/* Allocation & Sectors below holdings */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div className="space-y-6 mt-6">
             <AllocationDonut
               holdings={allocationData}
               totalValue={summary?.totalValue ?? 0}

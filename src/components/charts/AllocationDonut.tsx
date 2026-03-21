@@ -40,35 +40,6 @@ function DonutTooltip({
   );
 }
 
-function CustomLabel(props: {
-  cx?: number;
-  cy?: number;
-  midAngle?: number;
-  outerRadius?: number;
-  payload?: { ticker: string; percent: number };
-}) {
-  const { cx = 0, cy = 0, midAngle = 0, outerRadius = 0, payload } = props;
-  if (!payload) return null;
-
-  const RADIAN = Math.PI / 180;
-  const radius = outerRadius + 20;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor={x > cx ? "start" : "end"}
-      dominantBaseline="central"
-      className="text-xs font-financial"
-      fill="var(--text-secondary)"
-    >
-      {payload.ticker} {payload.percent.toFixed(0)}%
-    </text>
-  );
-}
-
 export function AllocationDonut({
   holdings,
   totalValue,
@@ -89,40 +60,64 @@ export function AllocationDonut({
       <h3 className="font-display text-base text-text-primary mb-4">
         Allocation
       </h3>
-      <ResponsiveContainer width="100%" height={280}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={100}
-            dataKey="marketValue"
-            nameKey="ticker"
-            label={CustomLabel}
-            isAnimationActive={true}
-            animationDuration={800}
-          >
-            {chartData.map((_, index) => (
-              <Cell
-                key={index}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
+      <div className="flex items-center gap-6">
+        <div className="w-[200px] h-[200px] flex-shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={85}
+                dataKey="marketValue"
+                nameKey="ticker"
+                isAnimationActive={true}
+                animationDuration={800}
+              >
+                {chartData.map((_, index) => (
+                  <Cell
+                    key={index}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
+                  />
+                ))}
+              </Pie>
+              <Tooltip content={<DonutTooltip />} />
+              <text
+                x="50%"
+                y="50%"
+                textAnchor="middle"
+                dominantBaseline="central"
+                className="text-sm font-financial"
+                fill="var(--text-primary)"
+              >
+                {formatCurrency(totalValue)}
+              </text>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Legend list */}
+        <div className="flex-1 min-w-0 space-y-1.5 max-h-[200px] overflow-y-auto">
+          {chartData.map((item, index) => (
+            <div key={item.ticker} className="flex items-center gap-2 text-sm">
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{
+                  backgroundColor:
+                    CHART_COLORS[index % CHART_COLORS.length],
+                }}
               />
-            ))}
-          </Pie>
-          <Tooltip content={<DonutTooltip />} />
-          <text
-            x="50%"
-            y="50%"
-            textAnchor="middle"
-            dominantBaseline="central"
-            className="text-lg font-financial"
-            fill="var(--text-primary)"
-          >
-            {formatCurrency(totalValue)}
-          </text>
-        </PieChart>
-      </ResponsiveContainer>
+              <span className="text-text-primary font-financial truncate">
+                {item.ticker}
+              </span>
+              <span className="ml-auto text-text-secondary font-financial flex-shrink-0">
+                {item.percent.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

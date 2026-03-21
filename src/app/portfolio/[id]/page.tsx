@@ -142,23 +142,20 @@ export default function PortfolioDetailPage() {
         </AddHoldingModal>
       </div>
 
-      <div className="md:grid md:grid-cols-[3fr_2fr] gap-6">
-        <div>
-          <HoldingsTable
-            holdings={holdingsWithQuotes}
-            portfolioId={portfolio.id}
-          />
-        </div>
-        <div className="mt-6 md:mt-0 space-y-6">
-          <AllocationDonut
-            holdings={allocationData}
-            totalValue={summary?.totalValue ?? 0}
-          />
-          <SectorBreakdown
-            holdings={sectorData}
-            totalValue={summary?.totalValue ?? 0}
-          />
-        </div>
+      <HoldingsTable
+        holdings={holdingsWithQuotes}
+        portfolioId={portfolio.id}
+      />
+
+      <div className="space-y-6 mt-6">
+        <AllocationDonut
+          holdings={allocationData}
+          totalValue={summary?.totalValue ?? 0}
+        />
+        <SectorBreakdown
+          holdings={sectorData}
+          totalValue={summary?.totalValue ?? 0}
+        />
       </div>
     </div>
   );

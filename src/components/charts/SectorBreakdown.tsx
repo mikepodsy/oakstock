@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Cell,
-  LabelList,
-} from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const CHART_COLORS = [
   "var(--chart-1)",
@@ -21,6 +13,28 @@ const CHART_COLORS = [
 interface SectorBreakdownProps {
   holdings: { sector: string | undefined; marketValue: number }[];
   totalValue: number;
+}
+
+function SectorTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: { sector: string; value: number; percent: number };
+  }>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0].payload;
+  return (
+    <div className="rounded-lg border border-border-primary bg-bg-elevated px-3 py-2 shadow-lg">
+      <p className="text-xs font-financial text-text-primary">{data.sector}</p>
+      <p className="text-xs text-text-secondary">{data.percent.toFixed(1)}%</p>
+    </div>
+  );
 }
 
 export function SectorBreakdown({
@@ -44,47 +58,59 @@ export function SectorBreakdown({
     }))
     .sort((a, b) => b.value - a.value);
 
-  const chartHeight = Math.max(chartData.length * 40, 120);
-
   return (
     <div>
       <h3 className="font-display text-base text-text-primary mb-4">
         Sectors
       </h3>
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart
-          data={chartData}
-          layout="vertical"
-          margin={{ top: 0, right: 50, left: 0, bottom: 0 }}
-        >
-          <XAxis type="number" hide />
-          <YAxis
-            type="category"
-            dataKey="sector"
-            tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
-            tickLine={false}
-            axisLine={false}
-            width={100}
-          />
-          <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={true}>
-            {chartData.map((_, index) => (
-              <Cell
-                key={index}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
+      <div className="flex items-center gap-6">
+        <div className="w-[200px] h-[200px] flex-shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={85}
+                dataKey="value"
+                nameKey="sector"
+                isAnimationActive={true}
+                animationDuration={800}
+              >
+                {chartData.map((_, index) => (
+                  <Cell
+                    key={index}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
+                  />
+                ))}
+              </Pie>
+              <Tooltip content={<SectorTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Legend list */}
+        <div className="flex-1 min-w-0 space-y-1.5 max-h-[200px] overflow-y-auto">
+          {chartData.map((item, index) => (
+            <div key={item.sector} className="flex items-center gap-2 text-sm">
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{
+                  backgroundColor:
+                    CHART_COLORS[index % CHART_COLORS.length],
+                }}
               />
-            ))}
-            <LabelList
-              dataKey="percent"
-              position="right"
-              formatter={(v) => `${Number(v).toFixed(1)}%`}
-              style={{
-                fill: "var(--text-secondary)",
-                fontSize: 12,
-              }}
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+              <span className="text-text-primary font-financial truncate">
+                {item.sector}
+              </span>
+              <span className="ml-auto text-text-secondary font-financial flex-shrink-0">
+                {item.percent.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

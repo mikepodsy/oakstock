@@ -40,6 +40,7 @@ export function mergeHoldingWithQuote(
     fiftyTwoWeekHigh: quote?.fiftyTwoWeekHigh,
     fiftyTwoWeekLow: quote?.fiftyTwoWeekLow,
     sector: quote?.sector,
+    website: quote?.website,
   };
 }
 

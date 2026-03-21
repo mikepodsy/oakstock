@@ -2,27 +2,16 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 
 const CHART_COLORS = [
-  "#7c3aed", // violet
-  "#06b6d4", // cyan
-  "#10b981", // emerald
-  "#f43f5e", // rose
-  "#3b82f6", // blue
-  "#f59e0b", // amber
-  "#8b5cf6", // purple
-  "#14b8a6", // teal
-  "#ec4899", // pink
-  "#6366f1", // indigo
-  "#84cc16", // lime
-  "#0ea5e9", // sky
-  "#d946ef", // fuchsia
-  "#22d3ee", // cyan-light
-  "#a78bfa", // violet-light
+  "#7c3aed", "#06b6d4", "#10b981", "#f43f5e", "#3b82f6",
+  "#f59e0b", "#8b5cf6", "#14b8a6", "#ec4899", "#6366f1",
+  "#84cc16", "#0ea5e9", "#d946ef", "#22d3ee", "#a78bfa",
 ];
 
 interface AllocationDonutProps {
-  holdings: { ticker: string; name: string; marketValue: number }[];
+  holdings: { ticker: string; name: string; website?: string; marketValue: number }[];
   totalValue: number;
 }
 
@@ -93,6 +82,7 @@ export function AllocationDonut({
     .map((h) => ({
       ticker: h.ticker,
       name: h.name,
+      website: h.website,
       marketValue: h.marketValue,
       percent: (h.marketValue / totalValue) * 100,
     }))
@@ -132,24 +122,26 @@ export function AllocationDonut({
           </ResponsiveContainer>
         </div>
 
-        {/* Legend list */}
-        <div className="min-w-[200px] space-y-2.5 max-h-[320px] overflow-y-auto pr-2">
+        {/* Legend list with logos */}
+        <div className="min-w-[240px] space-y-1 max-h-[340px] overflow-y-auto pr-2">
           {chartData.map((item, index) => (
-            <div key={item.ticker} className="flex items-center gap-2.5 text-sm">
+            <div key={item.ticker} className="flex items-center gap-2.5 py-1">
+              <div className="flex-shrink-0 [&_img]:!w-7 [&_img]:!h-7 [&_img]:!rounded-md [&_div]:!w-7 [&_div]:!h-7 [&_div]:!rounded-md [&_div]:!text-xs">
+                <CompanyLogo ticker={item.ticker} website={item.website} />
+              </div>
               <span
-                className="w-3 h-3 rounded-full flex-shrink-0"
+                className="w-2 h-2 rounded-full flex-shrink-0"
                 style={{
-                  backgroundColor:
-                    CHART_COLORS[index % CHART_COLORS.length],
+                  backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
                 }}
               />
-              <span className="text-text-primary font-financial font-medium flex-shrink-0">
+              <span className="text-sm text-text-primary font-financial font-medium flex-shrink-0">
                 {item.ticker}
               </span>
-              <span className="text-text-secondary font-financial truncate">
+              <span className="text-sm text-text-secondary font-financial truncate min-w-0">
                 {item.name}
               </span>
-              <span className="ml-auto text-text-primary font-financial flex-shrink-0 tabular-nums">
+              <span className="ml-auto text-sm text-text-primary font-financial flex-shrink-0 tabular-nums">
                 {item.percent.toFixed(2)}%
               </span>
             </div>

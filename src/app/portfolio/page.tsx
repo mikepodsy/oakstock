@@ -98,7 +98,7 @@ export default function PortfolioPage() {
     () =>
       holdingsWithQuotes
         .filter((h) => h.marketValue > 0)
-        .map((h) => ({ ticker: h.ticker, name: h.name, marketValue: h.marketValue })),
+        .map((h) => ({ ticker: h.ticker, name: h.name, website: h.website, marketValue: h.marketValue })),
     [holdingsWithQuotes]
   );
 
@@ -106,7 +106,7 @@ export default function PortfolioPage() {
     () =>
       holdingsWithQuotes
         .filter((h) => h.marketValue > 0)
-        .map((h) => ({ sector: h.sector, marketValue: h.marketValue })),
+        .map((h) => ({ sector: h.sector, currency: h.currency, marketValue: h.marketValue })),
     [holdingsWithQuotes]
   );
 

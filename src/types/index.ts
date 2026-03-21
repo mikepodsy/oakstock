@@ -42,6 +42,7 @@ export interface HoldingWithQuote extends Holding {
   fiftyTwoWeekHigh?: number;
   fiftyTwoWeekLow?: number;
   sector?: string;
+  website?: string;
 }
 
 // ─── Watchlist ───────────────────────────────────────

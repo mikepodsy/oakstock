@@ -123,7 +123,7 @@ export function AllocationDonut({
         </div>
 
         {/* Legend list with logos */}
-        <div className="min-w-[240px] space-y-1 max-h-[340px] overflow-y-auto pr-2">
+        <div className="w-[280px] flex-shrink-0 space-y-1 max-h-[340px] overflow-y-auto pr-2">
           {chartData.map((item, index) => (
             <div key={item.ticker} className="flex items-center gap-2.5 py-1">
               <div className="flex-shrink-0 [&_img]:!w-7 [&_img]:!h-7 [&_img]:!rounded-md [&_div]:!w-7 [&_div]:!h-7 [&_div]:!rounded-md [&_div]:!text-xs">

@@ -147,7 +147,7 @@ export default function PortfolioDetailPage() {
         portfolioId={portfolio.id}
       />
 
-      <div className="space-y-6 mt-6">
+      <div className="space-y-6 mt-6 max-w-[660px] mx-auto">
         <AllocationDonut
           holdings={allocationData}
           totalValue={summary?.totalValue ?? 0}

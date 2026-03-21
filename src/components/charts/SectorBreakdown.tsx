@@ -199,7 +199,7 @@ export function SectorBreakdown({
         </div>
 
         {/* Legend list with icons and percentage bars */}
-        <div className="min-w-[260px] space-y-2 max-h-[340px] overflow-y-auto pr-2">
+        <div className="w-[280px] flex-shrink-0 space-y-2 max-h-[340px] overflow-y-auto pr-2">
           {chartData.map((item, index) => (
             <div key={item.label} className="flex items-center gap-2.5 text-sm">
               <span

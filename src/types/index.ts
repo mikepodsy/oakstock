@@ -265,3 +265,23 @@ export interface SensitivityCell {
   discountRate: number;
   intrinsicValue: number;
 }
+
+// ─── Economic Indicators ─────────────────────────────
+export type EconomicIndicator = 'inflation' | 'unemployment' | 'oil';
+export type EconomicTimeRange = '1y' | '2y' | '5y' | '10y' | 'max';
+
+export interface EconomicDataPoint {
+  date: string;
+  value: number;
+}
+
+export interface EconomicIndicatorData {
+  indicator: EconomicIndicator;
+  name: string;
+  currentValue: number | null;
+  previousValue: number | null;
+  change: number | null;
+  unit: string;
+  data: EconomicDataPoint[];
+  lastUpdated: string;
+}

@@ -21,6 +21,7 @@ const NAV_LINKS = [
   { href: "/radar", label: "Radar" },
   { href: "/calendar", label: "Calendar" },
   { href: "/dividends", label: "Dividends" },
+  { href: "/economic", label: "Economic" },
   { href: "/dcf", label: "DCF" },
   { href: "/rebalance", label: "Rebalance" },
 ];

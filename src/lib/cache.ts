@@ -49,3 +49,4 @@ export const historyCache = getOrCreateCache<Array<{ date: string; close: number
 export const financialsCache = getOrCreateCache<Record<string, unknown>>("financials", 1800);
 export const fundamentalsCache = getOrCreateCache<Record<string, unknown>>("fundamentals-ts", 3600);
 export const calendarCache = getOrCreateCache<unknown[]>("calendar", 3600);
+export const economicCache = getOrCreateCache<unknown>("economic", 3600);

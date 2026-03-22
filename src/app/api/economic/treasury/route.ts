@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { treasuryCache } from "@/lib/cache";
+import { downsample } from "@/lib/downsample";
 import type { TreasuryMaturity, TreasurySeriesData, TreasuryBundleData, EconomicDataPoint } from "@/types";
 
 const TREASURY_SERIES: Record<TreasuryMaturity, { id: string; label: string }> = {
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
           currentValue,
           previousValue,
           change,
-          data,
+          data: downsample(data),
         } as TreasurySeriesData;
       })
     );

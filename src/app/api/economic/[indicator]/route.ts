@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { economicCache } from "@/lib/cache";
+import { downsample } from "@/lib/downsample";
 import type { EconomicIndicator, EconomicIndicatorData, EconomicDataPoint } from "@/types";
 
 const FRED_BASE = "https://api.stlouisfed.org/fred/series/observations";
@@ -155,7 +156,7 @@ export async function GET(
       previousValue,
       change,
       unit: config.unit,
-      data,
+      data: downsample(data),
       lastUpdated: new Date().toISOString(),
     };
 

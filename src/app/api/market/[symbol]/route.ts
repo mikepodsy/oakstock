@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { marketCache } from "@/lib/cache";
+import { downsample } from "@/lib/downsample";
 import type { MarketIndicator, EconomicIndicatorData, EconomicDataPoint } from "@/types";
 
 const yf = new YahooFinance();
@@ -93,7 +94,7 @@ export async function GET(
       previousValue,
       change,
       unit: config.unit,
-      data,
+      data: downsample(data),
       lastUpdated: new Date().toISOString(),
     };
 

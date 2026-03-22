@@ -14,6 +14,7 @@ const SYMBOL_CONFIG: Record<
   dxy: { ticker: "DX-Y.NYB", name: "US Dollar Index (DXY)", unit: "Index" },
   sp500: { ticker: "^GSPC", name: "S&P 500", unit: "Index" },
   dowjones: { ticker: "^DJI", name: "Dow Jones", unit: "Index" },
+  vix: { ticker: "^VIX", name: "VIX", unit: "Index" },
 };
 
 const VALID_SYMBOLS = Object.keys(SYMBOL_CONFIG) as MarketIndicator[];

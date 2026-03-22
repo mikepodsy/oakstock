@@ -38,7 +38,7 @@ function filterDataByRange(
 }
 
 function formatDisplayValue(value: number, unit: string): string {
-  if (unit === "%") return `${value.toFixed(2)}%`;
+  if (unit === "%" || unit === "bps") return `${value.toFixed(2)}%`;
   if (unit === "Index") return value.toFixed(2);
   return `$${value.toFixed(2)}`;
 }
@@ -85,7 +85,7 @@ function ChartContent({
   height: number;
 }) {
   const formatYAxis = (value: number) => {
-    if (data.unit === "%") return `${value.toFixed(1)}%`;
+    if (data.unit === "%" || data.unit === "bps") return `${value.toFixed(1)}%`;
     if (data.unit === "Index")
       return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;

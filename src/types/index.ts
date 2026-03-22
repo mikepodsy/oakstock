@@ -268,7 +268,7 @@ export interface SensitivityCell {
 
 // ─── Economic Indicators ─────────────────────────────
 export type EconomicIndicator = 'inflation' | 'unemployment' | 'oil' | 'tips' | 'fedrate';
-export type MarketIndicator = 'gold' | 'dxy' | 'sp500' | 'dowjones';
+export type MarketIndicator = 'gold' | 'dxy' | 'sp500' | 'dowjones' | 'vix';
 export type EconomicTimeRange = '1y' | '2y' | '5y' | '10y' | 'max';
 
 export interface EconomicDataPoint {

@@ -3,8 +3,11 @@
 import { useState } from "react";
 import type { EconomicTimeRange } from "@/types";
 import { useEconomicData } from "@/hooks/useEconomicData";
+import { useMarketData } from "@/hooks/useMarketData";
+import { useTreasuryData } from "@/hooks/useTreasuryData";
 import { EconomicSummaryCard } from "@/components/economic/EconomicSummaryCard";
 import { EconomicChart } from "@/components/economic/EconomicChart";
+import { TreasuryBondChart } from "@/components/economic/TreasuryBondChart";
 
 const TIME_RANGES: { label: string; value: EconomicTimeRange }[] = [
   { label: "1Y", value: "1y" },
@@ -20,6 +23,20 @@ export default function EconomicPage() {
   const inflation = useEconomicData("inflation", timeRange);
   const unemployment = useEconomicData("unemployment", timeRange);
   const oil = useEconomicData("oil", timeRange);
+  const gold = useMarketData("gold", timeRange);
+  const dxy = useMarketData("dxy", timeRange);
+  const sp500 = useMarketData("sp500", timeRange);
+  const treasury = useTreasuryData(timeRange);
+
+  const allErrors = [
+    inflation.error,
+    unemployment.error,
+    oil.error,
+    gold.error,
+    dxy.error,
+    sp500.error,
+    treasury.error,
+  ].filter(Boolean);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -29,7 +46,7 @@ export default function EconomicPage() {
           Economic Indicators
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          Key macroeconomic data from the Federal Reserve (FRED)
+          Key macroeconomic and market data
         </p>
       </div>
 
@@ -56,17 +73,17 @@ export default function EconomicPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <EconomicSummaryCard data={inflation.data} loading={inflation.loading} />
-        <EconomicSummaryCard
-          data={unemployment.data}
-          loading={unemployment.loading}
-        />
+        <EconomicSummaryCard data={unemployment.data} loading={unemployment.loading} />
         <EconomicSummaryCard data={oil.data} loading={oil.loading} />
+        <EconomicSummaryCard data={gold.data} loading={gold.loading} />
+        <EconomicSummaryCard data={dxy.data} loading={dxy.loading} />
+        <EconomicSummaryCard data={sp500.data} loading={sp500.loading} />
       </div>
 
       {/* Error */}
-      {(inflation.error || unemployment.error || oil.error) && (
+      {allErrors.length > 0 && (
         <div className="mb-4 p-3 rounded-lg bg-red-muted text-red-primary text-sm">
-          {inflation.error || unemployment.error || oil.error}
+          {allErrors[0]}
         </div>
       )}
 
@@ -87,6 +104,24 @@ export default function EconomicPage() {
           loading={oil.loading}
           title="WTI Crude Oil Price"
         />
+        <EconomicChart
+          data={gold.data}
+          loading={gold.loading}
+          title="Gold (Spot Price)"
+        />
+        <EconomicChart
+          data={dxy.data}
+          loading={dxy.loading}
+          title="US Dollar Index (DXY)"
+        />
+        <EconomicChart
+          data={sp500.data}
+          loading={sp500.loading}
+          title="S&P 500"
+        />
+
+        {/* Treasury Bonds */}
+        <TreasuryBondChart data={treasury.data} loading={treasury.loading} />
       </div>
     </div>
   );

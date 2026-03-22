@@ -13,6 +13,12 @@ import type { EconomicIndicatorData } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
+function formatDisplayValue(value: number, unit: string): string {
+  if (unit === "%") return `${value.toFixed(2)}%`;
+  if (unit === "Index") return value.toFixed(2);
+  return `$${value.toFixed(2)}`;
+}
+
 interface EconomicChartProps {
   data: EconomicIndicatorData | null;
   loading: boolean;
@@ -33,8 +39,7 @@ function CustomTooltip({
   if (!active || !payload?.length || !label) return null;
 
   const value = payload[0].value;
-  const formatted =
-    unit === "%" ? `${value.toFixed(2)}%` : `$${value.toFixed(2)}`;
+  const formatted = formatDisplayValue(value, unit);
 
   return (
     <div className="rounded-lg border border-border-primary bg-bg-elevated p-3 shadow-lg">
@@ -67,8 +72,11 @@ export function EconomicChart({ data, loading, title }: EconomicChartProps) {
     );
   }
 
-  const formatYAxis = (value: number) =>
-    data.unit === "%" ? `${value.toFixed(1)}%` : `$${value.toFixed(0)}`;
+  const formatYAxis = (value: number) => {
+    if (data.unit === "%") return `${value.toFixed(1)}%`;
+    if (data.unit === "Index") return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  };
 
   return (
     <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">

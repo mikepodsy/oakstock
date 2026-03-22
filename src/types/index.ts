@@ -268,6 +268,7 @@ export interface SensitivityCell {
 
 // ─── Economic Indicators ─────────────────────────────
 export type EconomicIndicator = 'inflation' | 'unemployment' | 'oil';
+export type MarketIndicator = 'gold' | 'dxy' | 'sp500';
 export type EconomicTimeRange = '1y' | '2y' | '5y' | '10y' | 'max';
 
 export interface EconomicDataPoint {
@@ -276,12 +277,29 @@ export interface EconomicDataPoint {
 }
 
 export interface EconomicIndicatorData {
-  indicator: EconomicIndicator;
+  indicator: EconomicIndicator | MarketIndicator;
   name: string;
   currentValue: number | null;
   previousValue: number | null;
   change: number | null;
   unit: string;
   data: EconomicDataPoint[];
+  lastUpdated: string;
+}
+
+// ─── Treasury Bonds ─────────────────────────────────
+export type TreasuryMaturity = '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5y' | '10y' | '20y' | '30y';
+
+export interface TreasurySeriesData {
+  maturity: TreasuryMaturity;
+  label: string;
+  currentValue: number | null;
+  previousValue: number | null;
+  change: number | null;
+  data: EconomicDataPoint[];
+}
+
+export interface TreasuryBundleData {
+  series: TreasurySeriesData[];
   lastUpdated: string;
 }

@@ -11,7 +11,8 @@ interface EconomicSummaryCardProps {
 
 function formatValue(value: number, unit: string) {
   if (unit === "%") return `${value.toFixed(2)}%`;
-  return `$${value.toFixed(2)}`;
+  if (unit === "Index") return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function EconomicSummaryCard({ data, loading }: EconomicSummaryCardProps) {

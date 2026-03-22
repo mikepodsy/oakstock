@@ -50,3 +50,5 @@ export const financialsCache = getOrCreateCache<Record<string, unknown>>("financ
 export const fundamentalsCache = getOrCreateCache<Record<string, unknown>>("fundamentals-ts", 3600);
 export const calendarCache = getOrCreateCache<unknown[]>("calendar", 3600);
 export const economicCache = getOrCreateCache<unknown>("economic", 3600);
+export const marketCache = getOrCreateCache<unknown>("market", 3600);
+export const treasuryCache = getOrCreateCache<unknown>("treasury", 3600);

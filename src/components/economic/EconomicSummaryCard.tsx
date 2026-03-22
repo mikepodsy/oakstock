@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 interface EconomicSummaryCardProps {
   data: EconomicIndicatorData | null;
   loading: boolean;
+  onClick?: () => void;
 }
 
 function formatValue(value: number, unit: string) {
@@ -15,7 +16,7 @@ function formatValue(value: number, unit: string) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function EconomicSummaryCard({ data, loading }: EconomicSummaryCardProps) {
+export function EconomicSummaryCard({ data, loading, onClick }: EconomicSummaryCardProps) {
   if (loading) {
     return (
       <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
@@ -39,7 +40,10 @@ export function EconomicSummaryCard({ data, loading }: EconomicSummaryCardProps)
       : "text-red-primary";
 
   return (
-    <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
+    <div
+      className={`rounded-xl border border-border-primary bg-bg-secondary p-5${onClick ? " cursor-pointer hover:border-text-tertiary transition-colors" : ""}`}
+      onClick={onClick}
+    >
       <p className="text-xs text-text-secondary mb-1">{data.name}</p>
       <p className="text-2xl font-financial text-text-primary mb-2">
         {data.currentValue !== null ? formatValue(data.currentValue, data.unit) : "N/A"}

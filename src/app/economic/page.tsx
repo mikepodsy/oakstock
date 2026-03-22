@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import type { EconomicTimeRange } from "@/types";
 import { useEconomicData } from "@/hooks/useEconomicData";
 import { useMarketData } from "@/hooks/useMarketData";
@@ -23,18 +23,41 @@ export default function EconomicPage() {
   const inflation = useEconomicData("inflation", timeRange);
   const unemployment = useEconomicData("unemployment", timeRange);
   const oil = useEconomicData("oil", timeRange);
+  const tips = useEconomicData("tips", timeRange);
+  const fedrate = useEconomicData("fedrate", timeRange);
   const gold = useMarketData("gold", timeRange);
   const dxy = useMarketData("dxy", timeRange);
   const sp500 = useMarketData("sp500", timeRange);
+  const dowjones = useMarketData("dowjones", timeRange);
   const treasury = useTreasuryData(timeRange);
+
+  // Refs for scroll-to-chart
+  const chartRefs = {
+    inflation: useRef<HTMLDivElement>(null),
+    unemployment: useRef<HTMLDivElement>(null),
+    oil: useRef<HTMLDivElement>(null),
+    gold: useRef<HTMLDivElement>(null),
+    dxy: useRef<HTMLDivElement>(null),
+    sp500: useRef<HTMLDivElement>(null),
+    dowjones: useRef<HTMLDivElement>(null),
+    tips: useRef<HTMLDivElement>(null),
+    fedrate: useRef<HTMLDivElement>(null),
+  };
+
+  const scrollToChart = useCallback((key: keyof typeof chartRefs) => {
+    chartRefs[key].current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
 
   const allErrors = [
     inflation.error,
     unemployment.error,
     oil.error,
+    tips.error,
+    fedrate.error,
     gold.error,
     dxy.error,
     sp500.error,
+    dowjones.error,
     treasury.error,
   ].filter(Boolean);
 
@@ -72,12 +95,15 @@ export default function EconomicPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <EconomicSummaryCard data={inflation.data} loading={inflation.loading} />
-        <EconomicSummaryCard data={unemployment.data} loading={unemployment.loading} />
-        <EconomicSummaryCard data={oil.data} loading={oil.loading} />
-        <EconomicSummaryCard data={gold.data} loading={gold.loading} />
-        <EconomicSummaryCard data={dxy.data} loading={dxy.loading} />
-        <EconomicSummaryCard data={sp500.data} loading={sp500.loading} />
+        <EconomicSummaryCard data={inflation.data} loading={inflation.loading} onClick={() => scrollToChart("inflation")} />
+        <EconomicSummaryCard data={unemployment.data} loading={unemployment.loading} onClick={() => scrollToChart("unemployment")} />
+        <EconomicSummaryCard data={oil.data} loading={oil.loading} onClick={() => scrollToChart("oil")} />
+        <EconomicSummaryCard data={gold.data} loading={gold.loading} onClick={() => scrollToChart("gold")} />
+        <EconomicSummaryCard data={dxy.data} loading={dxy.loading} onClick={() => scrollToChart("dxy")} />
+        <EconomicSummaryCard data={sp500.data} loading={sp500.loading} onClick={() => scrollToChart("sp500")} />
+        <EconomicSummaryCard data={dowjones.data} loading={dowjones.loading} onClick={() => scrollToChart("dowjones")} />
+        <EconomicSummaryCard data={tips.data} loading={tips.loading} onClick={() => scrollToChart("tips")} />
+        <EconomicSummaryCard data={fedrate.data} loading={fedrate.loading} onClick={() => scrollToChart("fedrate")} />
       </div>
 
       {/* Error */}
@@ -93,35 +119,69 @@ export default function EconomicPage() {
           data={inflation.data}
           loading={inflation.loading}
           title="Inflation Rate (CPI Year-over-Year)"
+          ref={chartRefs.inflation}
         />
         <EconomicChart
           data={unemployment.data}
           loading={unemployment.loading}
           title="Unemployment Rate"
+          ref={chartRefs.unemployment}
         />
         <EconomicChart
           data={oil.data}
           loading={oil.loading}
           title="WTI Crude Oil Price"
+          ref={chartRefs.oil}
         />
         <EconomicChart
           data={gold.data}
           loading={gold.loading}
           title="Gold (Spot Price)"
+          ref={chartRefs.gold}
         />
         <EconomicChart
           data={dxy.data}
           loading={dxy.loading}
           title="US Dollar Index (DXY)"
-        />
-        <EconomicChart
-          data={sp500.data}
-          loading={sp500.loading}
-          title="S&P 500"
+          ref={chartRefs.dxy}
         />
 
-        {/* Treasury Bonds */}
-        <TreasuryBondChart data={treasury.data} loading={treasury.loading} />
+        {/* S&P 500 and Dow Jones side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EconomicChart
+            data={sp500.data}
+            loading={sp500.loading}
+            title="S&P 500"
+            ref={chartRefs.sp500}
+          />
+          <EconomicChart
+            data={dowjones.data}
+            loading={dowjones.loading}
+            title="Dow Jones"
+            ref={chartRefs.dowjones}
+          />
+        </div>
+
+        {/* Federal Funds Rate */}
+        <EconomicChart
+          data={fedrate.data}
+          loading={fedrate.loading}
+          title="Federal Funds Rate"
+          ref={chartRefs.fedrate}
+        />
+
+        {/* TIPS and Treasury Yields side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EconomicChart
+            data={tips.data}
+            loading={tips.loading}
+            title="10Y TIPS Yield"
+            ref={chartRefs.tips}
+          />
+          <div>
+            <TreasuryBondChart data={treasury.data} loading={treasury.loading} />
+          </div>
+        </div>
       </div>
     </div>
   );

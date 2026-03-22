@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef } from "react";
 import {
   LineChart,
   Line,
@@ -51,73 +52,75 @@ function CustomTooltip({
   );
 }
 
-export function EconomicChart({ data, loading, title }: EconomicChartProps) {
-  if (loading) {
-    return (
-      <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
-        <Skeleton className="h-5 w-40 mb-4" />
-        <Skeleton className="h-[300px] w-full rounded-lg" />
-      </div>
-    );
-  }
-
-  if (!data || data.data.length === 0) {
-    return (
-      <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
-        <h3 className="text-lg font-display text-text-primary mb-2">{title}</h3>
-        <div className="h-[300px] flex items-center justify-center">
-          <p className="text-sm text-text-secondary">No data available</p>
+export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
+  function EconomicChart({ data, loading, title }, ref) {
+    if (loading) {
+      return (
+        <div ref={ref} className="rounded-xl border border-border-primary bg-bg-secondary p-5">
+          <Skeleton className="h-5 w-40 mb-4" />
+          <Skeleton className="h-[300px] w-full rounded-lg" />
         </div>
+      );
+    }
+
+    if (!data || data.data.length === 0) {
+      return (
+        <div ref={ref} className="rounded-xl border border-border-primary bg-bg-secondary p-5">
+          <h3 className="text-lg font-display text-text-primary mb-2">{title}</h3>
+          <div className="h-[300px] flex items-center justify-center">
+            <p className="text-sm text-text-secondary">No data available</p>
+          </div>
+        </div>
+      );
+    }
+
+    const formatYAxis = (value: number) => {
+      if (data.unit === "%") return `${value.toFixed(1)}%`;
+      if (data.unit === "Index") return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    };
+
+    return (
+      <div ref={ref} className="rounded-xl border border-border-primary bg-bg-secondary p-5">
+        <h3 className="text-lg font-display text-text-primary mb-4">{title}</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart
+            data={data.data}
+            margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--border-primary)"
+            />
+            <XAxis
+              dataKey="date"
+              tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
+              tickFormatter={(date: string) => format(new Date(date), "MMM yy")}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
+              tickFormatter={formatYAxis}
+              axisLine={false}
+              tickLine={false}
+              width={60}
+            />
+            <Tooltip
+              content={<CustomTooltip unit={data.unit} />}
+            />
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke="var(--green-primary)"
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={true}
+              animationDuration={800}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     );
   }
-
-  const formatYAxis = (value: number) => {
-    if (data.unit === "%") return `${value.toFixed(1)}%`;
-    if (data.unit === "Index") return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  };
-
-  return (
-    <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
-      <h3 className="text-lg font-display text-text-primary mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart
-          data={data.data}
-          margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="var(--border-primary)"
-          />
-          <XAxis
-            dataKey="date"
-            tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-            tickFormatter={(date: string) => format(new Date(date), "MMM yy")}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-            tickFormatter={formatYAxis}
-            axisLine={false}
-            tickLine={false}
-            width={60}
-          />
-          <Tooltip
-            content={<CustomTooltip unit={data.unit} />}
-          />
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke="var(--green-primary)"
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={true}
-            animationDuration={800}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+);

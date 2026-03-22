@@ -26,6 +26,18 @@ const SERIES_CONFIG: Record<
     unit: "USD/barrel",
     isInflation: false,
   },
+  tips: {
+    id: "DFII10",
+    name: "10Y TIPS Yield",
+    unit: "%",
+    isInflation: false,
+  },
+  fedrate: {
+    id: "FEDFUNDS",
+    name: "Federal Funds Rate",
+    unit: "%",
+    isInflation: false,
+  },
 };
 
 const VALID_INDICATORS = Object.keys(SERIES_CONFIG) as EconomicIndicator[];

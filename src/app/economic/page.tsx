@@ -115,36 +115,44 @@ export default function EconomicPage() {
 
       {/* Charts */}
       <div className="space-y-6">
-        <EconomicChart
-          data={inflation.data}
-          loading={inflation.loading}
-          title="Inflation Rate (CPI Year-over-Year)"
-          ref={chartRefs.inflation}
-        />
-        <EconomicChart
-          data={unemployment.data}
-          loading={unemployment.loading}
-          title="Unemployment Rate"
-          ref={chartRefs.unemployment}
-        />
+        {/* Inflation and Unemployment side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EconomicChart
+            data={inflation.data}
+            loading={inflation.loading}
+            title="Inflation Rate (CPI YoY)"
+            ref={chartRefs.inflation}
+          />
+          <EconomicChart
+            data={unemployment.data}
+            loading={unemployment.loading}
+            title="Unemployment Rate"
+            ref={chartRefs.unemployment}
+          />
+        </div>
+
         <EconomicChart
           data={oil.data}
           loading={oil.loading}
           title="WTI Crude Oil Price"
           ref={chartRefs.oil}
         />
-        <EconomicChart
-          data={gold.data}
-          loading={gold.loading}
-          title="Gold (Spot Price)"
-          ref={chartRefs.gold}
-        />
-        <EconomicChart
-          data={dxy.data}
-          loading={dxy.loading}
-          title="US Dollar Index (DXY)"
-          ref={chartRefs.dxy}
-        />
+
+        {/* Gold and DXY side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EconomicChart
+            data={gold.data}
+            loading={gold.loading}
+            title="Gold"
+            ref={chartRefs.gold}
+          />
+          <EconomicChart
+            data={dxy.data}
+            loading={dxy.loading}
+            title="US Dollar Index (DXY)"
+            ref={chartRefs.dxy}
+          />
+        </div>
 
         {/* S&P 500 and Dow Jones side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

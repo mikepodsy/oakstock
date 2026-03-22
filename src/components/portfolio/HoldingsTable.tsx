@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import type { HoldingWithQuote } from "@/types";
@@ -37,6 +37,7 @@ export function HoldingsTable({
   holdings: HoldingWithQuote[];
   portfolioId: string;
 }) {
+  const totalPortfolioValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
   const [sortKey, setSortKey] = useState<SortKey>("marketValue");
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -71,18 +72,27 @@ export function HoldingsTable({
             <tr className="border-b border-border-secondary">
               <th className="w-8 px-3 py-3" />
               {COLUMNS.map((col) => (
-                <th
-                  key={col.key}
-                  className={`px-3 py-3 font-medium text-text-secondary cursor-pointer hover:text-text-primary transition-colors select-none ${col.align === "right" ? "text-right" : "text-left"}`}
-                  onClick={() => handleSort(col.key)}
-                >
-                  {col.label}
-                  {sortKey === col.key && (
-                    <span className="ml-1 text-green-primary">
-                      {sortAsc ? "\u2191" : "\u2193"}
-                    </span>
+                <Fragment key={col.key}>
+                  <th
+                    className={`px-3 py-3 font-medium text-text-secondary cursor-pointer hover:text-text-primary transition-colors select-none ${col.align === "right" ? "text-right" : "text-left"}`}
+                    onClick={() => handleSort(col.key)}
+                  >
+                    {col.label}
+                    {sortKey === col.key && (
+                      <span className="ml-1 text-green-primary">
+                        {sortAsc ? "\u2191" : "\u2193"}
+                      </span>
+                    )}
+                  </th>
+                  {col.key === "totalShares" && (
+                    <th
+                      key="weight"
+                      className="px-3 py-3 font-medium text-text-secondary text-right select-none"
+                    >
+                      Weight
+                    </th>
                   )}
-                </th>
+                </Fragment>
               ))}
               <th className="w-10 px-3 py-3" />
             </tr>
@@ -94,6 +104,7 @@ export function HoldingsTable({
                 <HoldingRow
                   key={h.id}
                   holding={h}
+                  totalPortfolioValue={totalPortfolioValue}
                   isExpanded={isExpanded}
                   onToggle={() =>
                     setExpandedId(isExpanded ? null : h.id)
@@ -124,12 +135,14 @@ export function HoldingsTable({
 
 function HoldingRow({
   holding,
+  totalPortfolioValue,
   isExpanded,
   onToggle,
   onRemoveHolding,
   onRemoveLot,
 }: {
   holding: HoldingWithQuote;
+  totalPortfolioValue: number;
   isExpanded: boolean;
   onToggle: () => void;
   onRemoveHolding: () => void;
@@ -173,6 +186,11 @@ function HoldingRow({
         <td className="px-3 py-3 text-right font-financial text-text-primary">
           {h.totalShares.toFixed(h.totalShares % 1 === 0 ? 0 : 3)}
         </td>
+        <td className="px-3 py-3 text-right font-financial text-text-secondary">
+          {totalPortfolioValue > 0
+            ? `${(h.marketValue / totalPortfolioValue * 100).toFixed(1)}%`
+            : "—"}
+        </td>
         <td className="px-3 py-3 text-right font-financial text-text-primary">
           {formatCurrency(h.avgCostBasis)}
         </td>
@@ -208,7 +226,7 @@ function HoldingRow({
 
       {isExpanded && (
         <tr>
-          <td colSpan={10} className="bg-bg-tertiary/30 px-6 py-3">
+          <td colSpan={11} className="bg-bg-tertiary/30 px-6 py-3">
             <div className="text-xs text-text-secondary mb-2 font-medium">
               Lots
             </div>

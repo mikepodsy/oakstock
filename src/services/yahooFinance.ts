@@ -1,4 +1,4 @@
-import type { QuoteData, HistoricalDataPoint, FinancialData, FundamentalsData } from "@/types";
+import type { QuoteData, HistoricalDataPoint, FinancialData, FundamentalsData, BatchFinancialData } from "@/types";
 
 export async function fetchQuote(ticker: string): Promise<QuoteData> {
   const res = await fetch(`/api/quote?ticker=${encodeURIComponent(ticker)}`);
@@ -57,5 +57,26 @@ export async function fetchFinancials(ticker: string): Promise<FinancialData> {
 export async function fetchFundamentals(ticker: string): Promise<FundamentalsData> {
   const res = await fetch(`/api/fundamentals?ticker=${encodeURIComponent(ticker)}`);
   if (!res.ok) throw new Error(`Failed to fetch fundamentals for ${ticker}`);
+  return res.json();
+}
+
+export async function fetchBatchFinancials(tickers: string[]): Promise<BatchFinancialData[]> {
+  if (tickers.length === 0) return [];
+  const res = await fetch(
+    `/api/financials/batch?tickers=${tickers.map(encodeURIComponent).join(",")}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch batch financials");
+  return res.json();
+}
+
+export async function fetchDividendIncome(
+  tickers: string[],
+  from: string
+): Promise<Record<string, { date: string; dividend: number }[]>> {
+  if (tickers.length === 0) return {};
+  const res = await fetch(
+    `/api/dividends/income?tickers=${tickers.map(encodeURIComponent).join(",")}&from=${from}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch dividend income");
   return res.json();
 }

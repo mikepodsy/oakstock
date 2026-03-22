@@ -202,6 +202,44 @@ export interface IpoEvent {
 
 export type CalendarEvent = EarningsEvent | DividendEvent | EconomicEvent | IpoEvent;
 
+// ─── Dividends Portfolio ────────────────────────────
+export interface DividendHolding {
+  holdingId: string;
+  portfolioId: string;
+  portfolioName: string;
+  ticker: string;
+  name: string;
+  currency: "CAD" | "USD";
+  totalShares: number;
+  avgCostBasis: number;
+  currentPrice: number;
+  dividendYield: number;
+  annualDividendPerShare: number;
+  annualIncome: number;
+  yieldOnCost: number;
+}
+
+export interface DividendPayment {
+  symbol: string;
+  date: string;
+  dividend: number;
+  totalReceived: number;
+}
+
+export interface MonthlyIncome {
+  month: string;
+  totalIncome: number;
+  byTicker: { ticker: string; amount: number }[];
+}
+
+export interface BatchFinancialData {
+  ticker: string;
+  dividendYield: number | null;
+  dividendRate: number | null;
+  currentPrice: number | null;
+  error?: boolean;
+}
+
 // ─── DCF Calculator ──────────────────────────────────
 export interface DcfInputs {
   startingFcf: number;

@@ -122,12 +122,14 @@ export default function EconomicPage() {
             loading={inflation.loading}
             title="Inflation Rate (CPI YoY)"
             ref={chartRefs.inflation}
+            pageRange={timeRange}
           />
           <EconomicChart
             data={unemployment.data}
             loading={unemployment.loading}
             title="Unemployment Rate"
             ref={chartRefs.unemployment}
+            pageRange={timeRange}
           />
         </div>
 
@@ -136,6 +138,7 @@ export default function EconomicPage() {
           loading={oil.loading}
           title="WTI Crude Oil Price"
           ref={chartRefs.oil}
+          pageRange={timeRange}
         />
 
         {/* Gold and DXY side by side */}
@@ -145,12 +148,14 @@ export default function EconomicPage() {
             loading={gold.loading}
             title="Gold"
             ref={chartRefs.gold}
+            pageRange={timeRange}
           />
           <EconomicChart
             data={dxy.data}
             loading={dxy.loading}
             title="US Dollar Index (DXY)"
             ref={chartRefs.dxy}
+            pageRange={timeRange}
           />
         </div>
 
@@ -161,12 +166,14 @@ export default function EconomicPage() {
             loading={sp500.loading}
             title="S&P 500"
             ref={chartRefs.sp500}
+            pageRange={timeRange}
           />
           <EconomicChart
             data={dowjones.data}
             loading={dowjones.loading}
             title="Dow Jones"
             ref={chartRefs.dowjones}
+            pageRange={timeRange}
           />
         </div>
 
@@ -176,6 +183,7 @@ export default function EconomicPage() {
           loading={fedrate.loading}
           title="Federal Funds Rate"
           ref={chartRefs.fedrate}
+          pageRange={timeRange}
         />
 
         {/* TIPS and Treasury Yields side by side */}
@@ -185,6 +193,7 @@ export default function EconomicPage() {
             loading={tips.loading}
             title="10Y TIPS Yield"
             ref={chartRefs.tips}
+            pageRange={timeRange}
           />
           <div>
             <TreasuryBondChart data={treasury.data} loading={treasury.loading} />

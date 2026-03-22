@@ -18,7 +18,7 @@ const TIME_RANGES: { label: string; value: EconomicTimeRange }[] = [
 ];
 
 export default function EconomicPage() {
-  const [timeRange, setTimeRange] = useState<EconomicTimeRange>("5y");
+  const [timeRange, setTimeRange] = useState<EconomicTimeRange>("max");
 
   const inflation = useEconomicData("inflation", timeRange);
   const unemployment = useEconomicData("unemployment", timeRange);

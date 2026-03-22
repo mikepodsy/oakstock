@@ -153,7 +153,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
 
     // Filter MODAL_RANGES to only show options within the fetched data range
     const availableRanges = useMemo(() => {
-      const pageMonths = PAGE_RANGE_MONTHS[pageRange || "5y"] ?? 60;
+      const pageMonths = PAGE_RANGE_MONTHS[pageRange || "max"] ?? 0;
       if (pageMonths === 0) return MODAL_RANGES; // "max" — show all options
       return MODAL_RANGES.filter((r) => r.months === 0 || r.months <= pageMonths);
     }, [pageRange]);

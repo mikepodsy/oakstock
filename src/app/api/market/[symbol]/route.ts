@@ -34,7 +34,7 @@ function getRangeStart(range: string): Date {
       d.setFullYear(d.getFullYear() - 10);
       break;
     case "max":
-      d.setFullYear(1990, 0, 1);
+      d.setFullYear(1950, 0, 1);
       break;
     default:
       d.setFullYear(d.getFullYear() - 1);

@@ -132,6 +132,7 @@ function ChartContent({
 export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
   function EconomicChart({ data, loading, title }, ref) {
     const [fullscreen, setFullscreen] = useState(false);
+    const [cardRange, setCardRange] = useState("ALL");
     const [modalRange, setModalRange] = useState("ALL");
 
     const handleEsc = useCallback((e: KeyboardEvent) => {
@@ -149,10 +150,16 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
       };
     }, [fullscreen, handleEsc]);
 
-    // Reset range when opening modal
+    // Sync modal range with card range when opening
     useEffect(() => {
-      if (fullscreen) setModalRange("ALL");
-    }, [fullscreen]);
+      if (fullscreen) setModalRange(cardRange);
+    }, [fullscreen, cardRange]);
+
+    const cardData = useMemo(() => {
+      if (!data) return [];
+      const range = MODAL_RANGES.find((r) => r.label === cardRange);
+      return filterDataByRange(data.data, range?.months ?? 0);
+    }, [data, cardRange]);
 
     const modalData = useMemo(() => {
       if (!data) return [];
@@ -184,14 +191,35 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
       <>
         <div
           ref={ref}
-          className="rounded-xl border border-border-primary bg-bg-secondary p-5 cursor-pointer group"
-          onClick={() => setFullscreen(true)}
+          className="rounded-xl border border-border-primary bg-bg-secondary p-5 group"
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-display text-text-primary">{title}</h3>
-            <Maximize2 className="h-4 w-4 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex items-center gap-2">
+              <div className="flex gap-0.5 rounded-lg bg-bg-tertiary p-0.5">
+                {MODAL_RANGES.map((r) => (
+                  <button
+                    key={r.label}
+                    onClick={() => setCardRange(r.label)}
+                    className={`px-2 py-0.5 text-[10px] rounded-md transition-colors ${
+                      cardRange === r.label
+                        ? "bg-bg-secondary text-text-primary shadow-sm"
+                        : "text-text-tertiary hover:text-text-secondary"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setFullscreen(true)}
+                className="p-1 rounded-lg hover:bg-bg-tertiary transition-colors text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <ChartContent data={data} chartData={data.data} height={300} />
+          <ChartContent data={data} chartData={cardData} height={300} />
         </div>
 
         {/* Fullscreen Modal */}

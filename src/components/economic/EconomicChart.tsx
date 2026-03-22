@@ -162,7 +162,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
         {/* Fullscreen Modal */}
         {fullscreen && (
           <div
-            className="fixed inset-0 z-50 bg-bg-primary/90 backdrop-blur-sm flex items-center justify-center p-8"
+            className="fixed inset-0 z-50 bg-bg-primary/60 backdrop-blur-sm flex items-center justify-center p-8"
             onClick={() => setFullscreen(false)}
           >
             <div

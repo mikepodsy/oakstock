@@ -39,7 +39,7 @@ export default function RadarPage() {
       <div className="mb-6">
         <h1 className="font-display text-2xl text-text-primary">Radar</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Discover stocks by sector
+          Discover stocks by sector and theme
         </p>
       </div>
 

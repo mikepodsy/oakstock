@@ -96,6 +96,38 @@ export const RADAR_SECTORS: Record<string, { label: string; tickers: string[] }>
     label: "Communication Services",
     tickers: ["META", "GOOG", "NFLX", "DIS", "CMCSA", "T", "VZ", "TMUS", "CHTR", "EA", "WBD", "OMC", "TTWO"],
   },
+  artificial_intelligence: {
+    label: "Artificial Intelligence",
+    tickers: [],
+  },
+  fintech: {
+    label: "Fintech",
+    tickers: [],
+  },
+  cybersecurity: {
+    label: "Cybersecurity",
+    tickers: [],
+  },
+  growth_stocks: {
+    label: "Growth Stocks",
+    tickers: [],
+  },
+  dividend_aristocrats: {
+    label: "Dividend Aristocrats",
+    tickers: [],
+  },
+  semiconductors: {
+    label: "Semiconductors",
+    tickers: [],
+  },
+  cloud_computing: {
+    label: "Cloud Computing",
+    tickers: [],
+  },
+  cannabis: {
+    label: "Cannabis",
+    tickers: [],
+  },
 } as const;
 
 export const RADAR_SECTOR_KEYS = Object.keys(RADAR_SECTORS);

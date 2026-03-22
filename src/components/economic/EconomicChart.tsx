@@ -22,6 +22,7 @@ const MODAL_RANGES = [
   { label: "2Y", months: 24 },
   { label: "5Y", months: 60 },
   { label: "10Y", months: 120 },
+  { label: "20Y", months: 240 },
   { label: "ALL", months: 0 },
 ] as const;
 
@@ -46,7 +47,6 @@ interface EconomicChartProps {
   data: EconomicIndicatorData | null;
   loading: boolean;
   title: string;
-  pageRange?: string;
 }
 
 function CustomTooltip({
@@ -130,33 +130,11 @@ function ChartContent({
   );
 }
 
-// Map page-level range strings to months for filtering card-level options
-const PAGE_RANGE_MONTHS: Record<string, number> = {
-  "1y": 12,
-  "2y": 24,
-  "5y": 60,
-  "10y": 120,
-  max: 0, // 0 means no limit
-};
-
 export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
-  function EconomicChart({ data, loading, title, pageRange }, ref) {
+  function EconomicChart({ data, loading, title }, ref) {
     const [fullscreen, setFullscreen] = useState(false);
     const [cardRange, setCardRange] = useState("ALL");
     const [modalRange, setModalRange] = useState("ALL");
-
-    // Reset card/modal range to ALL when page-level range changes
-    useEffect(() => {
-      setCardRange("ALL");
-      setModalRange("ALL");
-    }, [pageRange]);
-
-    // Filter MODAL_RANGES to only show options within the fetched data range
-    const availableRanges = useMemo(() => {
-      const pageMonths = PAGE_RANGE_MONTHS[pageRange || "max"] ?? 0;
-      if (pageMonths === 0) return MODAL_RANGES; // "max" — show all options
-      return MODAL_RANGES.filter((r) => r.months === 0 || r.months <= pageMonths);
-    }, [pageRange]);
 
     const handleEsc = useCallback((e: KeyboardEvent) => {
       if (e.key === "Escape") setFullscreen(false);
@@ -220,7 +198,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
             <h3 className="text-lg font-display text-text-primary">{title}</h3>
             <div className="flex items-center gap-2">
               <div className="flex gap-0.5 rounded-lg bg-bg-tertiary p-0.5">
-                {availableRanges.map((r) => (
+                {MODAL_RANGES.map((r) => (
                   <button
                     key={r.label}
                     onClick={() => setCardRange(r.label)}
@@ -259,7 +237,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
                 <h3 className="text-xl font-display text-text-primary">{title}</h3>
                 <div className="flex items-center gap-3">
                   <div className="flex gap-1 rounded-lg bg-bg-tertiary p-0.5">
-                    {availableRanges.map((r) => (
+                    {MODAL_RANGES.map((r) => (
                       <button
                         key={r.label}
                         onClick={() => setModalRange(r.label)}

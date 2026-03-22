@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useState, useEffect, useCallback } from "react";
+import { forwardRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -10,10 +10,31 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import type { EconomicIndicatorData } from "@/types";
+import type { EconomicIndicatorData, EconomicDataPoint } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Maximize2, X } from "lucide-react";
+
+const MODAL_RANGES = [
+  { label: "3M", months: 3 },
+  { label: "6M", months: 6 },
+  { label: "1Y", months: 12 },
+  { label: "2Y", months: 24 },
+  { label: "5Y", months: 60 },
+  { label: "10Y", months: 120 },
+  { label: "ALL", months: 0 },
+] as const;
+
+function filterDataByRange(
+  data: EconomicDataPoint[],
+  months: number
+): EconomicDataPoint[] {
+  if (months === 0 || data.length === 0) return data;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - months);
+  const cutoffStr = cutoff.toISOString().split("T")[0];
+  return data.filter((d) => d.date >= cutoffStr);
+}
 
 function formatDisplayValue(value: number, unit: string): string {
   if (unit === "%") return `${value.toFixed(2)}%`;
@@ -55,9 +76,11 @@ function CustomTooltip({
 
 function ChartContent({
   data,
+  chartData,
   height,
 }: {
   data: EconomicIndicatorData;
+  chartData: EconomicDataPoint[];
   height: number;
 }) {
   const formatYAxis = (value: number) => {
@@ -70,7 +93,7 @@ function ChartContent({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart
-        data={data.data}
+        data={chartData}
         margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
       >
         <CartesianGrid
@@ -109,6 +132,7 @@ function ChartContent({
 export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
   function EconomicChart({ data, loading, title }, ref) {
     const [fullscreen, setFullscreen] = useState(false);
+    const [modalRange, setModalRange] = useState("ALL");
 
     const handleEsc = useCallback((e: KeyboardEvent) => {
       if (e.key === "Escape") setFullscreen(false);
@@ -124,6 +148,17 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
         document.body.style.overflow = "";
       };
     }, [fullscreen, handleEsc]);
+
+    // Reset range when opening modal
+    useEffect(() => {
+      if (fullscreen) setModalRange("ALL");
+    }, [fullscreen]);
+
+    const modalData = useMemo(() => {
+      if (!data) return [];
+      const range = MODAL_RANGES.find((r) => r.label === modalRange);
+      return filterDataByRange(data.data, range?.months ?? 0);
+    }, [data, modalRange]);
 
     if (loading) {
       return (
@@ -156,7 +191,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
             <h3 className="text-lg font-display text-text-primary">{title}</h3>
             <Maximize2 className="h-4 w-4 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-          <ChartContent data={data} height={300} />
+          <ChartContent data={data} chartData={data.data} height={300} />
         </div>
 
         {/* Fullscreen Modal */}
@@ -171,14 +206,31 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
             >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-display text-text-primary">{title}</h3>
-                <button
-                  onClick={() => setFullscreen(false)}
-                  className="p-1.5 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1 rounded-lg bg-bg-tertiary p-0.5">
+                    {MODAL_RANGES.map((r) => (
+                      <button
+                        key={r.label}
+                        onClick={() => setModalRange(r.label)}
+                        className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                          modalRange === r.label
+                            ? "bg-bg-secondary text-text-primary shadow-sm"
+                            : "text-text-tertiary hover:text-text-secondary"
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setFullscreen(false)}
+                    className="p-1.5 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
-              <ChartContent data={data} height={500} />
+              <ChartContent data={data} chartData={modalData} height={500} />
             </div>
           </div>
         )}

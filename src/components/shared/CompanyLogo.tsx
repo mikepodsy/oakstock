@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import tickerDomains from "@/data/ticker-domains.json";
 
 const LOGO_COLORS = [
   "#6366f1", "#8b5cf6", "#d946ef", "#f43f5e",
@@ -12,6 +13,15 @@ function getLogoColor(ticker: string): string {
   return LOGO_COLORS[hash % LOGO_COLORS.length];
 }
 
+const domainMap = tickerDomains as Record<string, string>;
+
+function getDomain(ticker: string, website?: string): string | null {
+  // Static map first (instant), then fall back to website prop
+  if (domainMap[ticker]) return domainMap[ticker];
+  if (!website) return null;
+  return website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+}
+
 export function CompanyLogo({
   ticker,
   website,
@@ -20,9 +30,7 @@ export function CompanyLogo({
   website?: string;
 }) {
   const [imgError, setImgError] = useState(false);
-  const domain = website
-    ? website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]
-    : null;
+  const domain = getDomain(ticker, website);
   const logoUrl = domain ? `/api/logo?domain=${encodeURIComponent(domain)}` : null;
 
   if (!logoUrl || imgError) {

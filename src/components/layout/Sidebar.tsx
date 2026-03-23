@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Calculator,
   Scale,
+  Globe,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -34,6 +35,7 @@ const NAV_LINKS = [
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
   { href: "/radar", label: "Radar", icon: Radar },
+  { href: "/market-data", label: "Market Data", icon: Globe },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/dividends", label: "Dividends", icon: HandCoins },
   { href: "/economic", label: "Economic", icon: TrendingUp },

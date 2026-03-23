@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { LayoutGrid, List, ChevronDown } from "lucide-react";
+import { LayoutGrid, List, ChevronDown, Search, X } from "lucide-react";
 import { useQuotes } from "@/hooks/useQuotes";
 import { RadarGrid, type RadarViewMode } from "@/components/radar/RadarGrid";
 import {
@@ -23,6 +23,7 @@ export default function RadarPage() {
   const [viewMode, setViewMode] = useState<RadarViewMode>("cards");
   const [sectorDropdownOpen, setSectorDropdownOpen] = useState(false);
   const [etfDropdownOpen, setEtfDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const stockTickers = useMemo(
     () => RADAR_SECTORS[selectedSector].tickers,
@@ -36,9 +37,10 @@ export default function RadarPage() {
   const activeTickers = activeTab === "stocks" ? stockTickers : etfTickers;
   const { quotes, loading } = useQuotes(activeTickers as unknown as string[]);
 
-  // Reset expanded card on navigation
+  // Reset expanded card and search on navigation
   useEffect(() => {
     setExpandedTicker(null);
+    setSearchQuery("");
   }, [selectedSector, selectedEtfCategory, activeTab]);
 
   // Close dropdowns on outside click
@@ -52,14 +54,19 @@ export default function RadarPage() {
     return () => document.removeEventListener("click", handler);
   }, [sectorDropdownOpen, etfDropdownOpen]);
 
-  const tickerItems = useMemo(
-    () =>
-      activeTickers.map((t) => ({
-        ticker: t,
-        name: quotes[t]?.name ?? t,
-      })),
-    [activeTickers, quotes]
-  );
+  const tickerItems = useMemo(() => {
+    const items = activeTickers.map((t) => ({
+      ticker: t,
+      name: quotes[t]?.name ?? t,
+    }));
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.trim().toLowerCase();
+    return items.filter(
+      (item) =>
+        item.ticker.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q)
+    );
+  }, [activeTickers, quotes, searchQuery]);
 
   function handleToggleExpand(ticker: string) {
     setExpandedTicker((prev) => (prev === ticker ? null : ticker));
@@ -127,8 +134,8 @@ export default function RadarPage() {
         </button>
       </div>
 
-      {/* Sub-navigation dropdown */}
-      <div className="mb-6 border-b border-border-primary pb-4">
+      {/* Sub-navigation dropdown + search */}
+      <div className="mb-6 border-b border-border-primary pb-4 flex items-center gap-3 flex-wrap">
         <div className="relative inline-block">
           {activeTab === "stocks" ? (
             <>
@@ -216,6 +223,26 @@ export default function RadarPage() {
                 </div>
               )}
             </>
+          )}
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by ticker or name…"
+            className="pl-9 pr-8 py-2 rounded-lg bg-bg-secondary border border-border-primary text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-green-primary/50 transition-colors w-64"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
       </div>

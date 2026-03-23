@@ -60,31 +60,48 @@ async function getLatestFiling(cik: string): Promise<FilingMeta | null> {
   return null;
 }
 
-async function getXmlUrl(cik: string, accession: string): Promise<string | null> {
+async function getXmlUrlWithDiag(
+  cik: string,
+  accession: string
+): Promise<{ url: string | null; indexItems: string[]; indexError?: string }> {
   const cikRaw = cik.replace(/^0+/, "");
   const accFmt = `${accession.slice(0, 10)}-${accession.slice(10, 12)}-${accession.slice(12)}`;
   const indexUrl = `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${accFmt}-index.json`;
+
+  let indexItems: string[] = [];
+  let indexError: string | undefined;
 
   try {
     const index = (await (await edgarGet(indexUrl)).json()) as {
       directory?: { item?: { name: string; type: string }[] };
     };
     const items = index.directory?.item ?? [];
+    indexItems = items.map((i) => i.name);
 
+    // Pass 1: explicit infotable file
     for (const item of items) {
-      if (item.name.toLowerCase().includes("infotable") && item.name.endsWith(".xml")) {
-        return `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`;
+      const n = item.name.toLowerCase();
+      if (n.endsWith(".xml") && (n.includes("infotable") || n.includes("informationtable") || n.includes("13finfo"))) {
+        return { url: `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`, indexItems };
       }
     }
+    // Pass 2: any XML that isn't clearly a cover sheet
+    const coverNames = new Set(["primary_doc.xml", "primarydocument.xml", "form.xml"]);
     for (const item of items) {
-      if (item.name.endsWith(".xml") && item.name !== "primary_doc.xml") {
-        return `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`;
+      if (item.name.endsWith(".xml") && !coverNames.has(item.name.toLowerCase())) {
+        return { url: `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`, indexItems };
       }
     }
-  } catch {
-    // ignore index errors
+    // Pass 3: any XML at all (maybe holdings are in the primary doc)
+    for (const item of items) {
+      if (item.name.endsWith(".xml")) {
+        return { url: `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`, indexItems };
+      }
+    }
+  } catch (e) {
+    indexError = String(e);
   }
-  return null;
+  return { url: null, indexItems, indexError };
 }
 
 function parse13fXml(xmlText: string): HoldingRow[] {
@@ -216,9 +233,14 @@ export async function POST(request: NextRequest) {
       }
 
       // 3. Find + fetch XML
-      const xmlUrl = await getXmlUrl(cik, filing.accession);
+      const { url: xmlUrl, indexItems, indexError } = await getXmlUrlWithDiag(cik, filing.accession);
       if (!xmlUrl) {
-        results[mid] = { error: "XML file not found in filing" };
+        results[mid] = {
+          error: "XML file not found in filing",
+          accession: filing.accession,
+          indexItems,
+          indexError,
+        };
         continue;
       }
 

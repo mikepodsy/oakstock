@@ -21,6 +21,7 @@ export default function RadarPage() {
   );
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<RadarViewMode>("cards");
+  const [sectorDropdownOpen, setSectorDropdownOpen] = useState(false);
   const [etfDropdownOpen, setEtfDropdownOpen] = useState(false);
 
   const stockTickers = useMemo(
@@ -40,13 +41,16 @@ export default function RadarPage() {
     setExpandedTicker(null);
   }, [selectedSector, selectedEtfCategory, activeTab]);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!etfDropdownOpen) return;
-    const handler = () => setEtfDropdownOpen(false);
+    if (!sectorDropdownOpen && !etfDropdownOpen) return;
+    const handler = () => {
+      setSectorDropdownOpen(false);
+      setEtfDropdownOpen(false);
+    };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
-  }, [etfDropdownOpen]);
+  }, [sectorDropdownOpen, etfDropdownOpen]);
 
   const tickerItems = useMemo(
     () =>
@@ -123,70 +127,98 @@ export default function RadarPage() {
         </button>
       </div>
 
-      {/* Sub-navigation: sector pills (Stocks) or category dropdown (ETFs) */}
-      {activeTab === "stocks" ? (
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 border-b border-border-primary">
-          {RADAR_SECTOR_KEYS.map((key) => (
-            <button
-              key={key}
-              onClick={() => setSelectedSector(key)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                key === selectedSector
-                  ? "bg-green-primary text-bg-primary"
-                  : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {RADAR_SECTORS[key].label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="mb-6 border-b border-border-primary pb-4">
-          {/* ETF category dropdown */}
-          <div className="relative inline-block">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setEtfDropdownOpen((o) => !o);
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-secondary border border-border-primary hover:border-green-primary/50 transition-colors text-sm font-medium text-text-primary min-w-[220px]"
-            >
-              <span className="flex-1 text-left">
-                {RADAR_ETF_CATEGORIES[selectedEtfCategory].label}
-              </span>
-              <ChevronDown
-                className={`h-4 w-4 text-text-tertiary transition-transform ${
-                  etfDropdownOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {etfDropdownOpen && (
-              <div
-                className="absolute top-full left-0 mt-1 z-50 w-64 rounded-xl bg-bg-secondary border border-border-primary shadow-xl overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
+      {/* Sub-navigation dropdown */}
+      <div className="mb-6 border-b border-border-primary pb-4">
+        <div className="relative inline-block">
+          {activeTab === "stocks" ? (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSectorDropdownOpen((o) => !o);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-secondary border border-border-primary hover:border-green-primary/50 transition-colors text-sm font-medium text-text-primary min-w-[220px]"
               >
-                {RADAR_ETF_CATEGORY_KEYS.map((key) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      setSelectedEtfCategory(key);
-                      setEtfDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                      key === selectedEtfCategory
-                        ? "bg-green-primary/10 text-green-primary font-medium"
-                        : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
-                    }`}
-                  >
-                    {RADAR_ETF_CATEGORIES[key].label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                <span className="flex-1 text-left">
+                  {RADAR_SECTORS[selectedSector].label}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-text-tertiary transition-transform ${
+                    sectorDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {sectorDropdownOpen && (
+                <div
+                  className="absolute top-full left-0 mt-1 z-50 w-64 max-h-80 overflow-y-auto rounded-xl bg-bg-secondary border border-border-primary shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {RADAR_SECTOR_KEYS.map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setSelectedSector(key);
+                        setSectorDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                        key === selectedSector
+                          ? "bg-green-primary/10 text-green-primary font-medium"
+                          : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                      }`}
+                    >
+                      {RADAR_SECTORS[key].label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEtfDropdownOpen((o) => !o);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-secondary border border-border-primary hover:border-green-primary/50 transition-colors text-sm font-medium text-text-primary min-w-[220px]"
+              >
+                <span className="flex-1 text-left">
+                  {RADAR_ETF_CATEGORIES[selectedEtfCategory].label}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-text-tertiary transition-transform ${
+                    etfDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {etfDropdownOpen && (
+                <div
+                  className="absolute top-full left-0 mt-1 z-50 w-64 max-h-80 overflow-y-auto rounded-xl bg-bg-secondary border border-border-primary shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {RADAR_ETF_CATEGORY_KEYS.map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setSelectedEtfCategory(key);
+                        setEtfDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                        key === selectedEtfCategory
+                          ? "bg-green-primary/10 text-green-primary font-medium"
+                          : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                      }`}
+                    >
+                      {RADAR_ETF_CATEGORIES[key].label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Grid */}
       <RadarGrid

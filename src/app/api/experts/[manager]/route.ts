@@ -5,10 +5,10 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 // Returns full holdings + QoQ comparison for a specific manager.
 export async function GET(
   request: NextRequest,
-  { params }: { params: { manager: string } }
+  { params }: { params: Promise<{ manager: string }> }
 ) {
   const supabase = createServerSupabaseClient();
-  const managerId = params.manager;
+  const { manager: managerId } = await params;
   const requestedQuarter = request.nextUrl.searchParams.get("quarter");
 
   // 1. Get manager info

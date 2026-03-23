@@ -139,3 +139,68 @@ export const RADAR_SECTORS: Record<string, { label: string; tickers: string[] }>
 } as const;
 
 export const RADAR_SECTOR_KEYS = Object.keys(RADAR_SECTORS);
+
+export const RADAR_ETF_CATEGORIES: Record<string, { label: string; tickers: string[] }> = {
+  broad_market: {
+    label: "Broad Market & Index",
+    tickers: ["SPY","IVV","VOO","VTI","ITOT","SCHB","QQQ","QQQM","DIA","IWM","IWB","IWV","VB","VBK","VBR","VO","VOT","VOE","VV","MGK","MGV","RSP","EUSA","SCHX","SCHA","SCHM","IVW","IVE","VUG","VTV"],
+  },
+  etf_technology: {
+    label: "Technology",
+    tickers: ["XLK","VGT","IYW","FTEC","SMH","SOXX","SOXQ","NVDL","USD","PSI","AIQ","BOTZ","ROBT","IRBO","ARKQ","WCLD","SKYY","CLOU","BUG","CIBR","HACK","IHAK","IGV","PSJ","FINX","IPAY","BLOK","BKCH","ARKW","ARKK"],
+  },
+  etf_healthcare: {
+    label: "Healthcare",
+    tickers: ["XLV","VHT","IYH","FHLC","IBB","XBI","BBH","ARKG","GNOM","PTH","IHI","MEDI","RXL","GDNA","IDNA","PSCH","IHE","PJP","IHF","HTEC"],
+  },
+  etf_financials: {
+    label: "Financials",
+    tickers: ["XLF","VFH","IYF","FNCL","KBE","KRE","IAT","KBWB","KBWR","KIE","IAK","KCE","IAI","FINX","IPAY","BLOK","MOFG","BIZD","PFFD","PGX"],
+  },
+  etf_energy: {
+    label: "Energy",
+    tickers: ["XLE","VDE","IYE","FENY","XOP","OIH","XES","AMLP","AMJ","MLPA","MLPX","ENFR","TPYP","ICLN","QCLN","ACES","SMOG","CNRG","FAN","TAN"],
+  },
+  etf_consumer: {
+    label: "Consumer",
+    tickers: ["XLY","XLP","VCR","VDC","IYC","IYK","FDIS","FSTA","PSCD","PSCC","RTH","XRT","PMR","IBUY","ONLN","PBJ","MOO","BITE","AWAY","PEJ"],
+  },
+  etf_industrials_materials: {
+    label: "Industrials & Materials",
+    tickers: ["XLI","XLB","VIS","VAW","IYJ","IYM","FIDU","FMAT","XAR","ITA","PPA","DFEN","XTN","IYT","FTXR","PAVE","IGF","IFRA","GNR","GUNR"],
+  },
+  etf_real_estate: {
+    label: "Real Estate",
+    tickers: ["VNQ","IYR","XLRE","SCHH","RWR","REM","RFI","NETL","INDS","HOMZ","REZ","STOR","SRVR","PPTY","KBWY","FFR","IFGL","VNQI","RWX","WPS"],
+  },
+  international_global: {
+    label: "International & Global",
+    tickers: ["VEA","VEU","VT","VXUS","EFA","IEFA","SCHF","VWO","EEM","IEMG","SCHE","FXI","KWEB","MCHI","EWJ","DXJ","DBJP","EWG","EWU","EWC","EWA","EWZ","EWW","EWY","EWT","INDA","INDY","SMIN","EZA","EMXC"],
+  },
+  fixed_income: {
+    label: "Fixed Income & Bonds",
+    tickers: ["BND","AGG","SCHZ","BIV","BSV","BLV","IEF","SHY","TLT","TLH","GOVT","VGIT","VGLT","VGSH","TIPS","VTIP","SCHP","LQD","VCIT","VCSH","VCLT","USIG","HYG","JNK","USHY","SHYG","MBB","VMBS","MUB","VTEB"],
+  },
+  commodities: {
+    label: "Commodities & Alternatives",
+    tickers: ["GLD","IAU","GLDM","SGOL","SLV","SIVR","PPLT","PALL","GDX","GDXJ","SIL","SILJ","USO","BNO","UNG","UCO","DBO","DBB","DBP","DBC","PDBC","COMT","COMB","GSG","WEAT","CORN","SOYB","CANE","WOOD","REMX"],
+  },
+  dividend_income: {
+    label: "Dividend & Income",
+    tickers: ["VYM","DVY","HDV","SCHD","DGRO","VIG","DGRW","SDY","NOBL","REGL","SMDV","DIV","SDIV","IDV","VYMI","FVD","RDIV","PEY","SPHD","SPYD"],
+  },
+  factor_smart_beta: {
+    label: "Factor & Smart Beta",
+    tickers: ["MTUM","QUAL","SIZE","VLUE","USMV","EFAV","EEMV","ACWV","LRGF","INTL","VFMF","VFMO","VFQY","VFVA","VFLQ","SPLV","XSLV","XMLV","SPHQ","SPMO"],
+  },
+  thematic_megatrend: {
+    label: "Thematic & Megatrend",
+    tickers: ["ARKK","ARKG","ARKW","ARKQ","ARKF","ARKX","BOTZ","AIQ","IRBO","ROBO","LIT","BATT","DRIV","KARS","IDRV","ECAR","ICLN","ACES","ERTH","VCAR","METV","UFO","ROKT","MOON","YOLO","MJ","MSOS","HERO","ESPO"],
+  },
+  leveraged_inverse: {
+    label: "Leveraged & Inverse",
+    tickers: ["TQQQ","SQQQ","QLD","PSQ","SPXL","SPXS","UPRO","SH","SDS","SSO","SOXL","SOXS","TECL","TECS","FNGU","FNGD","LABU","LABD","TNA","TZA","NUGT","DUST","UCO","SCO","TMF","TMV","TBF","UVXY","SVXY","VIXY"],
+  },
+} as const;
+
+export const RADAR_ETF_CATEGORY_KEYS = Object.keys(RADAR_ETF_CATEGORIES);

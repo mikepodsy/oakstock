@@ -94,7 +94,7 @@ export default function RadarPage() {
       {loading && Object.keys(quotes).length === 0 ? (
         <div className={viewMode === "cards"
           ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-          : "flex flex-col gap-2"
+          : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"
         }>
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className={viewMode === "cards" ? "h-48 rounded-xl" : "h-16 rounded-xl"} />

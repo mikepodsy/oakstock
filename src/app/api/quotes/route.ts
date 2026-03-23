@@ -83,16 +83,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await Promise.allSettled(
-      tickers.map((t) => fetchSingleQuote(t))
-    );
+    // Process in batches of 20 to avoid overwhelming Yahoo Finance
+    const BATCH_SIZE = 20;
+    const quotes: Awaited<ReturnType<typeof fetchSingleQuote>>[] = [];
 
-    const quotes = results
-      .filter(
-        (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchSingleQuote>>> =>
-          r.status === "fulfilled"
-      )
-      .map((r) => r.value);
+    for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+      const batch = tickers.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((t) => fetchSingleQuote(t))
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled") quotes.push(r.value);
+      }
+    }
 
     return NextResponse.json(quotes, { headers: CACHE_HEADERS });
   } catch {

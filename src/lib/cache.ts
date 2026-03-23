@@ -22,7 +22,7 @@ export class TTLCache<T = unknown> {
   }
 
   set(key: string, data: T): void {
-    if (this.store.size > 500) this.prune();
+    if (this.store.size > 2000) this.prune();
     this.store.set(key, { data, expiresAt: Date.now() + this.ttlMs });
   }
 
@@ -44,8 +44,8 @@ function getOrCreateCache<T>(key: string, ttlSeconds: number): TTLCache<T> {
   return g[globalKey] as TTLCache<T>;
 }
 
-export const quoteCache = getOrCreateCache<Record<string, unknown>>("quotes", 60);
-export const historyCache = getOrCreateCache<Array<{ date: string; close: number }>>("history", 600);
+export const quoteCache = getOrCreateCache<Record<string, unknown>>("quotes", 300);
+export const historyCache = getOrCreateCache<Array<{ date: string; close: number }>>("history", 1800);
 export const financialsCache = getOrCreateCache<Record<string, unknown>>("financials", 1800);
 export const fundamentalsCache = getOrCreateCache<Record<string, unknown>>("fundamentals-ts", 3600);
 export const calendarCache = getOrCreateCache<unknown[]>("calendar", 3600);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,25 @@ export function RadarCard({
   onToggle,
 }: RadarCardProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const watchlists = useWatchlistStore((s) => s.watchlists);
   const addItem = useWatchlistStore((s) => s.addItem);
 
@@ -57,6 +75,7 @@ export function RadarCard({
 
   return (
     <div
+      ref={cardRef}
       className={`rounded-xl border bg-bg-secondary transition-all duration-300 ${
         isExpanded
           ? "border-green-primary/40 shadow-lg"
@@ -122,8 +141,8 @@ export function RadarCard({
           </div>
         </div>
 
-        {/* Performance Pills */}
-        {quote && (
+        {/* Performance Pills — only load when visible */}
+        {quote && isVisible && (
           <div className="text-center">
             <p className="text-xs font-medium text-text-secondary mb-2">
               Performance

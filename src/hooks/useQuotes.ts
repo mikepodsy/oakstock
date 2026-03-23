@@ -37,10 +37,10 @@ export function useQuotes(tickers: string[]) {
     refetch();
   }, [refetch]);
 
-  // Auto-refresh every 60 seconds
+  // Auto-refresh every 5 minutes
   useEffect(() => {
     if (tickers.length === 0) return;
-    const interval = setInterval(refetch, 60_000);
+    const interval = setInterval(refetch, 300_000);
     return () => clearInterval(interval);
   }, [refetch, tickers.length]);
 

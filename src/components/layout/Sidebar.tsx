@@ -18,6 +18,7 @@ import {
   Globe,
   PanelLeftClose,
   PanelLeftOpen,
+  Users,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
@@ -41,6 +42,7 @@ const NAV_LINKS = [
   { href: "/economic", label: "Economic", icon: TrendingUp },
   { href: "/dcf", label: "DCF", icon: Calculator },
   { href: "/rebalance", label: "Rebalance", icon: Scale },
+  { href: "/experts", label: "Experts", icon: Users },
 ];
 
 const STORAGE_KEY = "oakstock-sidebar-collapsed";

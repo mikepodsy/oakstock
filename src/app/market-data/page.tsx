@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMarketTable, type MarketTableItem } from "@/hooks/useMarketTable";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -153,7 +154,11 @@ function DataRow({
       {/* Name */}
       <td className="py-2.5 pl-0 pr-4 text-sm text-text-primary whitespace-nowrap">{name}</td>
       {/* Symbol */}
-      <td className="py-2.5 pr-6 text-sm font-medium text-green-primary whitespace-nowrap">{item?.ticker ?? ticker}</td>
+      <td className="py-2.5 pr-6 text-sm font-medium text-green-primary whitespace-nowrap">
+        <Link href={`/stock/${encodeURIComponent(item?.ticker ?? ticker)}`} className="hover:underline">
+          {item?.ticker ?? ticker}
+        </Link>
+      </td>
       {/* Today */}
       <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap font-medium ${returnClass(r?.today ?? null)}`}>
         {item ? fmtReturn(r?.today ?? null) : <Skeleton className="h-4 w-14 ml-auto" />}

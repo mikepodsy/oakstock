@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { DataProvider } from "@/components/layout/DataProvider";
-import { Navbar } from "@/components/layout/Navbar";
+import { Sidebar } from "@/components/layout/Sidebar";
 import { MarketOverviewBar } from "@/components/layout/MarketOverviewBar";
 import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -34,9 +34,13 @@ export default function RootLayout({
         >
           <ThemeProvider>
             <DataProvider>
-              <Navbar />
-              <MarketOverviewBar />
-              <main className="min-h-[calc(100vh-104px)]">{children}</main>
+              <div className="flex flex-col md:flex-row h-screen overflow-hidden">
+                <Sidebar />
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <MarketOverviewBar />
+                  <main className="flex-1 overflow-y-auto">{children}</main>
+                </div>
+              </div>
               <Toaster />
               <SpeedInsights />
             </DataProvider>

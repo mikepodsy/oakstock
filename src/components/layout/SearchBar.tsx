@@ -93,7 +93,7 @@ export function SearchBar() {
   }
 
   return (
-    <div ref={containerRef} className="relative hidden md:block">
+    <div ref={containerRef} className="relative">
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
         <input
@@ -103,8 +103,8 @@ export function SearchBar() {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search stocks & ETFs..."
-          className="h-8 w-52 rounded-lg border border-border-primary bg-bg-tertiary pl-8 pr-8 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-green-primary transition-all"
+          placeholder="Search..."
+          className="h-8 w-full rounded-lg border border-border-primary bg-bg-tertiary pl-8 pr-8 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-green-primary transition-all"
         />
         {loading && (
           <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary animate-spin" />
@@ -112,7 +112,7 @@ export function SearchBar() {
       </div>
 
       {open && (
-        <div className="absolute top-full mt-1 w-80 right-0 rounded-lg border border-border-primary bg-bg-secondary shadow-lg overflow-hidden z-50">
+        <div className="absolute bottom-full mb-1 w-80 left-0 rounded-lg border border-border-primary bg-bg-secondary shadow-lg overflow-hidden z-50">
           {results.map((r, i) => (
             <button
               key={r.ticker}

@@ -74,12 +74,30 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;
   const areaColor = isUp ? "var(--green-primary)" : "var(--red-primary)";
 
+  const priceChange =
+    data.length >= 2 ? data[data.length - 1].close - data[0].close : 0;
+  const priceChangePercent =
+    data.length >= 2 && data[0].close !== 0
+      ? (priceChange / data[0].close) * 100
+      : 0;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-text-primary">
-          Price Chart
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-text-primary">
+            Price Chart
+          </span>
+          {!loading && data.length >= 2 && (
+            <span
+              className="text-xs font-medium"
+              style={{ color: areaColor }}
+            >
+              {isUp ? "+" : ""}
+              {priceChangePercent.toFixed(2)}%
+            </span>
+          )}
+        </div>
         <TimeRangePicker selected={period} onSelect={setPeriod} />
       </div>
 

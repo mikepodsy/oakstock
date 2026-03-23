@@ -9,6 +9,7 @@ import { StockPriceChart } from "@/components/charts/StockPriceChart";
 import { KeyStatsRow } from "@/components/stock/KeyStatsRow";
 import { FinancialChartsGrid } from "@/components/stock/FinancialChartsGrid";
 import { CompanyDescription } from "@/components/stock/CompanyDescription";
+import { SentimentSection } from "@/components/stock/SentimentSection";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StockDetailPage() {
@@ -81,6 +82,8 @@ export default function StockDetailPage() {
       <div className="mb-6">
         <StockPriceChart ticker={ticker} />
       </div>
+
+      <SentimentSection ticker={ticker} />
 
       <KeyStatsRow
         quote={quote}

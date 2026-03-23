@@ -4,7 +4,6 @@ import { useMemo, useState, useEffect } from "react";
 import { LayoutGrid, List } from "lucide-react";
 import { useQuotes } from "@/hooks/useQuotes";
 import { RadarGrid, type RadarViewMode } from "@/components/radar/RadarGrid";
-import { Skeleton } from "@/components/ui/skeleton";
 import { RADAR_SECTORS, RADAR_SECTOR_KEYS } from "@/utils/constants";
 
 export default function RadarPage() {
@@ -90,25 +89,13 @@ export default function RadarPage() {
         ))}
       </div>
 
-      {/* Loading state */}
-      {loading && Object.keys(quotes).length === 0 ? (
-        <div className={viewMode === "cards"
-          ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-          : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"
-        }>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className={viewMode === "cards" ? "h-48 rounded-xl" : "h-16 rounded-xl"} />
-          ))}
-        </div>
-      ) : (
-        <RadarGrid
-          tickers={tickerItems}
-          quotes={quotes}
-          expandedTicker={expandedTicker}
-          onToggleExpand={handleToggleExpand}
-          viewMode={viewMode}
-        />
-      )}
+      <RadarGrid
+        tickers={tickerItems}
+        quotes={quotes}
+        expandedTicker={expandedTicker}
+        onToggleExpand={handleToggleExpand}
+        viewMode={viewMode}
+      />
     </div>
   );
 }

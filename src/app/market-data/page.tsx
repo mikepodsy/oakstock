@@ -1,8 +1,84 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useMarketTable, type MarketTableItem } from "@/hooks/useMarketTable";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// ─── Provider Mapping ─────────────────────────────────
+const TICKER_PROVIDER: Record<string, { name: string; domain: string }> = {
+  // ── State Street (SPDR) ──────────────────────────────
+  SPY:  { name: "SPDR",    domain: "ssga.com" },
+  DIA:  { name: "SPDR",    domain: "ssga.com" },
+  MDY:  { name: "SPDR",    domain: "ssga.com" },
+  XLK:  { name: "SPDR",    domain: "ssga.com" },
+  XLV:  { name: "SPDR",    domain: "ssga.com" },
+  XLP:  { name: "SPDR",    domain: "ssga.com" },
+  XLU:  { name: "SPDR",    domain: "ssga.com" },
+  XLY:  { name: "SPDR",    domain: "ssga.com" },
+  XLC:  { name: "SPDR",    domain: "ssga.com" },
+  XLB:  { name: "SPDR",    domain: "ssga.com" },
+  XLF:  { name: "SPDR",    domain: "ssga.com" },
+  XLI:  { name: "SPDR",    domain: "ssga.com" },
+  XLE:  { name: "SPDR",    domain: "ssga.com" },
+  XLRE: { name: "SPDR",    domain: "ssga.com" },
+  SPDW: { name: "SPDR",    domain: "ssga.com" },
+  GLD:  { name: "SPDR",    domain: "ssga.com" },
+  BWX:  { name: "SPDR",    domain: "ssga.com" },
+  // ── Vanguard ─────────────────────────────────────────
+  VYM:  { name: "Vanguard", domain: "vanguard.com" },
+  VEA:  { name: "Vanguard", domain: "vanguard.com" },
+  VTI:  { name: "Vanguard", domain: "vanguard.com" },
+  BND:  { name: "Vanguard", domain: "vanguard.com" },
+  VCSH: { name: "Vanguard", domain: "vanguard.com" },
+  // ── iShares (BlackRock) ───────────────────────────────
+  IJR:  { name: "iShares", domain: "ishares.com" },
+  IWC:  { name: "iShares", domain: "ishares.com" },
+  IUSV: { name: "iShares", domain: "ishares.com" },
+  IUSG: { name: "iShares", domain: "ishares.com" },
+  QUAL: { name: "iShares", domain: "ishares.com" },
+  USMV: { name: "iShares", domain: "ishares.com" },
+  MTUM: { name: "iShares", domain: "ishares.com" },
+  DGRO: { name: "iShares", domain: "ishares.com" },
+  ACWI: { name: "iShares", domain: "ishares.com" },
+  IEMG: { name: "iShares", domain: "ishares.com" },
+  IEFA: { name: "iShares", domain: "ishares.com" },
+  EWZ:  { name: "iShares", domain: "ishares.com" },
+  EWQ:  { name: "iShares", domain: "ishares.com" },
+  EWU:  { name: "iShares", domain: "ishares.com" },
+  EWG:  { name: "iShares", domain: "ishares.com" },
+  EWJ:  { name: "iShares", domain: "ishares.com" },
+  MCHI: { name: "iShares", domain: "ishares.com" },
+  TLT:  { name: "iShares", domain: "ishares.com" },
+  TIP:  { name: "iShares", domain: "ishares.com" },
+  HYG:  { name: "iShares", domain: "ishares.com" },
+  SLV:  { name: "iShares", domain: "ishares.com" },
+};
+
+// ─── Provider Logo ────────────────────────────────────
+function ProviderLogo({ ticker }: { ticker: string }) {
+  const provider = TICKER_PROVIDER[ticker];
+  if (!provider) return <div className="w-5 h-5 shrink-0" />;
+
+  return (
+    <div
+      className="w-5 h-5 shrink-0 rounded overflow-hidden bg-bg-tertiary border border-border-primary"
+      title={provider.name}
+    >
+      <Image
+        src={`/api/logo?domain=${provider.domain}`}
+        alt={provider.name}
+        width={20}
+        height={20}
+        className="w-full h-full object-contain"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+        unoptimized
+      />
+    </div>
+  );
+}
 
 // ─── Section Definitions ──────────────────────────────
 const SECTIONS: {
@@ -152,7 +228,12 @@ function DataRow({
   return (
     <tr className={`group hover:bg-bg-tertiary transition-colors ${!isLast ? "border-b border-border-primary" : ""}`}>
       {/* Name */}
-      <td className="py-2.5 pl-0 pr-4 text-sm text-text-primary whitespace-nowrap">{name}</td>
+      <td className="py-2.5 pl-0 pr-4 text-sm text-text-primary whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          <ProviderLogo ticker={ticker} />
+          <span>{name}</span>
+        </div>
+      </td>
       {/* Symbol */}
       <td className="py-2.5 pr-6 text-sm font-medium text-green-primary whitespace-nowrap">
         <Link href={`/stock/${encodeURIComponent(item?.ticker ?? ticker)}`} className="hover:underline">
@@ -223,7 +304,12 @@ function DataRow({
 function SkeletonRow({ isLast }: { isLast: boolean }) {
   return (
     <tr className={!isLast ? "border-b border-border-primary" : ""}>
-      <td className="py-2.5 pl-0 pr-4"><Skeleton className="h-4 w-32" /></td>
+      <td className="py-2.5 pl-0 pr-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-5 h-5 rounded shrink-0" />
+          <Skeleton className="h-4 w-28" />
+        </div>
+      </td>
       <td className="py-2.5 pr-6"><Skeleton className="h-4 w-10" /></td>
       <td className="py-2.5 pr-4 text-right"><Skeleton className="h-4 w-14 ml-auto" /></td>
       <td className="py-2.5 pr-4 text-right hidden sm:table-cell"><Skeleton className="h-4 w-14 ml-auto" /></td>

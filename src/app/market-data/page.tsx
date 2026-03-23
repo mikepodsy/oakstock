@@ -1,388 +1,329 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useQuotes } from "@/hooks/useQuotes";
+import { useMarketTable, type MarketTableItem } from "@/hooks/useMarketTable";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
-// ─── Tab Types ────────────────────────────────────────
-type MarketTab = "key-markets" | "sectors" | "commodities" | "currencies" | "bonds" | "crypto";
-
-const TABS: { id: MarketTab; label: string }[] = [
-  { id: "key-markets", label: "Key Markets" },
-  { id: "sectors", label: "Sectors" },
-  { id: "commodities", label: "Commodities" },
-  { id: "currencies", label: "Currencies" },
-  { id: "bonds", label: "Bonds" },
-  { id: "crypto", label: "Crypto" },
-];
-
-// ─── Data Definitions ─────────────────────────────────
-const KEY_MARKETS_GROUPS: { label: string; items: { ticker: string; name: string }[] }[] = [
+// ─── Section Definitions ──────────────────────────────
+const SECTIONS: {
+  id: string;
+  title: string;
+  items: { ticker: string; name: string }[];
+}[] = [
   {
-    label: "US Indices",
+    id: "us-equities",
+    title: "U.S. EQUITIES",
     items: [
-      { ticker: "^GSPC", name: "S&P 500" },
-      { ticker: "^DJI", name: "Dow Jones Industrial" },
-      { ticker: "^IXIC", name: "NASDAQ Composite" },
-      { ticker: "^NDX", name: "NASDAQ 100" },
-      { ticker: "^RUT", name: "Russell 2000" },
-      { ticker: "^MID", name: "S&P 400 Mid-Cap" },
+      { ticker: "SPY", name: "S&P 500" },
+      { ticker: "DIA", name: "DJIA" },
+      { ticker: "QQQ", name: "NASDAQ 100" },
+      { ticker: "MDY", name: "Mid Cap" },
+      { ticker: "IJR", name: "Small Cap" },
+      { ticker: "IWC", name: "Micro Cap" },
     ],
   },
   {
-    label: "International",
+    id: "us-sectors",
+    title: "US EQUITY SECTORS",
     items: [
-      { ticker: "^GSPTSE", name: "TSX Composite" },
-      { ticker: "^FTSE", name: "FTSE 100" },
-      { ticker: "^GDAXI", name: "DAX" },
-      { ticker: "^FCHI", name: "CAC 40" },
-      { ticker: "^N225", name: "Nikkei 225" },
-      { ticker: "^HSI", name: "Hang Seng" },
-      { ticker: "^BVSP", name: "Bovespa" },
-      { ticker: "^NSEI", name: "Nifty 50" },
+      { ticker: "XLK", name: "Technology" },
+      { ticker: "XLV", name: "Healthcare" },
+      { ticker: "XLP", name: "Consumer Staples" },
+      { ticker: "XLU", name: "Utilities" },
+      { ticker: "XLY", name: "Consumer Discr." },
+      { ticker: "XLC", name: "Communication Svcs" },
+      { ticker: "XLB", name: "Basic Materials" },
+      { ticker: "XLF", name: "Financial Services" },
+      { ticker: "XLI", name: "Industrials" },
+      { ticker: "XLE", name: "Energy" },
+      { ticker: "XLRE", name: "Real Estate" },
     ],
   },
-];
-
-const SECTORS: { ticker: string; name: string; description: string }[] = [
-  { ticker: "XLK", name: "Technology", description: "SPDR Technology Select Sector" },
-  { ticker: "XLF", name: "Financials", description: "SPDR Financials Select Sector" },
-  { ticker: "XLE", name: "Energy", description: "SPDR Energy Select Sector" },
-  { ticker: "XLV", name: "Health Care", description: "SPDR Health Care Select Sector" },
-  { ticker: "XLC", name: "Communication Services", description: "SPDR Communication Services" },
-  { ticker: "XLY", name: "Consumer Discretionary", description: "SPDR Consumer Discretionary" },
-  { ticker: "XLP", name: "Consumer Staples", description: "SPDR Consumer Staples Select Sector" },
-  { ticker: "XLI", name: "Industrials", description: "SPDR Industrials Select Sector" },
-  { ticker: "XLB", name: "Materials", description: "SPDR Materials Select Sector" },
-  { ticker: "XLRE", name: "Real Estate", description: "SPDR Real Estate Select Sector" },
-  { ticker: "XLU", name: "Utilities", description: "SPDR Utilities Select Sector" },
-];
-
-const COMMODITIES: { ticker: string; name: string; unit: string }[] = [
-  { ticker: "GC=F", name: "Gold", unit: "oz" },
-  { ticker: "SI=F", name: "Silver", unit: "oz" },
-  { ticker: "CL=F", name: "Crude Oil (WTI)", unit: "bbl" },
-  { ticker: "BZ=F", name: "Brent Crude Oil", unit: "bbl" },
-  { ticker: "NG=F", name: "Natural Gas", unit: "MMBtu" },
-  { ticker: "HG=F", name: "Copper", unit: "lb" },
-  { ticker: "PL=F", name: "Platinum", unit: "oz" },
-  { ticker: "ZC=F", name: "Corn", unit: "bu" },
-  { ticker: "ZW=F", name: "Wheat", unit: "bu" },
-  { ticker: "ZS=F", name: "Soybeans", unit: "bu" },
-];
-
-const CURRENCIES: { ticker: string; name: string; pair: string }[] = [
-  { ticker: "DX-Y.NYB", name: "US Dollar Index", pair: "DXY" },
-  { ticker: "EURUSD=X", name: "Euro / US Dollar", pair: "EUR/USD" },
-  { ticker: "GBPUSD=X", name: "British Pound / US Dollar", pair: "GBP/USD" },
-  { ticker: "JPY=X", name: "US Dollar / Japanese Yen", pair: "USD/JPY" },
-  { ticker: "CAD=X", name: "US Dollar / Canadian Dollar", pair: "USD/CAD" },
-  { ticker: "AUDUSD=X", name: "Australian Dollar / US Dollar", pair: "AUD/USD" },
-  { ticker: "CHF=X", name: "US Dollar / Swiss Franc", pair: "USD/CHF" },
-  { ticker: "CNY=X", name: "US Dollar / Chinese Yuan", pair: "USD/CNY" },
-];
-
-const BONDS: { ticker: string; name: string; type: "yield" | "etf" }[] = [
-  { ticker: "^IRX", name: "13-Week Treasury Yield", type: "yield" },
-  { ticker: "^FVX", name: "5-Year Treasury Yield", type: "yield" },
-  { ticker: "^TNX", name: "10-Year Treasury Yield", type: "yield" },
-  { ticker: "^TYX", name: "30-Year Treasury Yield", type: "yield" },
-  { ticker: "SHY", name: "iShares 1–3yr Treasury Bond (SHY)", type: "etf" },
-  { ticker: "IEF", name: "iShares 7–10yr Treasury Bond (IEF)", type: "etf" },
-  { ticker: "TLT", name: "iShares 20+yr Treasury Bond (TLT)", type: "etf" },
-  { ticker: "LQD", name: "iShares Investment Grade Corp (LQD)", type: "etf" },
-  { ticker: "HYG", name: "iShares High Yield Corp Bond (HYG)", type: "etf" },
-];
-
-const CRYPTO: { ticker: string; name: string }[] = [
-  { ticker: "BTC-USD", name: "Bitcoin" },
-  { ticker: "ETH-USD", name: "Ethereum" },
-  { ticker: "SOL-USD", name: "Solana" },
-  { ticker: "BNB-USD", name: "BNB" },
-  { ticker: "XRP-USD", name: "XRP" },
-  { ticker: "ADA-USD", name: "Cardano" },
-  { ticker: "DOGE-USD", name: "Dogecoin" },
-  { ticker: "AVAX-USD", name: "Avalanche" },
+  {
+    id: "us-factors",
+    title: "US EQUITY FACTORS",
+    items: [
+      { ticker: "IUSV", name: "Value" },
+      { ticker: "IUSG", name: "Growth" },
+      { ticker: "QUAL", name: "Quality" },
+      { ticker: "USMV", name: "Low Volatility" },
+      { ticker: "VYM", name: "High Dividend Yield" },
+      { ticker: "MTUM", name: "Momentum" },
+      { ticker: "DGRO", name: "Dividend Growth" },
+      { ticker: "RSP", name: "Equal Weight" },
+    ],
+  },
+  {
+    id: "global-equities",
+    title: "GLOBAL EQUITIES",
+    items: [
+      { ticker: "ACWI", name: "World Equities" },
+      { ticker: "IEMG", name: "Emerging Markets" },
+      { ticker: "SPDW", name: "World ex-US" },
+      { ticker: "VEA", name: "Developed Markets" },
+      { ticker: "IEFA", name: "EAFE" },
+    ],
+  },
+  {
+    id: "countries",
+    title: "COUNTRIES",
+    items: [
+      { ticker: "EWZ", name: "Brazil" },
+      { ticker: "EWQ", name: "France" },
+      { ticker: "EWU", name: "U.K." },
+      { ticker: "EWG", name: "Germany" },
+      { ticker: "VTI", name: "U.S." },
+      { ticker: "EWJ", name: "Japan" },
+      { ticker: "MCHI", name: "China" },
+    ],
+  },
+  {
+    id: "bonds",
+    title: "BONDS",
+    items: [
+      { ticker: "TLT", name: "20+ Year Treasury Bonds" },
+      { ticker: "BND", name: "Aggregate Bonds - US" },
+      { ticker: "TIP", name: "TIPS - US" },
+      { ticker: "HYG", name: "High Yield Bonds - US" },
+      { ticker: "BWX", name: "International Govt. Bonds" },
+      { ticker: "VCSH", name: "Short Term Corporate" },
+    ],
+  },
+  {
+    id: "commodities",
+    title: "COMMODITIES",
+    items: [
+      { ticker: "DBB", name: "Industrial Metals" },
+      { ticker: "GLD", name: "Gold" },
+      { ticker: "SLV", name: "Silver" },
+      { ticker: "PPLT", name: "Platinum" },
+      { ticker: "DBA", name: "Agricultural Commodities" },
+      { ticker: "DBO", name: "Oil" },
+      { ticker: "UNG", name: "Natural Gas" },
+      { ticker: "CORN", name: "Corn" },
+      { ticker: "SOYB", name: "Soybeans" },
+    ],
+  },
+  {
+    id: "currencies",
+    title: "CURRENCIES",
+    items: [
+      { ticker: "UUP", name: "US Dollar" },
+      { ticker: "FXB", name: "British Pound" },
+      { ticker: "FXE", name: "Euro" },
+      { ticker: "FXY", name: "Japanese Yen" },
+    ],
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────
-function formatPrice(price: number, currency?: string): string {
-  if (price === 0) return "—";
-  const decimals = price < 1 ? 6 : price < 10 ? 4 : price < 1000 ? 2 : 2;
-  return price.toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+function fmtPrice(price: number): string {
+  if (!price) return "—";
+  if (price >= 1000) return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (price >= 1) return price.toFixed(2);
+  return price.toFixed(4);
 }
 
-function formatChange(change: number): string {
-  if (change === 0) return "0.00";
-  const abs = Math.abs(change);
-  const decimals = abs < 0.01 ? 4 : 2;
-  return (change >= 0 ? "+" : "") + change.toFixed(decimals);
+function fmtReturn(value: number | null): string {
+  if (value === null || value === undefined) return "—";
+  return (value >= 0 ? "+" : "") + value.toFixed(2) + "%";
 }
 
-function formatPct(pct: number): string {
-  return (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+function returnClass(value: number | null): string {
+  if (value === null || value === undefined) return "text-text-tertiary";
+  if (value > 0) return "text-green-primary";
+  if (value < 0) return "text-red-primary";
+  return "text-text-secondary";
 }
 
-// ─── Sub-components ───────────────────────────────────
-interface RowItem {
-  ticker: string;
-  name: string;
-  subtitle?: string;
-}
-
-function MarketTable({
-  label,
-  items,
-  quotes,
-  loading,
-  showSubtitle = false,
+// ─── Table Row ────────────────────────────────────────
+function DataRow({
+  name,
+  ticker,
+  item,
+  isLast,
 }: {
-  label?: string;
-  items: RowItem[];
-  quotes: Record<string, { currentPrice: number; dayChange: number; dayChangePercent: number; currency: string }>;
-  loading: boolean;
-  showSubtitle?: boolean;
+  name: string;
+  ticker: string;
+  item: MarketTableItem | undefined;
+  isLast: boolean;
 }) {
+  const r = item?.returns;
   return (
-    <div className="mb-6">
-      {label && (
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-text-tertiary mb-2 px-1">
-          {label}
-        </h2>
-      )}
-      <div className="rounded-xl border border-border-primary overflow-hidden">
-        {/* Table header */}
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2 bg-bg-tertiary border-b border-border-primary">
-          <span className="text-xs font-medium text-text-tertiary">Name</span>
-          <span className="text-xs font-medium text-text-tertiary text-right w-24">Price</span>
-          <span className="text-xs font-medium text-text-tertiary text-right w-24">Change</span>
-          <span className="text-xs font-medium text-text-tertiary text-right w-20">% Change</span>
-        </div>
+    <tr className={`group hover:bg-bg-tertiary transition-colors ${!isLast ? "border-b border-border-primary" : ""}`}>
+      {/* Name */}
+      <td className="py-2.5 pl-0 pr-4 text-sm text-text-primary whitespace-nowrap">{name}</td>
+      {/* Symbol */}
+      <td className="py-2.5 pr-6 text-sm font-medium text-green-primary whitespace-nowrap">{item?.ticker ?? ticker}</td>
+      {/* Today */}
+      <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap font-medium ${returnClass(r?.today ?? null)}`}>
+        {item ? fmtReturn(r?.today ?? null) : <Skeleton className="h-4 w-14 ml-auto" />}
+      </td>
+      {/* 5 Days */}
+      <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap ${returnClass(r?.fiveDays ?? null)} hidden sm:table-cell`}>
+        {item ? fmtReturn(r?.fiveDays ?? null) : <Skeleton className="h-4 w-14 ml-auto" />}
+      </td>
+      {/* 1 Month */}
+      <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap ${returnClass(r?.oneMonth ?? null)} hidden md:table-cell`}>
+        {item ? fmtReturn(r?.oneMonth ?? null) : <Skeleton className="h-4 w-16 ml-auto" />}
+      </td>
+      {/* YTD */}
+      <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap font-medium ${returnClass(r?.ytd ?? null)} hidden md:table-cell`}>
+        {item ? fmtReturn(r?.ytd ?? null) : <Skeleton className="h-4 w-14 ml-auto" />}
+      </td>
+      {/* 1 Year */}
+      <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap ${returnClass(r?.oneYear ?? null)} hidden lg:table-cell`}>
+        {item ? fmtReturn(r?.oneYear ?? null) : <Skeleton className="h-4 w-14 ml-auto" />}
+      </td>
+      {/* 3 Years */}
+      <td className={`py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap ${returnClass(r?.threeYears ?? null)} hidden xl:table-cell`}>
+        {item ? fmtReturn(r?.threeYears ?? null) : <Skeleton className="h-4 w-14 ml-auto" />}
+      </td>
+      {/* Day Range */}
+      <td className="py-2.5 pr-4 text-sm tabular-nums text-right whitespace-nowrap hidden lg:table-cell">
+        {item ? (
+          item.dayLow !== null && item.dayHigh !== null ? (
+            <span className="text-text-secondary">
+              {fmtPrice(item.dayLow)}{" "}
+              <span className="text-text-tertiary mx-1">–</span>
+              {fmtPrice(item.dayHigh)}
+            </span>
+          ) : (
+            <span className="text-text-tertiary">—</span>
+          )
+        ) : (
+          <Skeleton className="h-4 w-24 ml-auto" />
+        )}
+      </td>
+      {/* 52 Week Range */}
+      <td className="py-2.5 text-sm tabular-nums text-right whitespace-nowrap hidden xl:table-cell">
+        {item ? (
+          item.weekLow52 !== null && item.weekHigh52 !== null ? (
+            <span className="text-text-secondary">
+              {fmtPrice(item.weekLow52)}{" "}
+              <span className="text-text-tertiary mx-1">–</span>
+              {fmtPrice(item.weekHigh52)}
+            </span>
+          ) : (
+            <span className="text-text-tertiary">—</span>
+          )
+        ) : (
+          <Skeleton className="h-4 w-28 ml-auto" />
+        )}
+      </td>
+    </tr>
+  );
+}
 
-        {/* Rows */}
-        {items.map((item, idx) => {
-          const quote = quotes[item.ticker];
-          const isPositive = quote ? quote.dayChangePercent > 0 : false;
-          const isNegative = quote ? quote.dayChangePercent < 0 : false;
-          const isLast = idx === items.length - 1;
+// ─── Skeleton Rows ────────────────────────────────────
+function SkeletonRow({ isLast }: { isLast: boolean }) {
+  return (
+    <tr className={!isLast ? "border-b border-border-primary" : ""}>
+      <td className="py-2.5 pl-0 pr-4"><Skeleton className="h-4 w-32" /></td>
+      <td className="py-2.5 pr-6"><Skeleton className="h-4 w-10" /></td>
+      <td className="py-2.5 pr-4 text-right"><Skeleton className="h-4 w-14 ml-auto" /></td>
+      <td className="py-2.5 pr-4 text-right hidden sm:table-cell"><Skeleton className="h-4 w-14 ml-auto" /></td>
+      <td className="py-2.5 pr-4 text-right hidden md:table-cell"><Skeleton className="h-4 w-16 ml-auto" /></td>
+      <td className="py-2.5 pr-4 text-right hidden md:table-cell"><Skeleton className="h-4 w-14 ml-auto" /></td>
+      <td className="py-2.5 pr-4 text-right hidden lg:table-cell"><Skeleton className="h-4 w-14 ml-auto" /></td>
+      <td className="py-2.5 pr-4 text-right hidden xl:table-cell"><Skeleton className="h-4 w-14 ml-auto" /></td>
+      <td className="py-2.5 pr-4 text-right hidden lg:table-cell"><Skeleton className="h-4 w-24 ml-auto" /></td>
+      <td className="py-2.5 text-right hidden xl:table-cell"><Skeleton className="h-4 w-28 ml-auto" /></td>
+    </tr>
+  );
+}
 
-          return (
-            <div
-              key={item.ticker}
-              className={`grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 items-center hover:bg-bg-tertiary transition-colors ${
-                !isLast ? "border-b border-border-primary" : ""
-              }`}
-            >
-              {/* Name */}
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-text-primary truncate">{item.name}</div>
-                <div className="text-xs text-text-tertiary font-mono mt-0.5">
-                  {showSubtitle && item.subtitle ? item.subtitle : item.ticker}
-                </div>
-              </div>
+// ─── Section Component ────────────────────────────────
+function MarketSection({
+  title,
+  items,
+}: {
+  title: string;
+  items: { ticker: string; name: string }[];
+}) {
+  const tickers = items.map((i) => i.ticker);
+  const { data, loading } = useMarketTable(tickers);
+  const dataMap = new Map(data.map((d) => [d.ticker, d]));
 
-              {/* Price */}
-              <div className="w-24 text-right">
-                {loading && !quote ? (
-                  <Skeleton className="h-4 w-20 ml-auto" />
-                ) : quote ? (
-                  <span className="text-sm font-financial text-text-primary tabular-nums">
-                    {formatPrice(quote.currentPrice, quote.currency)}
-                  </span>
-                ) : (
-                  <span className="text-sm text-text-tertiary">—</span>
-                )}
-              </div>
+  return (
+    <section className="mb-10">
+      <h2 className="text-base font-bold text-text-primary mb-3 tracking-tight">
+        {title}
+      </h2>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          {/* Column headers */}
+          <thead>
+            <tr className="border-b-2 border-border-primary">
+              <th className="pb-2 pl-0 pr-4 text-xs font-semibold text-text-secondary text-left whitespace-nowrap">Name</th>
+              <th className="pb-2 pr-6 text-xs font-semibold text-text-secondary text-left whitespace-nowrap">Symbol</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap">Today</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden sm:table-cell">5 Days</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden md:table-cell">1 Month</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden md:table-cell">YTD</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden lg:table-cell">1 Year</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden xl:table-cell">3 Years</th>
+              <th className="pb-2 pr-4 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden lg:table-cell">Day Range</th>
+              <th className="pb-2 text-xs font-semibold text-text-secondary text-right whitespace-nowrap hidden xl:table-cell">52 Week Range</th>
+            </tr>
+          </thead>
 
-              {/* Change $ */}
-              <div className="w-24 text-right">
-                {loading && !quote ? (
-                  <Skeleton className="h-4 w-16 ml-auto" />
-                ) : quote ? (
-                  <span
-                    className={`text-sm font-financial tabular-nums ${
-                      isPositive
-                        ? "text-green-primary"
-                        : isNegative
-                        ? "text-red-primary"
-                        : "text-text-secondary"
-                    }`}
-                  >
-                    {formatChange(quote.dayChange)}
-                  </span>
-                ) : (
-                  <span className="text-sm text-text-tertiary">—</span>
-                )}
-              </div>
-
-              {/* % Change */}
-              <div className="w-20 text-right">
-                {loading && !quote ? (
-                  <Skeleton className="h-6 w-16 ml-auto rounded-full" />
-                ) : quote ? (
-                  <span
-                    className={`inline-block text-xs font-financial font-medium tabular-nums px-2 py-0.5 rounded-full ${
-                      isPositive
-                        ? "bg-green-muted text-green-primary"
-                        : isNegative
-                        ? "bg-red-muted text-red-primary"
-                        : "bg-bg-tertiary text-text-secondary"
-                    }`}
-                  >
-                    {formatPct(quote.dayChangePercent)}
-                  </span>
-                ) : (
-                  <span className="text-sm text-text-tertiary">—</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+          <tbody>
+            {loading && data.length === 0
+              ? items.map((item, idx) => (
+                  <SkeletonRow key={item.ticker} isLast={idx === items.length - 1} />
+                ))
+              : items.map((item, idx) => (
+                  <DataRow
+                    key={item.ticker}
+                    name={item.name}
+                    ticker={item.ticker}
+                    item={dataMap.get(item.ticker)}
+                    isLast={idx === items.length - 1}
+                  />
+                ))}
+          </tbody>
+        </table>
       </div>
-    </div>
+    </section>
   );
 }
 
-// ─── Tab Content Components ───────────────────────────
-function KeyMarketsTab() {
-  const allTickers = useMemo(
-    () => KEY_MARKETS_GROUPS.flatMap((g) => g.items.map((i) => i.ticker)),
-    []
-  );
-  const { quotes, loading, refetch } = useQuotes(allTickers);
-
-  return (
-    <div>
-      {KEY_MARKETS_GROUPS.map((group) => (
-        <MarketTable
-          key={group.label}
-          label={group.label}
-          items={group.items}
-          quotes={quotes}
-          loading={loading}
-        />
-      ))}
-    </div>
-  );
-}
-
-function SectorsTab() {
-  const tickers = useMemo(() => SECTORS.map((s) => s.ticker), []);
-  const { quotes, loading } = useQuotes(tickers);
-  const items = SECTORS.map((s) => ({ ticker: s.ticker, name: s.name, subtitle: s.description }));
-
-  return (
-    <MarketTable
-      label="US Sector ETFs"
-      items={items}
-      quotes={quotes}
-      loading={loading}
-      showSubtitle
-    />
-  );
-}
-
-function CommoditiesTab() {
-  const tickers = useMemo(() => COMMODITIES.map((c) => c.ticker), []);
-  const { quotes, loading } = useQuotes(tickers);
-  const items = COMMODITIES.map((c) => ({ ticker: c.ticker, name: c.name, subtitle: `per ${c.unit}` }));
-
-  return (
-    <MarketTable
-      label="Commodities Futures"
-      items={items}
-      quotes={quotes}
-      loading={loading}
-      showSubtitle
-    />
-  );
-}
-
-function CurrenciesTab() {
-  const tickers = useMemo(() => CURRENCIES.map((c) => c.ticker), []);
-  const { quotes, loading } = useQuotes(tickers);
-  const items = CURRENCIES.map((c) => ({ ticker: c.ticker, name: c.name, subtitle: c.pair }));
-
-  return (
-    <MarketTable
-      label="Forex & Currency"
-      items={items}
-      quotes={quotes}
-      loading={loading}
-      showSubtitle
-    />
-  );
-}
-
-function BondsTab() {
-  const yieldTickers = useMemo(() => BONDS.filter((b) => b.type === "yield").map((b) => b.ticker), []);
-  const etfTickers = useMemo(() => BONDS.filter((b) => b.type === "etf").map((b) => b.ticker), []);
-  const { quotes: yieldQuotes, loading: yieldLoading } = useQuotes(yieldTickers);
-  const { quotes: etfQuotes, loading: etfLoading } = useQuotes(etfTickers);
-
-  const yieldItems = BONDS.filter((b) => b.type === "yield").map((b) => ({ ticker: b.ticker, name: b.name }));
-  const etfItems = BONDS.filter((b) => b.type === "etf").map((b) => ({ ticker: b.ticker, name: b.name }));
-
-  return (
-    <div>
-      <MarketTable label="US Treasury Yields" items={yieldItems} quotes={yieldQuotes} loading={yieldLoading} />
-      <MarketTable label="Bond ETFs" items={etfItems} quotes={etfQuotes} loading={etfLoading} />
-    </div>
-  );
-}
-
-function CryptoTab() {
-  const tickers = useMemo(() => CRYPTO.map((c) => c.ticker), []);
-  const { quotes, loading } = useQuotes(tickers);
-
-  return (
-    <MarketTable label="Cryptocurrency" items={CRYPTO} quotes={quotes} loading={loading} />
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────
 export default function MarketDataPage() {
-  const [activeTab, setActiveTab] = useState<MarketTab>("key-markets");
-
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="px-6 py-6 max-w-screen-xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-display text-2xl text-text-primary">Market Data</h1>
-        <p className="text-sm text-text-secondary mt-1">
-          Live prices across indices, sectors, commodities, currencies, bonds, and crypto
-        </p>
-      </div>
+      <h1 className="font-display text-2xl font-bold text-text-primary mb-6 tracking-tight">
+        MARKET DATA
+      </h1>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-border-primary overflow-x-auto">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
-              activeTab === tab.id
-                ? "border-green-primary text-green-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
+      {/* Divider nav (visual only, matches SA style) */}
+      <div className="flex flex-wrap gap-x-5 gap-y-1 mb-8 pb-4 border-b border-border-primary">
+        {SECTIONS.map((s) => (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
-            {tab.label}
-          </button>
+            {s.title
+              .split(" ")
+              .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+              .join(" ")}
+          </a>
         ))}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === "key-markets" && <KeyMarketsTab />}
-      {activeTab === "sectors" && <SectorsTab />}
-      {activeTab === "commodities" && <CommoditiesTab />}
-      {activeTab === "currencies" && <CurrenciesTab />}
-      {activeTab === "bonds" && <BondsTab />}
-      {activeTab === "crypto" && <CryptoTab />}
+      {/* All Sections */}
+      {SECTIONS.map((section) => (
+        <div key={section.id} id={section.id}>
+          <MarketSection title={section.title} items={section.items} />
+        </div>
+      ))}
+
+      {/* Footer note */}
+      <p className="text-xs text-text-tertiary mt-4 pb-8">
+        Today column is in real-time. Multi-period returns calculated from historical closes. Data sourced from Yahoo Finance.
+      </p>
     </div>
   );
 }

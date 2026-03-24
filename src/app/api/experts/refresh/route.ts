@@ -15,15 +15,17 @@ interface FilingMeta {
   accession: string;
   filed_date: string;
   period: string;
+  primaryDocument: string;
 }
 
 // ── EDGAR helpers ─────────────────────────────────────────────────────────────
 const EDGAR_BASE = "https://data.sec.gov";
+const WWW_EDGAR  = "https://www.sec.gov";
 const EDGAR_HEADERS = {
   "User-Agent": "Oakstock research@oakstock.app",
   "Accept-Encoding": "gzip, deflate",
 };
-const DELAY_MS = 120; // <10 req/s
+const DELAY_MS = 150;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -36,6 +38,16 @@ async function edgarGet(url: string): Promise<Response> {
   return r;
 }
 
+async function edgarTry(url: string): Promise<Response | null> {
+  await sleep(DELAY_MS);
+  try {
+    const r = await fetch(url, { headers: EDGAR_HEADERS });
+    return r.ok ? r : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getLatestFiling(cik: string): Promise<FilingMeta | null> {
   const padded = cik.replace(/^0+/, "").padStart(10, "0");
   const url = `${EDGAR_BASE}/submissions/CIK${padded}.json`;
@@ -43,65 +55,160 @@ async function getLatestFiling(cik: string): Promise<FilingMeta | null> {
   const recent = (data.filings as Record<string, unknown>)?.recent as Record<string, string[]>;
   if (!recent) return null;
 
-  const forms = recent.form ?? [];
-  const accessions = recent.accessionNumber ?? [];
-  const filedDates = recent.filingDate ?? [];
-  const periods = recent.reportDate ?? [];
+  const forms       = recent.form            ?? [];
+  const accessions  = recent.accessionNumber ?? [];
+  const filedDates  = recent.filingDate      ?? [];
+  const periods     = recent.reportDate      ?? [];
+  const primaryDocs = recent.primaryDocument ?? [];
 
   for (let i = 0; i < forms.length; i++) {
     if (forms[i] === "13F-HR") {
       return {
-        accession: accessions[i].replace(/-/g, ""),
-        filed_date: filedDates[i],
-        period: periods[i],
+        accession:       accessions[i].replace(/-/g, ""),
+        filed_date:      filedDates[i],
+        period:          periods[i],
+        primaryDocument: primaryDocs[i] ?? "",
       };
     }
   }
   return null;
 }
 
+// Build a prioritised list of candidate XML filenames for the infotable.
+// Strategy:
+//   1. Derive from the primaryDocument name (most reliable)
+//   2. Try well-known convention names used by major filing agents
+//   3. Parse the filing index HTML as last resort
+function candidateInfoTableNames(primaryDocument: string): string[] {
+  const candidates: string[] = [];
+  const base = primaryDocument.replace(/\.[^.]+$/, ""); // strip extension
+
+  // Donnelley / Edgar Online pattern: d{n}form13fhr → d{n}form13fInfoTable
+  if (base) {
+    candidates.push(
+      `${base.replace(/hr$/i, "")}InfoTable.xml`,
+      `${base.replace(/hr$/i, "")}infotable.xml`,
+      `${base}InfoTable.xml`,
+    );
+  }
+
+  // Common generic names
+  candidates.push(
+    "form13fInfoTable.xml",
+    "form13finfotable.xml",
+    "informationTable.xml",
+    "informationtable.xml",
+    "infotable.xml",
+    "13F_InfoTable.xml",
+    "13f-infotable.xml",
+  );
+
+  // Deduplicate while preserving order
+  return [...new Set(candidates.filter(Boolean))];
+}
+
 async function getXmlUrlWithDiag(
   cik: string,
-  accession: string
-): Promise<{ url: string | null; indexItems: string[]; indexError?: string }> {
+  accession: string,
+  primaryDocument: string,
+): Promise<{ url: string | null; tried: string[]; indexError?: string }> {
   const cikRaw = cik.replace(/^0+/, "");
   const accFmt = `${accession.slice(0, 10)}-${accession.slice(10, 12)}-${accession.slice(12)}`;
-  const indexUrl = `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${accFmt}-index.json`;
-
-  let indexItems: string[] = [];
+  const archiveBase = `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}`;
+  const tried: string[] = [];
   let indexError: string | undefined;
 
+  // ── Approach 1: filing index JSON (data.sec.gov) ──────────────────────────
+  const indexJsonUrl = `${archiveBase}/${accFmt}-index.json`;
+  tried.push(indexJsonUrl);
   try {
-    const index = (await (await edgarGet(indexUrl)).json()) as {
+    const index = (await (await edgarGet(indexJsonUrl)).json()) as {
       directory?: { item?: { name: string; type: string }[] };
     };
     const items = index.directory?.item ?? [];
-    indexItems = items.map((i) => i.name);
+    const xmlNames = items.map((i) => i.name).filter((n) => n.endsWith(".xml"));
 
-    // Pass 1: explicit infotable file
-    for (const item of items) {
-      const n = item.name.toLowerCase();
-      if (n.endsWith(".xml") && (n.includes("infotable") || n.includes("informationtable") || n.includes("13finfo"))) {
-        return { url: `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`, indexItems };
+    for (const name of xmlNames) {
+      const n = name.toLowerCase();
+      if (n.includes("infotable") || n.includes("informationtable") || n.includes("13finfo")) {
+        return { url: `${archiveBase}/${name}`, tried };
       }
     }
-    // Pass 2: any XML that isn't clearly a cover sheet
-    const coverNames = new Set(["primary_doc.xml", "primarydocument.xml", "form.xml"]);
-    for (const item of items) {
-      if (item.name.endsWith(".xml") && !coverNames.has(item.name.toLowerCase())) {
-        return { url: `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`, indexItems };
+    // Any non-cover XML
+    const cover = new Set(["primary_doc.xml", "primarydocument.xml", "form.xml"]);
+    for (const name of xmlNames) {
+      if (!cover.has(name.toLowerCase())) {
+        return { url: `${archiveBase}/${name}`, tried };
       }
     }
-    // Pass 3: any XML at all (maybe holdings are in the primary doc)
-    for (const item of items) {
-      if (item.name.endsWith(".xml")) {
-        return { url: `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}/${item.name}`, indexItems };
-      }
+    if (xmlNames.length > 0) {
+      return { url: `${archiveBase}/${xmlNames[0]}`, tried };
     }
   } catch (e) {
     indexError = String(e);
   }
-  return { url: null, indexItems, indexError };
+
+  // ── Approach 2: filing index JSON (www.sec.gov mirror) ───────────────────
+  const wwwIndexUrl = `${WWW_EDGAR}/Archives/edgar/data/${cikRaw}/${accession}/${accFmt}-index.json`;
+  tried.push(wwwIndexUrl);
+  try {
+    const index = (await (await edgarGet(wwwIndexUrl)).json()) as {
+      directory?: { item?: { name: string; type: string }[] };
+    };
+    const items = index.directory?.item ?? [];
+    for (const item of items) {
+      const n = item.name.toLowerCase();
+      if (n.endsWith(".xml") && (n.includes("infotable") || n.includes("informationtable"))) {
+        return { url: `${archiveBase}/${item.name}`, tried };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // ── Approach 3: probe candidate filenames directly ────────────────────────
+  const candidates = candidateInfoTableNames(primaryDocument);
+  for (const filename of candidates) {
+    const testUrl = `${archiveBase}/${filename}`;
+    tried.push(testUrl);
+    const r = await edgarTry(testUrl);
+    if (r) return { url: testUrl, tried };
+  }
+
+  // ── Approach 4: fetch & parse the index HTM ───────────────────────────────
+  const indexHtmUrl = `${WWW_EDGAR}/Archives/edgar/data/${cikRaw}/${accession}/${accFmt}-index.htm`;
+  tried.push(indexHtmUrl);
+  try {
+    const htm = await (await edgarGet(indexHtmUrl)).text();
+    // Extract href links to XML files from the HTML
+    const hrefRe = /href="([^"]+\.xml)"/gi;
+    let m: RegExpExecArray | null;
+    const xmlLinks: string[] = [];
+    while ((m = hrefRe.exec(htm)) !== null) {
+      xmlLinks.push(m[1]);
+    }
+    for (const link of xmlLinks) {
+      const filename = link.split("/").pop() ?? link;
+      const n = filename.toLowerCase();
+      if (n.includes("infotable") || n.includes("informationtable") || n.includes("13finfo")) {
+        const fullUrl = link.startsWith("http") ? link : `${archiveBase}/${filename}`;
+        return { url: fullUrl, tried };
+      }
+    }
+    // Any XML link that isn't the cover
+    const cover = new Set(["primary_doc.xml", "primarydocument.xml"]);
+    for (const link of xmlLinks) {
+      const filename = link.split("/").pop() ?? link;
+      if (!cover.has(filename.toLowerCase())) {
+        const fullUrl = link.startsWith("http") ? link : `${archiveBase}/${filename}`;
+        return { url: fullUrl, tried };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return { url: null, tried, indexError };
 }
 
 function parse13fXml(xmlText: string): HoldingRow[] {
@@ -111,6 +218,8 @@ function parse13fXml(xmlText: string): HoldingRow[] {
     .replace(/<\?xml[^?]*\?>/g, "");
 
   const holdings: HoldingRow[] = [];
+
+  // Try <infoTable> blocks first, then <informationTable> wrapper
   const tableRe = /<infoTable>([\s\S]*?)<\/infoTable>/gi;
   let tableMatch: RegExpExecArray | null;
 
@@ -127,12 +236,12 @@ function parse13fXml(xmlText: string): HoldingRow[] {
     const putCall = extract("putCall");
 
     holdings.push({
-      cusip: extract("cusip"),
+      cusip:        extract("cusip"),
       company_name: extract("nameOfIssuer"),
-      value_usd: parseInt(valueRaw || "0", 10) * 1000,
-      shares: parseInt(sharesRaw || "0", 10),
-      share_class: extract("sshPrnamtType"),
-      option_type: putCall || null,
+      value_usd:    parseInt(valueRaw || "0", 10) * 1000,
+      shares:       parseInt(sharesRaw || "0", 10),
+      share_class:  extract("sshPrnamtType"),
+      option_type:  putCall || null,
     });
   }
 
@@ -188,13 +297,10 @@ function periodToQuarter(period: string): string {
 }
 
 // ── POST /api/experts/refresh?manager=buffett ─────────────────────────────────
-// Fetches latest 13F from EDGAR for a single manager and upserts to Supabase.
-// Call without ?manager to refresh all (slower — Vercel Pro timeout needed).
 export async function POST(request: NextRequest) {
   const supabase = createServerSupabaseClient();
   const managerId = request.nextUrl.searchParams.get("manager");
 
-  // Fetch manager(s)
   let query = supabase.from("expert_managers").select("*");
   if (managerId) query = query.eq("id", managerId) as typeof query;
   const { data: managers, error: mgErr } = await query;
@@ -233,12 +339,15 @@ export async function POST(request: NextRequest) {
       }
 
       // 3. Find + fetch XML
-      const { url: xmlUrl, indexItems, indexError } = await getXmlUrlWithDiag(cik, filing.accession);
+      const { url: xmlUrl, tried, indexError } = await getXmlUrlWithDiag(
+        cik, filing.accession, filing.primaryDocument
+      );
       if (!xmlUrl) {
         results[mid] = {
           error: "XML file not found in filing",
           accession: filing.accession,
-          indexItems,
+          primaryDocument: filing.primaryDocument,
+          tried,
           indexError,
         };
         continue;
@@ -246,6 +355,11 @@ export async function POST(request: NextRequest) {
 
       const xmlText = await (await edgarGet(xmlUrl)).text();
       const holdings = parse13fXml(xmlText);
+
+      if (holdings.length === 0) {
+        results[mid] = { error: "Parsed 0 holdings from XML", xmlUrl, tried };
+        continue;
+      }
 
       // 4. Get previous quarter for change tracking
       const { data: prevRows } = await supabase
@@ -272,31 +386,27 @@ export async function POST(request: NextRequest) {
         let change_type = "new";
         if (prevShares !== null) {
           change_type =
-            h.shares > prevShares
-              ? "increased"
-              : h.shares < prevShares
-              ? "decreased"
-              : "unchanged";
+            h.shares > prevShares ? "increased" :
+            h.shares < prevShares ? "decreased" : "unchanged";
         }
 
         return {
-          manager_id: mid,
+          manager_id:      mid,
           quarter,
           period_of_report: filing.period,
-          filed_date: filing.filed_date,
-          cusip: h.cusip || null,
-          ticker: tickerMap[h.cusip] || null,
-          company_name: h.company_name,
-          value_usd: h.value_usd,
-          shares: h.shares,
-          share_class: h.share_class || null,
-          option_type: h.option_type,
+          filed_date:       filing.filed_date,
+          cusip:            h.cusip || null,
+          ticker:           tickerMap[h.cusip] || null,
+          company_name:     h.company_name,
+          value_usd:        h.value_usd,
+          shares:           h.shares,
+          share_class:      h.share_class || null,
+          option_type:      h.option_type,
           change_type,
-          shares_prev: prevShares,
-          pct_portfolio:
-            totalValue > 0
-              ? Math.round((h.value_usd / totalValue) * 100000) / 1000
-              : 0,
+          shares_prev:      prevShares,
+          pct_portfolio:    totalValue > 0
+            ? Math.round((h.value_usd / totalValue) * 100000) / 1000
+            : 0,
         };
       });
 
@@ -318,8 +428,10 @@ export async function POST(request: NextRequest) {
       results[mid] = {
         status: "fetched",
         quarter,
-        filed_date: filing.filed_date,
-        holdings_count: holdings.length,
+        filed_date:       filing.filed_date,
+        primaryDocument:  filing.primaryDocument,
+        xmlUrl,
+        holdings_count:   holdings.length,
         tickers_resolved: Object.keys(tickerMap).length,
       };
     } catch (err) {

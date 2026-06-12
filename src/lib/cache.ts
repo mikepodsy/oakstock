@@ -52,3 +52,4 @@ export const calendarCache = getOrCreateCache<unknown[]>("calendar", 3600);
 export const economicCache = getOrCreateCache<unknown>("economic", 3600);
 export const marketCache = getOrCreateCache<unknown>("market", 3600);
 export const treasuryCache = getOrCreateCache<unknown>("treasury", 3600);
+export const cotCache = getOrCreateCache<unknown[]>("cot", 86400);

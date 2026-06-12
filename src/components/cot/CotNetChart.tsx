@@ -12,18 +12,10 @@ import {
   LabelList,
 } from "recharts";
 import type { CotCategory } from "@/types";
-
-function formatContracts(v: number): string {
-  return new Intl.NumberFormat("en-US").format(Math.abs(v));
-}
-
-function formatCompact(v: number): string {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
-}
+import { formatCompactNumber, formatSignedContracts } from "@/utils/formatters";
 
 function formatDelta(change: number): string {
-  if (change === 0) return "—";
-  const abs = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(change));
+  const abs = formatCompactNumber(Math.abs(change));
   return change > 0 ? `▲ ${abs}` : `▼ ${abs}`;
 }
 
@@ -92,7 +84,7 @@ export function CotNetChart({ categories }: CotNetChartProps) {
           <CartesianGrid horizontal={false} stroke="var(--border-primary)" strokeDasharray="3 3" />
           <XAxis
             type="number"
-            tickFormatter={formatCompact}
+            tickFormatter={formatCompactNumber}
             tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
@@ -107,10 +99,7 @@ export function CotNetChart({ categories }: CotNetChartProps) {
           />
           <Tooltip
             contentStyle={tooltipStyle}
-            formatter={(v) => {
-              const n = Number(v);
-              return [`${n >= 0 ? "+" : ""}${formatContracts(n)} contracts`, "Net"];
-            }}
+            formatter={(v) => [`${formatSignedContracts(Number(v))} contracts`, "Net"]}
             cursor={{ fill: "var(--bg-tertiary)", opacity: 0.4 }}
           />
           <Bar dataKey="net" radius={[0, 3, 3, 0]}>

@@ -11,14 +11,7 @@ import {
   Legend,
 } from "recharts";
 import type { CotCategory } from "@/types";
-
-function formatContracts(v: number): string {
-  return new Intl.NumberFormat("en-US").format(Math.abs(v));
-}
-
-function formatCompact(v: number): string {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
-}
+import { formatCompactNumber, formatContracts } from "@/utils/formatters";
 
 interface CotPositionChartProps {
   categories: CotCategory[];
@@ -53,7 +46,7 @@ export function CotPositionChart({ categories, title }: CotPositionChartProps) {
           <CartesianGrid horizontal={false} stroke="var(--border-primary)" strokeDasharray="3 3" />
           <XAxis
             type="number"
-            tickFormatter={formatCompact}
+            tickFormatter={formatCompactNumber}
             tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}

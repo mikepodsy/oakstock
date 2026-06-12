@@ -32,3 +32,11 @@ export function formatCompactNumber(value: number): string {
     maximumFractionDigits: 1,
   }).format(value);
 }
+
+export function formatContracts(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+export function formatSignedContracts(value: number): string {
+  return new Intl.NumberFormat("en-US", { signDisplay: "exceptZero" }).format(value);
+}

@@ -1,3 +1,5 @@
+"use client";
+
 import type { CotReport } from "@/types";
 
 interface CotInstrumentTabsProps {
@@ -12,6 +14,8 @@ export function CotInstrumentTabs({ reports, selected, onSelect }: CotInstrument
       {reports.map((r) => (
         <button
           key={r.instrument}
+          type="button"
+          aria-pressed={selected === r.instrument}
           onClick={() => onSelect(r.instrument)}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             selected === r.instrument

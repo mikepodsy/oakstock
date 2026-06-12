@@ -58,10 +58,12 @@ The API route makes two parallel fetches — one to each CFTC endpoint — then 
 
 | Display Name | CFTC Filter String | Report Type |
 |---|---|---|
-| S&P 500 | `S&P 500 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE` | `tff` |
-| Nasdaq 100 | `NASDAQ-100 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE` | `tff` |
+| S&P 500 | `S&P 500 Consolidated - CHICAGO MERCANTILE EXCHANGE` | `tff` |
+| Nasdaq 100 | `NASDAQ-100 Consolidated - CHICAGO MERCANTILE EXCHANGE` | `tff` |
 | Gold | `GOLD - COMMODITY EXCHANGE INC.` | `disagg` |
-| Crude Oil WTI | `CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE` | `disagg` |
+| Crude Oil WTI | `WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE` | `disagg` |
+
+> **Verified against live API 2026-06-11.** The "Consolidated" series (mixed case) combine full-size + e-mini + micro contracts and are current. The older names (`S&P 500 STOCK INDEX`, `NASDAQ-100 STOCK INDEX`, `CRUDE OIL, LIGHT SWEET`) stopped updating in 2021/2015/2022 respectively — do not use them.
 
 ### Category labels by report type
 
@@ -113,16 +115,20 @@ export interface CotReport {
 - Maps CFTC column names to `CotCategory` fields based on `reportType`
 - Filters each response to exact instrument name match
 
-**CFTC endpoints used (OpenDataSoft format — append query params as URL search params):**
-- TFF: `https://publicreporting.cftc.gov/api/explore/dataset/fin_fut/exports/json/`
-- Disaggregated: `https://publicreporting.cftc.gov/api/explore/dataset/com_disagg/exports/json/`
+**CFTC endpoints (Socrata SODA API — verified against live API 2026-06-11):**
+- TFF: `https://publicreporting.cftc.gov/resource/gpe5-46if.json`
+- Disaggregated: `https://publicreporting.cftc.gov/resource/72hh-3qpy.json`
 
-Query params appended per request:
-- `where=market_and_exchange_names%3D%22<CFTC_NAME>%22` — filter to exact instrument name
-- `limit=2` — fetch 2 records (latest + previous week for WoW delta)
-- `order_by=report_date_as_of_desc` — most recent first
+Query params per request (SoQL, via `URLSearchParams`):
+- `$where=market_and_exchange_names='<CFTC_NAME>'` — exact instrument match (single quotes)
+- `$order=report_date_as_yyyy_mm_dd DESC` — most recent first
+- `$limit=2` — latest + previous week (for WoW delta)
 
-**Note for implementer:** Verify the exact `where` filter param name and syntax against the live CFTC OpenDataSoft API before building — the filter field may be `market_and_exchange_names` or a variant. The CFTC public reporting portal at `publicreporting.cftc.gov` has a dataset explorer for confirming field names.
+**Response format facts (verified):**
+- Response is a flat JSON array of records — no `results` wrapper
+- All numeric values come back as **strings** (e.g. `"1202632"`) — convert with `Number()`
+- Report date field is `report_date_as_yyyy_mm_dd`, ISO format `"2026-06-02T00:00:00.000"` — `.slice(0, 10)` for `YYYY-MM-DD`
+- No API key required; no auth headers
 
 **TFF column mapping:**
 | Category | Longs col | Shorts col |
@@ -133,14 +139,16 @@ Query params appended per request:
 | Other Reportables | `other_rept_positions_long` | `other_rept_positions_short` |
 | Retail / Non-Reportable | `nonrept_positions_long_all` | `nonrept_positions_short_all` |
 
-**Disaggregated column mapping:**
+**Disaggregated column mapping (verified against live API 2026-06-11):**
 | Category | Longs col | Shorts col |
 |---|---|---|
-| Swap Dealers | `swap_positions_long_all` | `swap_positions_short_all` |
-| Managed Money | `m_money_positions_long` | `m_money_positions_short` |
-| Producer / Merchant | `prod_merc_positions_long_all` | `prod_merc_positions_short_all` |
+| Swap Dealers | `swap_positions_long_all` | `swap__positions_short_all` |
+| Managed Money | `m_money_positions_long_all` | `m_money_positions_short_all` |
+| Producer / Merchant | `prod_merc_positions_long` | `prod_merc_positions_short` |
 | Other Reportables | `other_rept_positions_long` | `other_rept_positions_short` |
 | Retail / Non-Reportable | `nonrept_positions_long_all` | `nonrept_positions_short_all` |
+
+> ⚠️ `swap__positions_short_all` genuinely has a **double underscore** in the CFTC dataset — it is not a typo. Do not "fix" it.
 
 ---
 

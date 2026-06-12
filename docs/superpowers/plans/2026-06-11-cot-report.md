@@ -101,39 +101,20 @@ git commit -m "feat(cot): add cotCache (86400s TTL)"
 **Files:**
 - Create: `src/app/api/cot/route.ts`
 
-**Before starting — verify CFTC field names:**
+**API facts (verified against live CFTC API on 2026-06-11 — do not re-derive):**
 
-The CFTC public portal uses the OpenDataSoft v2.1 API. Before writing the route, run these two curl commands to confirm field names match the spec. If any column name differs, update the `COLUMN_MAP` constants in the route accordingly.
+The CFTC portal is a **Socrata** instance (the OpenDataSoft-style `/api/explore/` paths do NOT exist). Verified mechanics:
 
-```bash
-# Check TFF (financial futures) — S&P 500 record
-curl -s "https://publicreporting.cftc.gov/api/explore/v2.1/catalog/datasets/fin_fut/records?where=market_and_exchange_names%3D%22S%26P+500+STOCK+INDEX+-+CHICAGO+MERCANTILE+EXCHANGE%22&limit=1&order_by=report_date_as_of+desc" | python3 -m json.tool | head -80
-```
-
-```bash
-# Check Disaggregated — Gold record
-curl -s "https://publicreporting.cftc.gov/api/explore/v2.1/catalog/datasets/com_disagg/records?where=market_and_exchange_names%3D%22GOLD+-+COMMODITY+EXCHANGE+INC.%22&limit=1&order_by=report_date_as_of+desc" | python3 -m json.tool | head -80
-```
-
-Confirm these fields exist in the TFF response:
-- `asset_mgr_positions_long`, `asset_mgr_positions_short`
-- `lev_money_positions_long`, `lev_money_positions_short`
-- `dealer_positions_long_all`, `dealer_positions_short_all`
-- `other_rept_positions_long`, `other_rept_positions_short`
-- `nonrept_positions_long_all`, `nonrept_positions_short_all`
-- `report_date_as_of`
-
-Confirm these fields exist in the Disaggregated response:
-- `swap_positions_long_all`, `swap_positions_short_all`
-- `m_money_positions_long`, `m_money_positions_short`
-- `prod_merc_positions_long_all`, `prod_merc_positions_short_all`
-- `other_rept_positions_long`, `other_rept_positions_short`
-- `nonrept_positions_long_all`, `nonrept_positions_short_all`
-- `report_date_as_of`
-
-Also confirm `market_and_exchange_names` is the correct filter field name.
-
-If any names differ, adjust the constants in the route below before implementing.
+- TFF dataset: `https://publicreporting.cftc.gov/resource/gpe5-46if.json`
+- Disaggregated dataset: `https://publicreporting.cftc.gov/resource/72hh-3qpy.json`
+- SoQL params: `$where=market_and_exchange_names='<NAME>'`, `$order=report_date_as_yyyy_mm_dd DESC`, `$limit=2`
+- Response: flat JSON array (no wrapper object)
+- All numeric values are **strings** — convert with `Number()`
+- Date field: `report_date_as_yyyy_mm_dd` (ISO `"2026-06-02T00:00:00.000"` — slice to 10 chars)
+- Instrument names verified current: `S&P 500 Consolidated - CHICAGO MERCANTILE EXCHANGE`, `NASDAQ-100 Consolidated - CHICAGO MERCANTILE EXCHANGE`, `GOLD - COMMODITY EXCHANGE INC.`, `WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE`
+- Disaggregated short column for swap dealers is `swap__positions_short_all` — **double underscore is real, not a typo**
+- Managed Money columns carry `_all` suffix: `m_money_positions_long_all` / `m_money_positions_short_all`
+- Producer/Merchant columns have NO suffix: `prod_merc_positions_long` / `prod_merc_positions_short`
 
 - [ ] **Step 4: Create the route file**
 
@@ -146,12 +127,12 @@ import type { CotReport, CotCategory, CotInstrument, CotReportType } from "@/typ
 const INSTRUMENTS: CotInstrument[] = [
   {
     label: "S&P 500",
-    cftcName: "S&P 500 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE",
+    cftcName: "S&P 500 Consolidated - CHICAGO MERCANTILE EXCHANGE",
     reportType: "tff",
   },
   {
     label: "Nasdaq 100",
-    cftcName: "NASDAQ-100 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE",
+    cftcName: "NASDAQ-100 Consolidated - CHICAGO MERCANTILE EXCHANGE",
     reportType: "tff",
   },
   {
@@ -161,7 +142,7 @@ const INSTRUMENTS: CotInstrument[] = [
   },
   {
     label: "Crude Oil WTI",
-    cftcName: "CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE",
+    cftcName: "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE",
     reportType: "disagg",
   },
 ];
@@ -178,19 +159,21 @@ const TFF_CATEGORIES: { name: string; cols: ColPair }[] = [
 ];
 
 const DISAGG_CATEGORIES: { name: string; cols: ColPair }[] = [
-  { name: "Swap Dealers",        cols: { long: "swap_positions_long_all",      short: "swap_positions_short_all" } },
-  { name: "Managed Money",       cols: { long: "m_money_positions_long",       short: "m_money_positions_short" } },
-  { name: "Producer / Merchant", cols: { long: "prod_merc_positions_long_all", short: "prod_merc_positions_short_all" } },
-  { name: "Other Reportables",   cols: { long: "other_rept_positions_long",    short: "other_rept_positions_short" } },
+  // CFTC's actual field name has a double underscore in swap__positions_short_all — not a typo
+  { name: "Swap Dealers",        cols: { long: "swap_positions_long_all",    short: "swap__positions_short_all" } },
+  { name: "Managed Money",       cols: { long: "m_money_positions_long_all", short: "m_money_positions_short_all" } },
+  { name: "Producer / Merchant", cols: { long: "prod_merc_positions_long",   short: "prod_merc_positions_short" } },
+  { name: "Other Reportables",   cols: { long: "other_rept_positions_long",  short: "other_rept_positions_short" } },
   { name: "Retail / Non-Reportable", cols: { long: "nonrept_positions_long_all", short: "nonrept_positions_short_all" } },
 ];
 
+// Socrata dataset IDs on publicreporting.cftc.gov
 const DATASET: Record<CotReportType, string> = {
-  tff:    "fin_fut",
-  disagg: "com_disagg",
+  tff:    "gpe5-46if",
+  disagg: "72hh-3qpy",
 };
 
-const CFTC_BASE = "https://publicreporting.cftc.gov/api/explore/v2.1/catalog/datasets";
+const CFTC_BASE = "https://publicreporting.cftc.gov/resource";
 
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=86400",
@@ -219,18 +202,21 @@ function buildCategories(
 async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | null> {
   const dataset = DATASET[instrument.reportType];
   const categoryDefs = instrument.reportType === "tff" ? TFF_CATEGORIES : DISAGG_CATEGORIES;
-  const whereValue = encodeURIComponent(`"${instrument.cftcName}"`);
-  const url = `${CFTC_BASE}/${dataset}/records?where=market_and_exchange_names%3D${whereValue}&limit=2&order_by=report_date_as_of+desc`;
+  const params = new URLSearchParams({
+    $where: `market_and_exchange_names='${instrument.cftcName}'`,
+    $order: "report_date_as_yyyy_mm_dd DESC",
+    $limit: "2",
+  });
+  const url = `${CFTC_BASE}/${dataset}.json?${params}`;
 
-  const res = await fetch(url, { next: { revalidate: 0 } }); // cache handled by TTLCache
+  const res = await fetch(url, { cache: "no-store" }); // caching handled by TTLCache
   if (!res.ok) {
     console.error(`[COT] CFTC fetch failed for ${instrument.label}: ${res.status}`);
     return null;
   }
 
-  const json = await res.json() as { results?: Record<string, unknown>[] };
-  const results = json.results ?? [];
-  if (results.length === 0) {
+  const results = (await res.json()) as Record<string, unknown>[];
+  if (!Array.isArray(results) || results.length === 0) {
     console.error(`[COT] No records found for ${instrument.label}`);
     return null;
   }
@@ -240,7 +226,8 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 
   return {
     instrument: instrument.label,
-    reportDate: String(latest.report_date_as_of ?? ""),
+    // Socrata returns ISO timestamps like "2026-06-02T00:00:00.000"
+    reportDate: String(latest.report_date_as_yyyy_mm_dd ?? "").slice(0, 10),
     reportType: instrument.reportType,
     categories: buildCategories(latest, prev, categoryDefs),
   };
@@ -976,10 +963,10 @@ git status
 
 ## Known Implementation Notes
 
-1. **CFTC field names** — The column names in the route were taken from the CFTC data dictionary and the spec. Verify them against the live API (Task 3 pre-step) before implementing the route. Common gotcha: the Disaggregated `spread` columns have inconsistent naming in some datasets.
+1. **CFTC field names** — All column names, dataset IDs, instrument names, and the API format were verified against the live Socrata API on 2026-06-11. Do not change `swap__positions_short_all` (double underscore) — that is the real field name. All numeric values arrive as strings; the `num()` helper converts them.
 
 2. **`DeltaLabel` component in `CotNetChart`** — The custom `LabelList` content renderer requires careful typing because Recharts passes unknown props. If TypeScript complains about the `content` prop, cast `props` to `LabelProps` explicitly.
 
 3. **Negative net bars** — Recharts with `layout="vertical"` handles negative values correctly (bars extend left from the zero line). No special handling needed.
 
-4. **Report date format** — CFTC returns dates as `YYYY-MM-DD` strings. `formatDate` from `src/utils/formatters.ts` handles this correctly.
+4. **Report date format** — The route slices Socrata's ISO timestamp to `YYYY-MM-DD` before returning. `formatDate` from `src/utils/formatters.ts` handles that format correctly.

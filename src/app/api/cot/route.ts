@@ -61,7 +61,8 @@ const CACHE_HEADERS = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function num(record: Record<string, unknown>, col: string): number {
   const v = record[col];
-  return typeof v === "number" ? v : Number(v ?? 0);
+  const n = typeof v === "number" ? v : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function buildCategories(
@@ -121,10 +122,34 @@ export async function GET() {
   }
 
   const results = await Promise.allSettled(INSTRUMENTS.map(fetchInstrument));
+
+  // Log any rejections so transient failures are visible in server logs
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      console.error(`[COT] fetchInstrument rejected for ${INSTRUMENTS[i].label}:`, r.reason);
+    }
+  });
+
   const reports: CotReport[] = results
     .filter((r): r is PromiseFulfilledResult<CotReport> => r.status === "fulfilled" && r.value !== null)
     .map((r) => r.value);
 
+  if (reports.length === 0) {
+    // Total outage — don't pin an empty response in any cache layer
+    return NextResponse.json(reports, {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+
+  if (reports.length < INSTRUMENTS.length) {
+    // Partial — return what we have but let next request retry the failed instruments
+    return NextResponse.json(reports, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+
+  // All instruments succeeded — safe to cache for 24h
   cotCache.set(CACHE_KEY, reports as unknown[]);
   return NextResponse.json(reports, { headers: CACHE_HEADERS });
 }

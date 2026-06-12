@@ -78,6 +78,12 @@ The API route makes two parallel fetches — one to each CFTC endpoint — then 
 ```ts
 export type CotReportType = "tff" | "disagg";
 
+export interface CotInstrument {
+  label: string;          // "S&P 500"
+  cftcName: string;       // exact CFTC filter string
+  reportType: CotReportType;
+}
+
 export interface CotCategory {
   name: string;       // e.g. "Leveraged Funds"
   longs: number;      // raw contract count
@@ -99,7 +105,7 @@ export interface CotReport {
 ## API Route (`/api/cot`)
 
 - **Method:** GET
-- **Cache:** `revalidate = 86400` (24 hours, weekly COT data)
+- **Cache:** Module-level `TTLCache` via `getOrCreateCache` (pattern from `src/lib/cache.ts`) with 86400s TTL, plus `Cache-Control: public, s-maxage=86400, stale-while-revalidate=86400` response header. Do NOT use `export const revalidate` — the `getOrCreateCache` pattern survives Next.js hot reloads. Add `export const cotCache = getOrCreateCache<CotReport[]>("cot", 86400)` to `src/lib/cache.ts`.
 - **Response:** `CotReport[]`
 - Fans out two parallel fetches to CFTC public endpoints
 - Each fetch requests `limit=2` records sorted descending by report date
@@ -107,9 +113,16 @@ export interface CotReport {
 - Maps CFTC column names to `CotCategory` fields based on `reportType`
 - Filters each response to exact instrument name match
 
-**CFTC endpoints used:**
+**CFTC endpoints used (OpenDataSoft format — append query params as URL search params):**
 - TFF: `https://publicreporting.cftc.gov/api/explore/dataset/fin_fut/exports/json/`
 - Disaggregated: `https://publicreporting.cftc.gov/api/explore/dataset/com_disagg/exports/json/`
+
+Query params appended per request:
+- `where=market_and_exchange_names%3D%22<CFTC_NAME>%22` — filter to exact instrument name
+- `limit=2` — fetch 2 records (latest + previous week for WoW delta)
+- `order_by=report_date_as_of_desc` — most recent first
+
+**Note for implementer:** Verify the exact `where` filter param name and syntax against the live CFTC OpenDataSoft API before building — the filter field may be `market_and_exchange_names` or a variant. The CFTC public reporting portal at `publicreporting.cftc.gov` has a dataset explorer for confirming field names.
 
 **TFF column mapping:**
 | Category | Longs col | Shorts col |
@@ -123,7 +136,7 @@ export interface CotReport {
 **Disaggregated column mapping:**
 | Category | Longs col | Shorts col |
 |---|---|---|
-| Swap Dealers | `swap_positions_long_all` | `swap__positions_short_all` |
+| Swap Dealers | `swap_positions_long_all` | `swap_positions_short_all` |
 | Managed Money | `m_money_positions_long` | `m_money_positions_short` |
 | Producer / Merchant | `prod_merc_positions_long_all` | `prod_merc_positions_short_all` |
 | Other Reportables | `other_rept_positions_long` | `other_rept_positions_short` |
@@ -144,7 +157,7 @@ Mirrors `useEconomicData.ts` pattern exactly:
 - `useCallback` wrapping the fetch
 - `useEffect` to call on mount
 - Returns `{ data, loading, error, refetch }`
-- No auto-refresh interval (COT data is weekly; 24h cache is sufficient)
+- **No `setInterval` auto-refresh** (unlike `useEconomicData` which polls every 15 min) — COT data is weekly and the 24h server cache makes client-side polling unnecessary
 
 ---
 

@@ -303,3 +303,27 @@ export interface TreasuryBundleData {
   series: TreasurySeriesData[];
   lastUpdated: string;
 }
+
+// ─── COT Report ───────────────────────────────────────
+export type CotReportType = "tff" | "disagg";
+
+export interface CotInstrument {
+  label: string;
+  cftcName: string;
+  reportType: CotReportType;
+}
+
+export interface CotCategory {
+  name: string;
+  longs: number;
+  shorts: number;
+  net: number;
+  netChange: number;
+}
+
+export interface CotReport {
+  instrument: string;
+  reportDate: string;
+  reportType: CotReportType;
+  categories: CotCategory[];
+}

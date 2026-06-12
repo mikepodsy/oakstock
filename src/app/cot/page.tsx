@@ -13,19 +13,17 @@ export default function CotPage() {
   const { data, loading, error, refetch } = useCotData();
   const [selected, setSelected] = useState<string | null>(null);
 
-  const report = data
-    ? (data.find((r) => r.instrument === (selected ?? data[0]?.instrument)) ?? data[0])
+  const report = data?.length
+    ? (data.find((r) => r.instrument === selected) ?? data[0])
     : null;
-
-  const selectedInstrument = report?.instrument ?? selected ?? data?.[0]?.instrument ?? "S&P 500";
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">COT Report</h1>
-          <p className="text-sm text-text-tertiary mt-0.5">
+          <h1 className="font-display text-2xl text-text-primary">COT Report</h1>
+          <p className="text-sm text-text-secondary mt-1">
             CFTC Commitment of Traders — positioning by trader category
           </p>
         </div>
@@ -45,6 +43,7 @@ export default function CotPage() {
         <div className="rounded-xl border border-border-primary bg-bg-secondary p-6 text-center">
           <p className="text-sm text-text-secondary mb-3">{error}</p>
           <button
+            type="button"
             onClick={refetch}
             className="flex items-center gap-2 mx-auto px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm hover:bg-bg-elevated transition-colors"
           >
@@ -55,34 +54,40 @@ export default function CotPage() {
       )}
 
       {/* Content */}
-      {!loading && !error && data && data.length > 0 && (
+      {!loading && !error && data && report && (
         <div className="space-y-4">
           {/* Instrument tabs */}
           <CotInstrumentTabs
             reports={data}
-            selected={selectedInstrument}
+            selected={report.instrument}
             onSelect={setSelected}
           />
 
-          {report && (
-            <>
-              {/* Long / Short chart */}
-              <CotPositionChart
-                categories={report.categories}
-                title={`${report.instrument} — Long / Short Positioning`}
-              />
+          {/* Long / Short chart */}
+          <CotPositionChart
+            categories={report.categories}
+            title={`${report.instrument} — Long / Short Positioning`}
+          />
 
-              {/* Net position chart */}
-              <CotNetChart categories={report.categories} />
-            </>
-          )}
+          {/* Net position chart */}
+          <CotNetChart categories={report.categories} />
         </div>
       )}
 
       {/* Empty state (API returned 0 instruments) */}
       {!loading && !error && data && data.length === 0 && (
         <div className="rounded-xl border border-border-primary bg-bg-secondary p-6 text-center">
-          <p className="text-sm text-text-secondary">No COT data available. CFTC data may be temporarily unavailable.</p>
+          <p className="text-sm text-text-secondary mb-3">
+            No COT data available. CFTC data may be temporarily unavailable.
+          </p>
+          <button
+            type="button"
+            onClick={refetch}
+            className="flex items-center gap-2 mx-auto px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm hover:bg-bg-elevated transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </button>
         </div>
       )}
     </div>

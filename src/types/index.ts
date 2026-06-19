@@ -102,6 +102,9 @@ export type PerformanceReturns = Record<PerformancePeriod, number | null>;
 export interface HistoricalDataPoint {
   date: string; // ISO date
   close: number;
+  open?: number;
+  high?: number;
+  low?: number;
 }
 
 export interface PortfolioChartPoint {

@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
       .map((item) => ({
         date: item.date.toISOString().split("T")[0],
         close: (item.close ?? item.adjclose)!,
+        open: item.open ?? undefined,
+        high: item.high ?? undefined,
+        low: item.low ?? undefined,
       }));
 
     historyCache.set(cacheKey, data);

@@ -153,10 +153,8 @@ export function MarginLineChart({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-text-primary">{title}</h3>
         <Dialog open={expanded} onOpenChange={setExpanded}>
-          <DialogTrigger>
-            <button className="p-1 rounded-md hover:bg-bg-tertiary transition-colors">
-              <Maximize2 className="w-3.5 h-3.5 text-text-tertiary" />
-            </button>
+          <DialogTrigger className="p-1 rounded-md hover:bg-bg-tertiary transition-colors">
+            <Maximize2 className="w-3.5 h-3.5 text-text-tertiary" />
           </DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>

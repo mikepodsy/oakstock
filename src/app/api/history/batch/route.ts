@@ -16,7 +16,7 @@ const VALID_PERIODS = new Set([
 async function fetchPeriod(
   ticker: string,
   period: string
-): Promise<Array<{ date: string; close: number }>> {
+): Promise<Array<{ date: string; close: number; open?: number; high?: number; low?: number }>> {
   const startDate = getPeriodStartDate(period);
   const result = await yf.chart(ticker, {
     period1: startDate,
@@ -28,6 +28,9 @@ async function fetchPeriod(
     .map((item) => ({
       date: item.date.toISOString().split("T")[0],
       close: (item.close ?? item.adjclose)!,
+      open: item.open ?? undefined,
+      high: item.high ?? undefined,
+      low: item.low ?? undefined,
     }));
 }
 
@@ -54,7 +57,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const result: Record<string, Array<{ date: string; close: number }>> = {};
+  const result: Record<
+    string,
+    Array<{ date: string; close: number; open?: number; high?: number; low?: number }>
+  > = {};
   const uncached: string[] = [];
 
   // Check cache first for each period

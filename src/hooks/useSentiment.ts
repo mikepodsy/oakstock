@@ -46,10 +46,12 @@ export function useSentiment(ticker: string): UseSentimentReturn {
 
     setLoading(true);
     fetch(`/api/sentiment?ticker=${ticker}&voterId=${voterId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        setCounts(data.counts);
-        setUserVote(data.userVote ?? null);
+        if (data?.counts) {
+          setCounts(data.counts);
+          setUserVote(data.userVote ?? null);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));

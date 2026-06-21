@@ -110,7 +110,12 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
       </div>
 
       <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
+        <BarChart
+          data={data}
+          margin={{ top: 4, right: 8, bottom: 0, left: 4 }}
+          barGap={0}
+          barCategoryGap="6%"
+        >
           <CartesianGrid vertical={false} stroke="var(--border-primary)" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"

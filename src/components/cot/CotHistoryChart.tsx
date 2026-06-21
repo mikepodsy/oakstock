@@ -49,6 +49,12 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
   // Thin x-axis labels to ~10 across the year so they don't overlap
   const tickInterval = Math.max(0, Math.ceil(history.length / 10) - 1);
 
+  // 52 weeks × multiple bars per week needs more room than the page width can
+  // give, so the chart scrolls horizontally on a wider canvas. Net mode draws
+  // one bar per category each week, so it needs proportionally more space.
+  const perWeekPx = metric === "net" ? categoryNames.length * 11 + 8 : 22;
+  const chartMinWidth = Math.max(640, history.length * perWeekPx);
+
   const data = history.map((week) => {
     const row: Record<string, string | number> = { date: week.reportDate };
     for (const cat of week.categories) {
@@ -109,13 +115,16 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <BarChart
-          data={data}
-          margin={{ top: 4, right: 8, bottom: 0, left: 4 }}
-          barGap={0}
-          barCategoryGap="6%"
-        >
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: chartMinWidth }}>
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart
+              data={data}
+              margin={{ top: 4, right: 8, bottom: 0, left: 4 }}
+              barGap={1}
+              barCategoryGap="12%"
+              maxBarSize={28}
+            >
           <CartesianGrid vertical={false} stroke="var(--border-primary)" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"
@@ -161,8 +170,10 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
                   fillOpacity={0.5}
                 />,
               ])}
-        </BarChart>
-      </ResponsiveContainer>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }

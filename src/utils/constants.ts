@@ -138,7 +138,40 @@ export const RADAR_SECTORS: Record<string, { label: string; tickers: string[] }>
   },
 } as const;
 
-export const RADAR_SECTOR_KEYS = Object.keys(RADAR_SECTORS);
+// "All Companies" = every sector's tickers, deduped. Added as the default option.
+export const RADAR_ALL_KEY = "all";
+const RADAR_ALL_COMPANIES_TICKERS = Array.from(
+  new Set(Object.values(RADAR_SECTORS).flatMap((s) => s.tickers))
+);
+RADAR_SECTORS[RADAR_ALL_KEY] = {
+  label: "All Companies",
+  tickers: RADAR_ALL_COMPANIES_TICKERS,
+};
+
+// "All Companies" first, then the sectors in their declared order
+export const RADAR_SECTOR_KEYS = [
+  RADAR_ALL_KEY,
+  ...Object.keys(RADAR_SECTORS).filter((k) => k !== RADAR_ALL_KEY),
+];
+
+// ─── Radar ranking + timeframe controls ───────────────────
+export type RadarRanking = "default" | "gainers" | "losers" | "trending";
+
+export const RADAR_RANKINGS: { key: RadarRanking; label: string }[] = [
+  { key: "default", label: "Default" },
+  { key: "gainers", label: "Top Gainers" },
+  { key: "losers", label: "Top Losers" },
+  { key: "trending", label: "Top Trending" },
+];
+
+// Daily only for now; structured so 1W/1M/etc. can be added later.
+export const RADAR_TIMEFRAMES: { key: string; label: string }[] = [
+  { key: "1d", label: "Today" },
+];
+
+// Top-N shown for ranked views, and the cap for the unranked "All Companies" view
+export const RADAR_RANKING_LIMIT = 50;
+export const RADAR_ALL_DEFAULT_CAP = 100;
 
 export const RADAR_ETF_CATEGORIES: Record<string, { label: string; tickers: string[] }> = {
   broad_market: {

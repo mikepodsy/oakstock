@@ -11,10 +11,8 @@ import {
   Eye,
   Radar,
   CalendarDays,
-  HandCoins,
   TrendingUp,
   Calculator,
-  Scale,
   Globe,
   PanelLeftClose,
   PanelLeftOpen,
@@ -39,11 +37,9 @@ const NAV_LINKS = [
   { href: "/radar", label: "Radar", icon: Radar },
   { href: "/market-data", label: "Market Data", icon: Globe },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/dividends", label: "Dividends", icon: HandCoins },
   { href: "/economic", label: "Economic", icon: TrendingUp },
   { href: "/cot", label: "COT Report", icon: BarChart2 },
   { href: "/dcf", label: "DCF", icon: Calculator },
-  { href: "/rebalance", label: "Rebalance", icon: Scale },
   { href: "/experts", label: "Experts", icon: Users },
 ];
 

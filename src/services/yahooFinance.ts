@@ -83,15 +83,3 @@ export async function fetchBatchFinancials(tickers: string[]): Promise<BatchFina
   if (!res.ok) throw new Error("Failed to fetch batch financials");
   return res.json();
 }
-
-export async function fetchDividendIncome(
-  tickers: string[],
-  from: string
-): Promise<Record<string, { date: string; dividend: number }[]>> {
-  if (tickers.length === 0) return {};
-  const res = await fetch(
-    `/api/dividends/income?tickers=${tickers.map(encodeURIComponent).join(",")}&from=${from}`
-  );
-  if (!res.ok) throw new Error("Failed to fetch dividend income");
-  return res.json();
-}

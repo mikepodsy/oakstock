@@ -114,25 +114,6 @@ export interface PortfolioChartPoint {
   costBasis: number;
 }
 
-// ─── AI Rebalancing ──────────────────────────────────
-export interface RebalanceRequest {
-  portfolioId: string;
-  goal: "growth" | "income" | "balanced" | "conservative";
-  riskTolerance: "low" | "medium" | "high";
-  investmentHorizon: "short" | "medium" | "long";
-  additionalCapital?: number;
-}
-
-export interface RebalanceSuggestion {
-  ticker: string;
-  name: string;
-  currentAllocation: number;
-  suggestedAllocation: number;
-  action: "buy" | "sell" | "hold";
-  sharesToTrade: number;
-  reasoning: string;
-}
-
 // ─── Fundamentals Time Series ────────────────────────
 export interface FinancialStatement {
   date: string;

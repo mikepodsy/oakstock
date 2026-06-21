@@ -15,6 +15,21 @@ export async function fetchQuotes(tickers: string[]): Promise<QuoteData[]> {
   return res.json();
 }
 
+export async function fetchScreener(
+  type: "day_gainers" | "day_losers",
+  count = 50
+): Promise<string[]> {
+  const res = await fetch(`/api/radar/screener?type=${type}&count=${count}`);
+  if (!res.ok) throw new Error("Failed to fetch screener");
+  return res.json();
+}
+
+export async function fetchTrending(count = 25): Promise<string[]> {
+  const res = await fetch(`/api/radar/trending?count=${count}`);
+  if (!res.ok) throw new Error("Failed to fetch trending");
+  return res.json();
+}
+
 export async function searchTickers(
   query: string
 ): Promise<

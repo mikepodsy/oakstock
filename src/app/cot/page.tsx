@@ -5,6 +5,7 @@ import { useCotData } from "@/hooks/useCotData";
 import { CotInstrumentTabs } from "@/components/cot/CotInstrumentTabs";
 import { CotPositionChart } from "@/components/cot/CotPositionChart";
 import { CotNetChart } from "@/components/cot/CotNetChart";
+import { CotHistoryChart } from "@/components/cot/CotHistoryChart";
 import { CotLoadingSkeleton } from "@/components/cot/CotLoadingSkeleton";
 import { formatDate } from "@/utils/formatters";
 import { RefreshCw } from "lucide-react";
@@ -71,6 +72,13 @@ export default function CotPage() {
 
           {/* Net position chart */}
           <CotNetChart categories={report.categories} />
+
+          {/* 52-week historical positioning */}
+          <CotHistoryChart
+            history={report.history}
+            categoryNames={report.categories.map((c) => c.name)}
+            title={`${report.instrument} — 52-Week Positioning`}
+          />
         </div>
       )}
 

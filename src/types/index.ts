@@ -324,9 +324,22 @@ export interface CotCategory {
   netChange: number;
 }
 
+export interface CotWeekCategory {
+  name: string;
+  longs: number;
+  shorts: number;
+  net: number;
+}
+
+export interface CotWeek {
+  reportDate: string;
+  categories: CotWeekCategory[];
+}
+
 export interface CotReport {
   instrument: string;
   reportDate: string;
   reportType: CotReportType;
   categories: CotCategory[];
+  history: CotWeek[];
 }

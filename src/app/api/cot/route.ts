@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { cotCache } from "@/lib/cache";
-import type { CotReport, CotCategory, CotInstrument, CotReportType } from "@/types";
+import type { CotReport, CotCategory, CotWeek, CotInstrument, CotReportType } from "@/types";
+
+// Weeks of history exposed for the 52-week positioning chart
+const HISTORY_WEEKS = 52;
 
 // ─── Instrument Config (add more here to extend) ──────────────────────────────
 const INSTRUMENTS: CotInstrument[] = [
@@ -79,13 +82,37 @@ function buildCategories(
   });
 }
 
+function reportDateOf(record: Record<string, unknown>): string {
+  // Socrata returns ISO timestamps like "2026-06-02T00:00:00.000"
+  return String(record.report_date_as_yyyy_mm_dd ?? "").slice(0, 10);
+}
+
+function buildHistory(
+  records: Record<string, unknown>[],
+  categoryDefs: { name: string; cols: ColPair }[]
+): CotWeek[] {
+  // records arrive newest-first; reverse so the chart plots oldest → newest left to right
+  return records
+    .slice(0, HISTORY_WEEKS)
+    .map((rec) => ({
+      reportDate: reportDateOf(rec),
+      categories: categoryDefs.map(({ name, cols }) => {
+        const longs = num(rec, cols.long);
+        const shorts = num(rec, cols.short);
+        return { name, longs, shorts, net: longs - shorts };
+      }),
+    }))
+    .reverse();
+}
+
 async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | null> {
   const dataset = DATASET[instrument.reportType];
   const categoryDefs = instrument.reportType === "tff" ? TFF_CATEGORIES : DISAGG_CATEGORIES;
   const params = new URLSearchParams({
     $where: `market_and_exchange_names='${instrument.cftcName}'`,
     $order: "report_date_as_yyyy_mm_dd DESC",
-    $limit: "2",
+    // 52 weeks of history + 1 extra for the latest week's week-over-week netChange calc
+    $limit: String(HISTORY_WEEKS + 1),
   });
   const url = `${CFTC_BASE}/${dataset}.json?${params}`;
 
@@ -106,10 +133,10 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 
   return {
     instrument: instrument.label,
-    // Socrata returns ISO timestamps like "2026-06-02T00:00:00.000"
-    reportDate: String(latest.report_date_as_yyyy_mm_dd ?? "").slice(0, 10),
+    reportDate: reportDateOf(latest),
     reportType: instrument.reportType,
     categories: buildCategories(latest, prev, categoryDefs),
+    history: buildHistory(results, categoryDefs),
   };
 }
 

@@ -10,7 +10,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { ChevronsRight } from "lucide-react";
+import { ChevronsRight, Maximize2, Minimize2 } from "lucide-react";
 import { TimeRangePicker } from "./TimeRangePicker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchQuestradeCandles } from "@/services/questrade";
@@ -43,6 +43,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   const [data, setData] = useState<QuestradeCandle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const theme = useThemeStore((s) => s.theme);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,6 +74,26 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   const goToLatest = useCallback(() => {
     chartRef.current?.timeScale().scrollToRealTime();
   }, []);
+
+  // While expanded: exit on Escape and lock background scroll. The chart uses
+  // autoSize (ResizeObserver), so growing the wrapper resizes it automatically —
+  // no need to recreate the chart.
+  useEffect(() => {
+    if (!fullscreen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [fullscreen]);
 
   // Create the chart + series. Recreated on theme change so canvas colors
   // (which must be resolved hex, not CSS var() strings) refresh.
@@ -171,7 +192,13 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       : 0;
 
   return (
-    <div>
+    <div
+      className={
+        fullscreen
+          ? "fixed inset-0 z-50 flex flex-col bg-bg-primary p-4"
+          : undefined
+      }
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text-primary">
@@ -196,19 +223,33 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
         />
       </div>
 
-      <div className="relative h-[300px]">
+      <div className={`relative ${fullscreen ? "flex-1" : "h-[300px]"}`}>
         {/* Chart container stays mounted so lightweight-charts can attach. */}
         <div ref={containerRef} className="h-full w-full" />
 
         {!loading && !error && data.length > 0 && (
-          <button
-            onClick={goToLatest}
-            title="Jump to latest candle"
-            aria-label="Jump to latest candle"
-            className="absolute top-2 right-2 z-10 flex items-center justify-center rounded-md border border-border-primary bg-bg-elevated/80 p-1.5 text-text-secondary backdrop-blur transition-colors hover:text-text-primary"
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </button>
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+            <button
+              onClick={goToLatest}
+              title="Jump to latest candle"
+              aria-label="Jump to latest candle"
+              className="flex items-center justify-center rounded-md border border-border-primary bg-bg-elevated/80 p-1.5 text-text-secondary backdrop-blur transition-colors hover:text-text-primary"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setFullscreen((v) => !v)}
+              title={fullscreen ? "Exit full screen" : "Full screen"}
+              aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+              className="flex items-center justify-center rounded-md border border-border-primary bg-bg-elevated/80 p-1.5 text-text-secondary backdrop-blur transition-colors hover:text-text-primary"
+            >
+              {fullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </button>
+          </div>
         )}
 
         {loading ? (

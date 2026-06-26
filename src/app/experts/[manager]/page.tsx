@@ -315,7 +315,7 @@ export default function ExpertDetailPage({
             <div className="mb-3">
               <TopBar holdings={data?.holdings ?? []} />
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-5 max-w-md">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
               <div className="bg-bg-secondary border border-border-primary rounded-xl px-4 py-3">
                 <p className="text-text-tertiary text-xs mb-1">Portfolio Value</p>
                 <p className="text-text-primary font-bold text-lg">{formatUSD(stats.total_value_usd)}</p>
@@ -324,10 +324,9 @@ export default function ExpertDetailPage({
                 <p className="text-text-tertiary text-xs mb-1">Holdings</p>
                 <p className="text-text-primary font-bold text-lg">{stats.holdings_count}</p>
               </div>
+              {/* Fund performance widgets (period returns + Sharpe) */}
+              <FundPerformance managerId={managerId} />
             </div>
-
-            {/* Fund performance + Sharpe */}
-            <FundPerformance managerId={managerId} />
           </>
         )}
 

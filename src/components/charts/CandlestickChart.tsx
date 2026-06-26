@@ -11,9 +11,17 @@ import {
   ColorType,
   type IChartApi,
   type ISeriesApi,
+  type IPriceLine,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { ChevronsRight, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
+import {
+  ChevronsRight,
+  ChevronDown,
+  Maximize2,
+  Minimize2,
+  Minus,
+  X,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -30,6 +38,7 @@ import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
 import { useIndicatorStore } from "@/stores/indicatorStore";
+import { useDrawingStore } from "@/stores/drawingStore";
 import {
   sma as smaCalc,
   ema as emaCalc,
@@ -64,6 +73,21 @@ function cssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
+// Drawn horizontal lines: a distinct cyan so they read differently from the
+// indicator overlays (blue/amber/purple).
+const DRAW_LINE_COLOR = "#22d3ee";
+// Stable empty reference so the store selector doesn't churn when a ticker has
+// no lines yet (avoids re-render loops).
+const EMPTY_LINES: { id: string; price: number }[] = [];
+// How close (px) the cursor must be to a line to grab it.
+const LINE_HIT_PX = 6;
+
+// Round a clicked/dragged price to a sensible precision for its magnitude.
+function roundPrice(p: number): number {
+  const decimals = Math.abs(p) >= 1 ? 2 : 4;
+  return Number(p.toFixed(decimals));
+}
+
 export function CandlestickChart({
   ticker,
   name,
@@ -94,6 +118,20 @@ export function CandlestickChart({
   const rsiCfg = useIndicatorStore((s) => s.rsi);
   const volumeCfg = useIndicatorStore((s) => s.volume);
   const sessionsCfg = useIndicatorStore((s) => s.sessions);
+
+  // User-drawn horizontal lines for this ticker (persisted, per-symbol).
+  const linesRaw = useDrawingStore((s) => s.lines[ticker]);
+  const lines = linesRaw ?? EMPTY_LINES;
+  const addLine = useDrawingStore((s) => s.addLine);
+  const moveLine = useDrawingStore((s) => s.moveLine);
+  const removeLine = useDrawingStore((s) => s.removeLine);
+
+  // Draw-line tool state: drawMode arms a click-to-place; hover tracks the line
+  // under the cursor (for the drag handle + ✕ delete affordance).
+  const [drawMode, setDrawMode] = useState(false);
+  const [hover, setHover] = useState<{ id: string; y: number } | null>(null);
+  const priceLineRefs = useRef<Map<string, IPriceLine>>(new Map());
+  const dragRef = useRef<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<ISeriesApi<
@@ -430,6 +468,133 @@ export function CandlestickChart({
     }
   }, [sessionsCfg, interval, data, theme, chartType]);
 
+  // Render the drawn horizontal lines as native price lines on the candle
+  // series — they span the full width, get a right-axis price label for free,
+  // and stay synced through pan/zoom. Full teardown + rebuild on change (and
+  // after the chart is recreated on theme/type change); the set is tiny.
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+    for (const pl of priceLineRefs.current.values()) {
+      try {
+        series.removePriceLine(pl);
+      } catch {
+        /* series was recreated; the line went with it */
+      }
+    }
+    priceLineRefs.current.clear();
+    for (const line of lines) {
+      const pl = series.createPriceLine({
+        price: line.price,
+        color: DRAW_LINE_COLOR,
+        lineWidth: 2,
+        axisLabelVisible: true,
+        title: "",
+      });
+      priceLineRefs.current.set(line.id, pl);
+    }
+  }, [lines, theme, chartType, data]);
+
+  // Disable chart pan/zoom while placing or dragging a line so the gesture
+  // doesn't scroll the chart. Re-applied after the chart is recreated.
+  useEffect(() => {
+    chartRef.current?.applyOptions({
+      handleScroll: !drawMode,
+      handleScale: !drawMode,
+    });
+  }, [drawMode, theme, chartType]);
+
+  // Cursor y relative to the chart container's top, matching the coordinate
+  // space lightweight-charts uses for priceToCoordinate / coordinateToPrice.
+  const relativeY = useCallback((clientY: number): number | null => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    return rect ? clientY - rect.top : null;
+  }, []);
+
+  // Hover detection: highlight the nearest line within the grab threshold.
+  const onChartMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (dragRef.current) return; // drag has its own window listener
+      const series = candleSeriesRef.current;
+      const yc = relativeY(e.clientY);
+      if (drawMode || yc == null || !series) {
+        setHover((prev) => (prev ? null : prev));
+        return;
+      }
+      let best: { id: string; y: number } | null = null;
+      let bestDist = LINE_HIT_PX;
+      for (const line of lines) {
+        const coord = series.priceToCoordinate(line.price);
+        if (coord == null) continue;
+        const d = Math.abs(coord - yc);
+        if (d < bestDist) {
+          bestDist = d;
+          best = { id: line.id, y: coord };
+        }
+      }
+      setHover((prev) => {
+        if (!best && !prev) return prev;
+        if (best && prev && best.id === prev.id && best.y === prev.y) return prev;
+        return best;
+      });
+    },
+    [drawMode, lines, relativeY]
+  );
+
+  // Press on a hovered line to start dragging it vertically. Live-updates the
+  // price line via applyOptions and commits to the store on release.
+  const onChartMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (drawMode || !hover) return;
+      const series = candleSeriesRef.current;
+      const chart = chartRef.current;
+      if (!series || !chart) return;
+      const id = hover.id;
+      e.preventDefault();
+      dragRef.current = id;
+      chart.applyOptions({ handleScroll: false, handleScale: false });
+      let lastPrice = lines.find((l) => l.id === id)?.price ?? null;
+
+      const move = (ev: MouseEvent) => {
+        const yc = relativeY(ev.clientY);
+        if (yc == null) return;
+        const price = series.coordinateToPrice(yc);
+        if (price == null) return;
+        lastPrice = roundPrice(price);
+        priceLineRefs.current.get(id)?.applyOptions({ price: lastPrice });
+        setHover({ id, y: yc });
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        dragRef.current = null;
+        chartRef.current?.applyOptions({
+          handleScroll: !drawMode,
+          handleScale: !drawMode,
+        });
+        if (lastPrice != null) moveLine(ticker, id, lastPrice);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    },
+    [drawMode, hover, lines, moveLine, relativeY, ticker]
+  );
+
+  // In draw mode, a click drops a new line at the clicked price.
+  const onChartClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!drawMode) return;
+      const series = candleSeriesRef.current;
+      const yc = relativeY(e.clientY);
+      if (yc == null || !series) return;
+      const price = series.coordinateToPrice(yc);
+      if (price == null) return;
+      addLine(ticker, roundPrice(price));
+      setDrawMode(false);
+    },
+    [addLine, drawMode, relativeY, ticker]
+  );
+
   const isUp =
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;
   const priceChangePercent =
@@ -573,11 +738,70 @@ export function CandlestickChart({
 
         {/* Indicators (multi-select, configurable, persisted). */}
         <IndicatorsMenu isIntraday={isIntraday} />
+
+        {/* Horizontal-line draw tool. Toggles click-to-place; lines persist. */}
+        <button
+          type="button"
+          onClick={() => setDrawMode((v) => !v)}
+          title={
+            drawMode
+              ? "Click the chart to place a line"
+              : "Draw horizontal line"
+          }
+          className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+            drawMode
+              ? "border-green-primary bg-green-primary/10 text-text-primary"
+              : "border-border-primary bg-transparent text-text-secondary hover:text-text-primary"
+          }`}
+        >
+          <Minus className="h-3 w-3" />
+          Lines
+          {lines.length > 0 && (
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-green-primary px-1 text-[10px] text-white">
+              {lines.length}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className={`relative ${fullscreen ? "flex-1" : "h-[300px]"}`}>
         {/* Chart container stays mounted so lightweight-charts can attach. */}
-        <div ref={containerRef} className="h-full w-full" />
+        <div
+          ref={containerRef}
+          className="h-full w-full"
+          style={{
+            cursor: drawMode
+              ? "crosshair"
+              : hover
+                ? "ns-resize"
+                : undefined,
+          }}
+          onMouseMove={onChartMouseMove}
+          onMouseDown={onChartMouseDown}
+          onMouseLeave={() => {
+            if (!dragRef.current) setHover(null);
+          }}
+          onClick={onChartClick}
+        />
+
+        {/* ✕ delete affordance for the line under the cursor. */}
+        {hover && !drawMode && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              removeLine(ticker, hover.id);
+              setHover(null);
+            }}
+            style={{ top: hover.y - 10 }}
+            title="Remove line"
+            aria-label="Remove line"
+            className="absolute left-2 z-20 flex h-5 w-5 items-center justify-center rounded border border-border-primary bg-bg-elevated/90 text-text-secondary backdrop-blur transition-colors hover:text-red-primary"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
 
         {!loading && !error && legend.length > 0 && (
           <div className="absolute top-2 left-2 z-10 flex flex-col gap-0.5 rounded-md bg-bg-elevated/70 px-2 py-1 backdrop-blur">

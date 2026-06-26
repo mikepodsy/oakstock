@@ -13,11 +13,12 @@ async function fetchSingleQuote(ticker: string) {
   if (cached) return cached;
   try {
     const summary = await yf.quoteSummary(ticker, {
-      modules: ["price", "assetProfile"],
+      modules: ["price", "assetProfile", "summaryDetail"],
     });
 
     const price = summary.price;
     const profile = summary.assetProfile;
+    const detail = summary.summaryDetail;
 
     const data = {
       ticker: price?.symbol ?? ticker,
@@ -29,9 +30,9 @@ async function fetchSingleQuote(ticker: string) {
         ? price.regularMarketChangePercent * 100
         : 0,
       marketCap: price?.marketCap ?? undefined,
-      peRatio: undefined,
-      fiftyTwoWeekHigh: undefined,
-      fiftyTwoWeekLow: undefined,
+      peRatio: detail?.trailingPE ?? undefined,
+      fiftyTwoWeekHigh: detail?.fiftyTwoWeekHigh ?? undefined,
+      fiftyTwoWeekLow: detail?.fiftyTwoWeekLow ?? undefined,
       sector: profile?.sector ?? undefined,
       website: profile?.website ?? undefined,
       currency: price?.currency ?? "USD",

@@ -4,10 +4,6 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  TrendingUp,
-  TrendingDown,
-  Star,
-  Minus,
   ChevronDown,
   ExternalLink,
   BarChart3,
@@ -63,6 +59,12 @@ interface ExpertData {
   stats: Stats;
 }
 
+interface Quote {
+  currentPrice: number;
+  fiftyTwoWeekLow?: number;
+  fiftyTwoWeekHigh?: number;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatUSD(n: number): string {
   if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
@@ -71,17 +73,22 @@ function formatUSD(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-function formatShares(n: number): string {
-  if (n >= 1e9)  return `${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6)  return `${(n / 1e6).toFixed(2)}M`;
-  if (n >= 1e3)  return `${(n / 1e3).toFixed(1)}K`;
-  return n.toLocaleString();
+function formatPrice(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function pctChange(current: number, prev: number | null): string | null {
-  if (prev === null || prev === 0) return null;
-  const delta = ((current - prev) / prev) * 100;
-  return (delta > 0 ? "+" : "") + delta.toFixed(1) + "%";
+// Color the raw Dataroma "Recent Activity" text (Add/Buy green, Reduce/Sell red).
+function activityColor(activity: string | null): string {
+  const a = (activity ?? "").toLowerCase();
+  if (a.startsWith("add") || a.startsWith("buy")) return "text-emerald-400";
+  if (a.startsWith("reduce") || a.startsWith("sell")) return "text-red-400";
+  return "text-text-tertiary";
+}
+
+// Yahoo uses a dash for share-class tickers (BRK.B → BRK-B).
+function yahooSymbol(ticker: string): string {
+  return ticker.replace(/\./g, "-");
 }
 
 const AVATAR_COLORS = [
@@ -97,25 +104,6 @@ function avatarColor(id: string) {
 }
 function getInitials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
-// ── Change badge ──────────────────────────────────────────────────────────────
-function ChangeBadge({ type }: { type: string }) {
-  const map: Record<string, { label: string; className: string; Icon: React.ElementType }> = {
-    new:       { label: "New",       className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", Icon: Star },
-    increased: { label: "Added",     className: "bg-blue-500/10 text-blue-400 border-blue-500/20",         Icon: TrendingUp },
-    decreased: { label: "Reduced",   className: "bg-orange-500/10 text-orange-400 border-orange-500/20",   Icon: TrendingDown },
-    unchanged: { label: "Held",      className: "bg-bg-tertiary text-text-tertiary border-border-primary", Icon: Minus },
-    sold:      { label: "Sold",      className: "bg-red-500/10 text-red-400 border-red-500/20",            Icon: TrendingDown },
-  };
-  const cfg = map[type] ?? map.unchanged;
-  const { label, className, Icon } = cfg;
-  return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border font-medium ${className}`}>
-      <Icon className="h-3 w-3" />
-      {label}
-    </span>
-  );
 }
 
 // ── Sector donut (simple CSS-based) ──────────────────────────────────────────
@@ -178,6 +166,7 @@ export default function ExpertDetailPage({
   const [filterChange, setFilterChange] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"value" | "pct" | "change">("value");
   const [quarterOpen, setQuarterOpen] = useState(false);
+  const [quotes, setQuotes] = useState<Record<string, Quote>>({});
 
   useEffect(() => {
     const url = `/api/experts/${managerId}${selectedQuarter ? `?quarter=${encodeURIComponent(selectedQuarter)}` : ""}`;
@@ -194,6 +183,36 @@ export default function ExpertDetailPage({
         setLoading(false);
       });
   }, [managerId, selectedQuarter]);
+
+  // Fetch live quotes (current price + 52-week range) for the loaded holdings.
+  useEffect(() => {
+    const symbols = Array.from(
+      new Set(
+        (data?.holdings ?? [])
+          .map((h) => h.ticker)
+          .filter((t): t is string => Boolean(t))
+          .map(yahooSymbol)
+      )
+    );
+    if (symbols.length === 0) return;
+    let cancelled = false;
+    fetch(`/api/quotes?tickers=${encodeURIComponent(symbols.join(","))}`)
+      .then((r) => r.json())
+      .then((arr) => {
+        if (cancelled || !Array.isArray(arr)) return;
+        const map: Record<string, Quote> = {};
+        for (const q of arr) {
+          map[q.ticker] = {
+            currentPrice: q.currentPrice,
+            fiftyTwoWeekLow: q.fiftyTwoWeekLow,
+            fiftyTwoWeekHigh: q.fiftyTwoWeekHigh,
+          };
+        }
+        setQuotes(map);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [data]);
 
   const manager = data?.manager;
   const stats = data?.stats;
@@ -416,111 +435,122 @@ export default function ExpertDetailPage({
           </div>
         ) : (
           <div className="bg-bg-secondary border border-border-primary rounded-2xl overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-[2rem_2.5rem_1fr_5rem_6rem_5rem_6rem] gap-3 px-4 py-3 border-b border-border-primary">
-              <span className="text-text-tertiary text-xs">#</span>
-              <span className="text-text-tertiary text-xs" />
-              <span className="text-text-tertiary text-xs">Company</span>
-              <span className="text-text-tertiary text-xs text-right">% Port.</span>
-              <span className="text-text-tertiary text-xs text-right">Value</span>
-              <span className="text-text-tertiary text-xs text-right">Shares</span>
-              <span className="text-text-tertiary text-xs text-center">Change</span>
-            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[940px] text-sm">
+                <thead>
+                  <tr className="border-b border-border-primary text-text-tertiary text-xs">
+                    <th className="text-left  font-normal px-4 py-3">Stock</th>
+                    <th className="text-right font-normal px-3 py-3 whitespace-nowrap">% of Portfolio</th>
+                    <th className="text-left  font-normal px-3 py-3 whitespace-nowrap">Recent Activity</th>
+                    <th className="text-right font-normal px-3 py-3">Shares</th>
+                    <th className="text-right font-normal px-3 py-3 whitespace-nowrap">Reported Price</th>
+                    <th className="text-right font-normal px-3 py-3">Value</th>
+                    <th className="text-right font-normal px-3 py-3 whitespace-nowrap">Current Price</th>
+                    <th className="text-right font-normal px-3 py-3 whitespace-nowrap">+/- Reported</th>
+                    <th className="text-right font-normal px-3 py-3 whitespace-nowrap">52W Low</th>
+                    <th className="text-right font-normal px-3 py-3 pr-4 whitespace-nowrap">52W High</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-primary">
+                  {sorted.map((holding) => {
+                    const ticker = holding.ticker ?? holding.company_name.slice(0, 5).toUpperCase();
+                    const reported = holding.shares > 0 ? holding.value_usd / holding.shares : null;
+                    const quote = holding.ticker ? quotes[yahooSymbol(holding.ticker)] : undefined;
+                    const current = quote?.currentPrice;
+                    const vsReported =
+                      reported && current ? ((current - reported) / reported) * 100 : null;
 
-            {/* Rows */}
-            <div className="divide-y divide-border-primary">
-              {sorted.map((holding, i) => {
-                const sharesDelta = pctChange(holding.shares, holding.shares_prev);
-                const ticker = holding.ticker ?? holding.company_name.slice(0, 5).toUpperCase();
+                    return (
+                      <tr key={holding.id} className="hover:bg-bg-tertiary transition-colors">
+                        {/* Stock */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {holding.ticker ? (
+                              <CompanyLogo
+                                ticker={holding.ticker}
+                                className="w-8 h-8 rounded-md"
+                                textClassName="text-[10px]"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-md bg-bg-tertiary flex items-center justify-center text-text-tertiary text-[10px] font-bold shrink-0">
+                                {ticker.slice(0, 2)}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                {holding.ticker ? (
+                                  <Link
+                                    href={`/stock/${holding.ticker}`}
+                                    className="text-text-primary font-medium hover:text-green-primary transition-colors flex items-center gap-1"
+                                  >
+                                    {holding.ticker}
+                                    <ExternalLink className="h-2.5 w-2.5 opacity-40" />
+                                  </Link>
+                                ) : (
+                                  <span className="text-text-primary font-medium">{holding.company_name}</span>
+                                )}
+                                {holding.option_type && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                                    {holding.option_type}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-text-tertiary text-xs truncate max-w-[220px]">{holding.company_name}</p>
+                            </div>
+                          </div>
+                        </td>
 
-                return (
-                  <div
-                    key={holding.id}
-                    className="grid grid-cols-[2rem_2.5rem_1fr_5rem_6rem_5rem_6rem] gap-3 px-4 py-3 hover:bg-bg-tertiary transition-colors items-center"
-                  >
-                    {/* Rank */}
-                    <span className="text-text-tertiary text-xs text-right">{i + 1}</span>
+                        {/* % of Portfolio */}
+                        <td className="px-3 py-3 text-right text-text-primary font-medium tabular-nums">
+                          {holding.pct_portfolio?.toFixed(2)}
+                        </td>
 
-                    {/* Logo */}
-                    {holding.ticker ? (
-                      <CompanyLogo
-                        ticker={holding.ticker}
-                        className="w-9 h-9 rounded-md"
-                        textClassName="text-[10px]"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-md bg-bg-tertiary flex items-center justify-center text-text-tertiary text-[10px] font-bold shrink-0">
-                        {ticker.slice(0, 2)}
-                      </div>
-                    )}
+                        {/* Recent Activity */}
+                        <td className={`px-3 py-3 whitespace-nowrap tabular-nums ${activityColor(holding.activity)}`}>
+                          {holding.activity || "—"}
+                        </td>
 
-                    {/* Company */}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {holding.ticker ? (
-                          <Link
-                            href={`/stock/${holding.ticker}`}
-                            className="text-text-primary text-sm font-medium hover:text-green-primary transition-colors flex items-center gap-1"
-                          >
-                            {holding.ticker}
-                            <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100" />
-                          </Link>
-                        ) : (
-                          <span className="text-text-primary text-sm font-medium">
-                            {holding.company_name}
-                          </span>
-                        )}
-                        {holding.option_type && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                            {holding.option_type}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-text-tertiary text-xs truncate">{holding.company_name}</p>
-                    </div>
+                        {/* Shares */}
+                        <td className="px-3 py-3 text-right text-text-secondary tabular-nums">
+                          {holding.shares.toLocaleString()}
+                        </td>
 
-                    {/* % Portfolio */}
-                    <div className="text-right">
-                      <span className="text-text-primary text-sm font-medium">
-                        {holding.pct_portfolio?.toFixed(2)}%
-                      </span>
-                      <div className="h-1 mt-1 rounded-full bg-bg-tertiary overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-green-primary/60"
-                          style={{ width: `${Math.min(holding.pct_portfolio * 2.5, 100)}%` }}
-                        />
-                      </div>
-                    </div>
+                        {/* Reported Price */}
+                        <td className="px-3 py-3 text-right text-text-secondary tabular-nums">
+                          {formatPrice(reported)}
+                        </td>
 
-                    {/* Value */}
-                    <span className="text-text-secondary text-sm text-right">
-                      {formatUSD(holding.value_usd)}
-                    </span>
+                        {/* Value */}
+                        <td className="px-3 py-3 text-right text-text-primary tabular-nums">
+                          ${holding.value_usd.toLocaleString()}
+                        </td>
 
-                    {/* Shares */}
-                    <div className="text-right">
-                      <span className="text-text-secondary text-sm">
-                        {formatShares(holding.shares)}
-                      </span>
-                      {sharesDelta && (
-                        <p className={`text-xs ${parseFloat(sharesDelta) > 0 ? "text-emerald-400" : "text-orange-400"}`}>
-                          {sharesDelta}
-                        </p>
-                      )}
-                    </div>
+                        {/* Current Price */}
+                        <td className="px-3 py-3 text-right text-text-secondary tabular-nums">
+                          {formatPrice(current)}
+                        </td>
 
-                    {/* Change badge */}
-                    <div className="flex flex-col items-center gap-0.5">
-                      <ChangeBadge type={holding.change_type} />
-                      {holding.activity && /\d/.test(holding.activity) && (
-                        <span className="text-text-tertiary text-[10px] tabular-nums">
-                          {holding.activity.replace(/^(Add|Reduce)\s*/i, "")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                        {/* +/- Reported */}
+                        <td className={`px-3 py-3 text-right tabular-nums ${
+                          vsReported === null ? "text-text-tertiary" : vsReported >= 0 ? "text-emerald-400" : "text-red-400"
+                        }`}>
+                          {vsReported === null ? "—" : `${vsReported >= 0 ? "+" : ""}${vsReported.toFixed(2)}%`}
+                        </td>
+
+                        {/* 52W Low */}
+                        <td className="px-3 py-3 text-right text-text-tertiary tabular-nums">
+                          {formatPrice(quote?.fiftyTwoWeekLow)}
+                        </td>
+
+                        {/* 52W High */}
+                        <td className="px-3 py-3 pr-4 text-right text-text-tertiary tabular-nums">
+                          {formatPrice(quote?.fiftyTwoWeekHigh)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
             {/* Footer */}
@@ -529,7 +559,7 @@ export default function ExpertDetailPage({
                 Showing {sorted.length} of {equityHoldings.length} positions
               </span>
               <span className="text-text-tertiary text-xs">
-                Source: Dataroma · {stats?.quarter}
+                Holdings: Dataroma · Quotes: Yahoo Finance · {stats?.quarter}
               </span>
             </div>
           </div>

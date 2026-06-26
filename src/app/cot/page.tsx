@@ -109,11 +109,11 @@ export default function CotPage() {
           {/* Net position chart */}
           <CotNetChart categories={groups.categories} />
 
-          {/* 52-week historical positioning */}
+          {/* Historical positioning (selectable look-back window) */}
           <CotHistoryChart
             history={groups.history}
             categoryNames={groups.categories.map((c) => c.name)}
-            title={`${report.instrument} — 52-Week Positioning (${viewLabel})`}
+            title={`${report.instrument} — Positioning Over Time (${viewLabel})`}
           />
         </div>
       )}

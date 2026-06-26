@@ -80,7 +80,11 @@ export default function StockDetailPage() {
       <StockHeader quote={quote} />
 
       <div className="mb-6">
-        <CandlestickChart ticker={ticker} />
+        <CandlestickChart
+          ticker={ticker}
+          name={quote.name}
+          website={quote.website}
+        />
       </div>
 
       <SentimentSection ticker={ticker} />

@@ -13,6 +13,7 @@ import {
 
 interface WatchlistCardDetailProps {
   ticker: string;
+  name?: string;
   currentPrice: number;
 }
 
@@ -42,6 +43,7 @@ function getRatingColor(rating: string): string {
 
 export function WatchlistCardDetail({
   ticker,
+  name,
   currentPrice,
 }: WatchlistCardDetailProps) {
   const { data, loading, error, refetch } = useFinancials(ticker);
@@ -87,7 +89,11 @@ export function WatchlistCardDetail({
   return (
     <div className="mt-4 pt-4 border-t border-border-primary space-y-5">
       {/* Price Chart */}
-      <CandlestickChart ticker={ticker} />
+      <CandlestickChart
+        ticker={ticker}
+        name={name}
+        website={data?.website ?? undefined}
+      />
 
       {/* Key Financials */}
       <div>

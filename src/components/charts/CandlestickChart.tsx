@@ -22,6 +22,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { IndicatorsMenu } from "./IndicatorsMenu";
 import { SessionBackgroundPrimitive } from "./sessionBackground";
 import { fetchQuestradeCandles } from "@/services/questrade";
@@ -43,6 +44,8 @@ import type { QuestradeCandle } from "@/types";
 
 interface CandlestickChartProps {
   ticker: string;
+  name?: string;
+  website?: string;
 }
 
 // Intraday candle sizes — show time (not just date) on the axis for these.
@@ -61,9 +64,15 @@ function cssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-export function CandlestickChart({ ticker }: CandlestickChartProps) {
+export function CandlestickChart({
+  ticker,
+  name,
+  website,
+}: CandlestickChartProps) {
   const [interval, setInterval] = useState("OneDay");
-  const [chartType, setChartType] = useState<"candles" | "bars">("candles");
+  const [chartType, setChartType] = useState<"candles" | "bars" | "line">(
+    "candles"
+  );
   const [data, setData] = useState<QuestradeCandle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +96,9 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   const sessionsCfg = useIndicatorStore((s) => s.sessions);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const candleSeriesRef = useRef<ISeriesApi<"Candlestick" | "Bar"> | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<
+    "Candlestick" | "Bar" | "Line"
+  > | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const colorsRef = useRef({ up: "#22C55E", down: "#EF4444" });
@@ -169,6 +180,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
 
     const up = cssVar("--green-primary", "#22C55E");
     const down = cssVar("--red-primary", "#EF4444");
+    const lineColor = cssVar("--text-primary", "#F0EDE8");
     const text = cssVar("--text-tertiary", "#8b8b8b");
     const bg = cssVar("--bg-secondary", "#000000");
     const grid = cssVar("--border-primary", "#222222");
@@ -193,13 +205,19 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
     const candleSeries =
       chartType === "bars"
         ? chart.addSeries(BarSeries, { upColor: up, downColor: down })
-        : chart.addSeries(CandlestickSeries, {
-            upColor: up,
-            downColor: down,
-            borderVisible: false,
-            wickUpColor: up,
-            wickDownColor: down,
-          });
+        : chartType === "line"
+          ? chart.addSeries(LineSeries, {
+              color: lineColor,
+              lineWidth: 2,
+              priceLineVisible: false,
+            })
+          : chart.addSeries(CandlestickSeries, {
+              upColor: up,
+              downColor: down,
+              borderVisible: false,
+              wickUpColor: up,
+              wickDownColor: down,
+            });
     candleSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.1, bottom: 0.25 },
     });
@@ -236,15 +254,24 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
 
     const { up, down } = colorsRef.current;
 
-    candleSeries.setData(
-      data.map((c) => ({
-        time: (Date.parse(c.time) / 1000) as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }))
-    );
+    if (chartType === "line") {
+      (candleSeries as ISeriesApi<"Line">).setData(
+        data.map((c) => ({
+          time: (Date.parse(c.time) / 1000) as UTCTimestamp,
+          value: c.close,
+        }))
+      );
+    } else {
+      (candleSeries as ISeriesApi<"Candlestick" | "Bar">).setData(
+        data.map((c) => ({
+          time: (Date.parse(c.time) / 1000) as UTCTimestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }))
+      );
+    }
 
     volumeSeries.setData(
       data.map((c) => ({
@@ -449,6 +476,21 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
           Price Chart
         </span>
 
+        {/* Fullscreen: company logo + name between the label and the price. */}
+        {fullscreen && (
+          <span className="flex items-center gap-2">
+            <CompanyLogo
+              ticker={ticker}
+              website={website}
+              className="w-6 h-6 rounded-md"
+              textClassName="text-[10px]"
+            />
+            <span className="text-sm font-semibold text-text-primary">
+              {name ?? ticker}
+            </span>
+          </span>
+        )}
+
         {/* Fullscreen: current price + today's change beside the label. */}
         {fullscreen && quote && (
           <>
@@ -502,19 +544,28 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
         {/* Chart type: candles vs OHLC bars. */}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
-            {chartType === "bars" ? "Bars" : "Candles"}
+            {chartType === "bars"
+              ? "Bars"
+              : chartType === "line"
+                ? "Line"
+                : "Candles"}
             <ChevronDown className="h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuRadioGroup
               value={chartType}
-              onValueChange={(v) => setChartType(v as "candles" | "bars")}
+              onValueChange={(v) =>
+                setChartType(v as "candles" | "bars" | "line")
+              }
             >
               <DropdownMenuRadioItem value="candles">
                 Candles
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="bars">
                 OHLC Bars
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="line">
+                Line
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>

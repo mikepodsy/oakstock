@@ -10,11 +10,18 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { ChevronsRight, Maximize2, Minimize2 } from "lucide-react";
-import { TimeRangePicker } from "./TimeRangePicker";
+import { ChevronsRight, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchQuestradeCandles } from "@/services/questrade";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
+import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
 import type { QuestradeCandle } from "@/types";
 
@@ -44,6 +51,12 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  // Latest price + today's change (last daily close vs prior daily close).
+  // Fetched independently of the chart interval so it stays a true day change.
+  const [quote, setQuote] = useState<{
+    price: number;
+    changePercent: number;
+  } | null>(null);
   const theme = useThemeStore((s) => s.theme);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +82,30 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Pull the latest two daily candles to derive current price and today's
+  // change, regardless of which interval the chart is showing.
+  useEffect(() => {
+    let cancelled = false;
+    setQuote(null);
+    fetchQuestradeCandles(ticker, "OneDay")
+      .then((daily) => {
+        if (cancelled || daily.length < 2) return;
+        const last = daily[daily.length - 1];
+        const prev = daily[daily.length - 2];
+        if (prev.close === 0) return;
+        setQuote({
+          price: last.close,
+          changePercent: ((last.close - prev.close) / prev.close) * 100,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setQuote(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker]);
 
   // Jump back to the most recent candle.
   const goToLatest = useCallback(() => {
@@ -191,6 +228,9 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       ? ((data[data.length - 1].close - data[0].close) / data[0].close) * 100
       : 0;
 
+  const intervalLabel =
+    QUESTRADE_INTERVALS.find((r) => r.value === interval)?.label ?? interval;
+
   return (
     <div
       className={
@@ -199,28 +239,60 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
           : undefined
       }
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text-primary">
-            Price Chart
-          </span>
-          {!loading && data.length >= 2 && (
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm font-medium text-text-primary">
+          Price Chart
+        </span>
+
+        {/* Fullscreen: current price + today's change beside the label. */}
+        {fullscreen && quote && (
+          <>
+            <span className="text-sm font-semibold text-text-primary">
+              {formatCurrency(quote.price)}
+            </span>
             <span
               className="text-xs font-medium"
               style={{
-                color: isUp ? "var(--green-primary)" : "var(--red-primary)",
+                color:
+                  quote.changePercent >= 0
+                    ? "var(--green-primary)"
+                    : "var(--red-primary)",
               }}
             >
-              {isUp ? "+" : ""}
-              {priceChangePercent.toFixed(2)}%
+              {formatPercent(quote.changePercent)}
             </span>
-          )}
-        </div>
-        <TimeRangePicker
-          selected={interval}
-          onSelect={setInterval}
-          ranges={QUESTRADE_INTERVALS}
-        />
+          </>
+        )}
+
+        {/* Normal view keeps the selected-range change. */}
+        {!fullscreen && !loading && data.length >= 2 && (
+          <span
+            className="text-xs font-medium"
+            style={{
+              color: isUp ? "var(--green-primary)" : "var(--red-primary)",
+            }}
+          >
+            {isUp ? "+" : ""}
+            {priceChangePercent.toFixed(2)}%
+          </span>
+        )}
+
+        {/* Interval dropdown (replaces the old top-right button row). */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+            {intervalLabel}
+            <ChevronDown className="h-3 w-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup value={interval} onValueChange={setInterval}>
+              {QUESTRADE_INTERVALS.map((opt) => (
+                <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className={`relative ${fullscreen ? "flex-1" : "h-[300px]"}`}>
@@ -228,7 +300,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
         <div ref={containerRef} className="h-full w-full" />
 
         {!loading && !error && data.length > 0 && (
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+          <div className="absolute top-2 right-14 z-10 flex items-center gap-1.5">
             <button
               onClick={goToLatest}
               title="Jump to latest candle"

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Loader2 } from "lucide-react";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 
 interface SearchResult {
   ticker: string;
@@ -93,7 +94,7 @@ export function SearchBar() {
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative w-44 sm:w-56 md:w-64">
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
         <input
@@ -112,7 +113,7 @@ export function SearchBar() {
       </div>
 
       {open && (
-        <div className="absolute bottom-full mb-1 w-80 left-0 rounded-lg border border-border-primary bg-bg-secondary shadow-lg overflow-hidden z-50">
+        <div className="absolute top-full mt-1 w-80 right-0 rounded-lg border border-border-primary bg-bg-secondary shadow-lg overflow-hidden z-50">
           {results.map((r, i) => (
             <button
               key={r.ticker}
@@ -122,7 +123,12 @@ export function SearchBar() {
                 i === activeIndex ? "bg-bg-tertiary" : ""
               }`}
             >
-              <span className="font-medium text-sm text-text-primary min-w-[60px]">
+              <CompanyLogo
+                ticker={r.ticker}
+                className="w-7 h-7 rounded-md"
+                textClassName="text-[10px]"
+              />
+              <span className="font-medium text-sm text-text-primary min-w-[52px]">
                 {r.ticker}
               </span>
               <span className="text-sm text-text-secondary truncate flex-1">

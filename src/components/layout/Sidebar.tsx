@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
-import { SearchBar } from "./SearchBar";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -117,10 +116,8 @@ export function Sidebar() {
 
         {/* Bottom section */}
         <div className={`flex flex-col gap-2 px-2 py-3 border-t border-border-primary ${collapsed ? "items-center" : ""}`}>
-          {!collapsed && <SearchBar />}
           <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2 px-1"}`}>
             <ThemeToggle />
-            <UserButton />
             {!collapsed && <div className="flex-1" />}
             <Button
               variant="ghost"

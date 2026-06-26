@@ -25,9 +25,13 @@ function getDomain(ticker: string, website?: string): string | null {
 export function CompanyLogo({
   ticker,
   website,
+  className = "w-14 h-14 rounded-xl",
+  textClassName = "text-lg",
 }: {
   ticker: string;
   website?: string;
+  className?: string;
+  textClassName?: string;
 }) {
   const [imgError, setImgError] = useState(false);
   const domain = getDomain(ticker, website);
@@ -36,7 +40,7 @@ export function CompanyLogo({
   if (!logoUrl || imgError) {
     return (
       <div
-        className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
+        className={`${className} flex items-center justify-center text-white font-bold shrink-0 ${textClassName}`}
         style={{ backgroundColor: getLogoColor(ticker) }}
       >
         {ticker.slice(0, 2)}
@@ -48,7 +52,7 @@ export function CompanyLogo({
     <img
       src={logoUrl}
       alt={`${ticker} logo`}
-      className="w-14 h-14 rounded-xl object-contain bg-white shrink-0"
+      className={`${className} object-contain bg-white shrink-0`}
       onError={() => setImgError(true)}
     />
   );

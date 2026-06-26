@@ -30,6 +30,7 @@ interface Holding {
   change_type: string;
   shares_prev: number | null;
   pct_portfolio: number;
+  activity: string | null;
 }
 
 interface Manager {
@@ -507,8 +508,13 @@ export default function ExpertDetailPage({
                     </div>
 
                     {/* Change badge */}
-                    <div className="flex justify-center">
+                    <div className="flex flex-col items-center gap-0.5">
                       <ChangeBadge type={holding.change_type} />
+                      {holding.activity && /\d/.test(holding.activity) && (
+                        <span className="text-text-tertiary text-[10px] tabular-nums">
+                          {holding.activity.replace(/^(Add|Reduce)\s*/i, "")}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -521,7 +527,7 @@ export default function ExpertDetailPage({
                 Showing {sorted.length} of {equityHoldings.length} positions
               </span>
               <span className="text-text-tertiary text-xs">
-                Source: SEC EDGAR · {stats?.quarter}
+                Source: Dataroma · {stats?.quarter}
               </span>
             </div>
           </div>

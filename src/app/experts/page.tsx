@@ -228,7 +228,7 @@ export default function ExpertsPage() {
 
   async function handleRefreshAll() {
     setRefreshing(true);
-    setRefreshMsg("Fetching 13F data from SEC EDGAR… this may take a minute.");
+    setRefreshMsg("Fetching latest holdings from Dataroma… this may take a minute.");
     try {
       const r = await fetch("/api/experts/refresh", { method: "POST" });
       const data = await r.json();
@@ -255,7 +255,7 @@ export default function ExpertsPage() {
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Experts</h1>
             <p className="text-text-secondary text-sm mt-1">
-              Institutional 13F filings from the world's top investors · SEC EDGAR
+              13F portfolios of the world&apos;s top value investors · via Dataroma
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0 mt-1">
@@ -272,14 +272,14 @@ export default function ExpertsPage() {
               onClick={handleRefreshAll}
               disabled={refreshing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-tertiary border border-border-primary text-text-secondary hover:text-text-primary hover:border-green-primary/40 text-xs transition-colors disabled:opacity-50"
-              title="Fetch latest 13F data from SEC EDGAR"
+              title="Fetch latest holdings from Dataroma"
             >
               {refreshing ? (
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}
-              {refreshing ? "Fetching…" : "Fetch 13F Data"}
+              {refreshing ? "Fetching…" : "Fetch Holdings"}
             </button>
           </div>
         </div>
@@ -294,7 +294,7 @@ export default function ExpertsPage() {
 
         {/* Info banner */}
         <div className="mt-3 px-4 py-2.5 rounded-xl bg-bg-tertiary border border-border-primary text-text-tertiary text-xs leading-relaxed">
-          13F filings are quarterly SEC disclosures required of institutional managers with &gt;$100M AUM.
+          Holdings come from quarterly 13F filings (aggregated by Dataroma) required of institutional managers with &gt;$100M AUM.
           They reveal US long equity positions only — no shorts, bonds, or international holdings.
           Data is filed up to 45 days after quarter end.
         </div>

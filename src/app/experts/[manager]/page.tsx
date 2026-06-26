@@ -442,15 +442,17 @@ export default function ExpertDetailPage({
                     <span className="text-text-tertiary text-xs text-right">{i + 1}</span>
 
                     {/* Logo */}
-                    <div className="w-9 h-9">
-                      {holding.ticker ? (
-                        <CompanyLogo ticker={holding.ticker} />
-                      ) : (
-                        <div className="w-9 h-9 rounded-lg bg-bg-tertiary flex items-center justify-center text-text-tertiary text-xs font-bold">
-                          {ticker.slice(0, 2)}
-                        </div>
-                      )}
-                    </div>
+                    {holding.ticker ? (
+                      <CompanyLogo
+                        ticker={holding.ticker}
+                        className="w-9 h-9 rounded-md"
+                        textClassName="text-[10px]"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-md bg-bg-tertiary flex items-center justify-center text-text-tertiary text-[10px] font-bold shrink-0">
+                        {ticker.slice(0, 2)}
+                      </div>
+                    )}
 
                     {/* Company */}
                     <div className="min-w-0">

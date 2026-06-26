@@ -32,11 +32,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { IndicatorsMenu } from "./IndicatorsMenu";
+import { ChartStyleMenu } from "./ChartStyleMenu";
 import { SessionBackgroundPrimitive } from "./sessionBackground";
 import { fetchQuestradeCandles } from "@/services/questrade";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
+import { useChartStyleStore, withAlpha } from "@/stores/chartStyleStore";
 import { useIndicatorStore } from "@/stores/indicatorStore";
 import { useDrawingStore } from "@/stores/drawingStore";
 import {
@@ -108,6 +110,9 @@ export function CandlestickChart({
     changePercent: number;
   } | null>(null);
   const theme = useThemeStore((s) => s.theme);
+  // Candle/background style config (persisted globally). Applied live to the
+  // existing chart via applyOptions, so edits don't recreate the canvas.
+  const chartStyle = useChartStyleStore();
 
   // Indicator config (persisted globally). Selected as individual slices so each
   // effect only re-runs when its own indicator changes.
@@ -216,13 +221,19 @@ export function CandlestickChart({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const up = cssVar("--green-primary", "#22C55E");
-    const down = cssVar("--red-primary", "#EF4444");
+    // Read the latest style imperatively so this effect doesn't recreate the
+    // chart on every color tweak — the dedicated style effect below applies
+    // those live. Theme CSS vars remain the fallback for unset values.
+    const style = useChartStyleStore.getState();
+    const up = withAlpha(style.body.up, style.candleOpacity);
+    const down = withAlpha(style.body.down, style.candleOpacity);
     const lineColor = cssVar("--text-primary", "#F0EDE8");
     const text = cssVar("--text-tertiary", "#8b8b8b");
-    const bg = cssVar("--bg-secondary", "#000000");
+    const bg = withAlpha(style.background, style.backgroundOpacity);
     const grid = cssVar("--border-primary", "#222222");
-    colorsRef.current = { up, down };
+    // Volume bars track the candle body colors (opaque, regardless of body fill
+    // opacity) so they stay legible.
+    colorsRef.current = { up: style.body.up, down: style.body.down };
 
     const chart = createChart(containerRef.current, {
       autoSize: true,
@@ -252,9 +263,12 @@ export function CandlestickChart({
           : chart.addSeries(CandlestickSeries, {
               upColor: up,
               downColor: down,
-              borderVisible: false,
-              wickUpColor: up,
-              wickDownColor: down,
+              borderVisible: style.border.visible,
+              borderUpColor: style.border.up,
+              borderDownColor: style.border.down,
+              wickVisible: style.wick.visible,
+              wickUpColor: style.wick.up,
+              wickDownColor: style.wick.down,
             });
     candleSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.1, bottom: 0.25 },
@@ -282,6 +296,50 @@ export function CandlestickChart({
       sessionPrimitiveRef.current = null;
     };
   }, [theme, chartType]);
+
+  // Apply candle/background style live to the existing chart + series. Runs on
+  // any style change (and after the chart is recreated, since the candle series
+  // ref changes). No recreation → no flicker, viewport preserved.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    if (!chart) return;
+
+    const up = withAlpha(chartStyle.body.up, chartStyle.candleOpacity);
+    const down = withAlpha(chartStyle.body.down, chartStyle.candleOpacity);
+    colorsRef.current = { up: chartStyle.body.up, down: chartStyle.body.down };
+
+    chart.applyOptions({
+      layout: {
+        background: {
+          type: ColorType.Solid,
+          color: withAlpha(chartStyle.background, chartStyle.backgroundOpacity),
+        },
+      },
+    });
+
+    // Border/wick options only exist on the candlestick series; bars and line
+    // map their up/down to the body colors.
+    if (candleSeries) {
+      if (chartType === "candles") {
+        (candleSeries as ISeriesApi<"Candlestick">).applyOptions({
+          upColor: up,
+          downColor: down,
+          borderVisible: chartStyle.border.visible,
+          borderUpColor: chartStyle.border.up,
+          borderDownColor: chartStyle.border.down,
+          wickVisible: chartStyle.wick.visible,
+          wickUpColor: chartStyle.wick.up,
+          wickDownColor: chartStyle.wick.down,
+        });
+      } else if (chartType === "bars") {
+        (candleSeries as ISeriesApi<"Bar">).applyOptions({
+          upColor: up,
+          downColor: down,
+        });
+      }
+    }
+  }, [chartStyle, chartType, theme]);
 
   // Push data into the series when it (or the recreated chart) changes.
   useEffect(() => {
@@ -738,6 +796,9 @@ export function CandlestickChart({
 
         {/* Indicators (multi-select, configurable, persisted). */}
         <IndicatorsMenu isIntraday={isIntraday} />
+
+        {/* Candle/background colors + opacity (persisted globally). */}
+        <ChartStyleMenu />
 
         {/* Horizontal-line draw tool. Toggles click-to-place; lines persist. */}
         <button

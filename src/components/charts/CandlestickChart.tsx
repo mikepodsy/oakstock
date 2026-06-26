@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createChart,
   CandlestickSeries,
+  BarSeries,
   HistogramSeries,
   LineSeries,
   LineStyle,
@@ -62,6 +63,7 @@ function cssVar(name: string, fallback: string): string {
 
 export function CandlestickChart({ ticker }: CandlestickChartProps) {
   const [interval, setInterval] = useState("OneDay");
+  const [chartType, setChartType] = useState<"candles" | "bars">("candles");
   const [data, setData] = useState<QuestradeCandle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   const sessionsCfg = useIndicatorStore((s) => s.sessions);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick" | "Bar"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const colorsRef = useRef({ up: "#22C55E", down: "#EF4444" });
@@ -188,13 +190,16 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       },
     });
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: up,
-      downColor: down,
-      borderVisible: false,
-      wickUpColor: up,
-      wickDownColor: down,
-    });
+    const candleSeries =
+      chartType === "bars"
+        ? chart.addSeries(BarSeries, { upColor: up, downColor: down })
+        : chart.addSeries(CandlestickSeries, {
+            upColor: up,
+            downColor: down,
+            borderVisible: false,
+            wickUpColor: up,
+            wickDownColor: down,
+          });
     candleSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.1, bottom: 0.25 },
     });
@@ -220,7 +225,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       indicatorSeriesRef.current = [];
       sessionPrimitiveRef.current = null;
     };
-  }, [theme]);
+  }, [theme, chartType]);
 
   // Push data into the series when it (or the recreated chart) changes.
   useEffect(() => {
@@ -253,7 +258,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
     // Open on the most recent data rather than fitting the whole history, so a
     // fresh chart / interval change lands on the current day.
     chart.timeScale().scrollToRealTime();
-  }, [data, theme, interval]);
+  }, [data, theme, interval, chartType]);
 
   // Rebuild indicator overlays + the RSI sub-pane whenever the data, theme
   // (chart recreate) or any indicator config changes. Full teardown + rebuild
@@ -365,6 +370,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   }, [
     data,
     theme,
+    chartType,
     smaCfg,
     emaCfg,
     bollingerCfg,
@@ -395,7 +401,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       }
       sessionPrimitiveRef.current = null;
     }
-  }, [sessionsCfg, interval, data, theme]);
+  }, [sessionsCfg, interval, data, theme, chartType]);
 
   const isUp =
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;
@@ -489,6 +495,27 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
                   {opt.label}
                 </DropdownMenuRadioItem>
               ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Chart type: candles vs OHLC bars. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+            {chartType === "bars" ? "Bars" : "Candles"}
+            <ChevronDown className="h-3 w-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={chartType}
+              onValueChange={(v) => setChartType(v as "candles" | "bars")}
+            >
+              <DropdownMenuRadioItem value="candles">
+                Candles
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="bars">
+                OHLC Bars
+              </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>

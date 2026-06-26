@@ -7,10 +7,9 @@ import {
   TrendingDown,
   Star,
   ArrowRight,
-  Users,
   RefreshCw,
   Minus,
-  Download,
+  Search,
 } from "lucide-react";
 import { ManagerLogo } from "@/components/shared/ManagerLogo";
 
@@ -189,8 +188,7 @@ export default function ExpertsPage() {
   const [managers, setManagers] = useState<ExpertManager[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   function loadManagers() {
     setLoading(true);
@@ -208,26 +206,14 @@ export default function ExpertsPage() {
 
   useEffect(() => { loadManagers(); }, []);
 
-  async function handleRefreshAll() {
-    setRefreshing(true);
-    setRefreshMsg("Fetching latest holdings from Dataroma… this may take a minute.");
-    try {
-      const r = await fetch("/api/experts/refresh", { method: "POST" });
-      const data = await r.json();
-      const fetched = Object.values(data.results ?? {}).filter(
-        (v: unknown) => (v as { status?: string }).status === "fetched"
-      ).length;
-      setRefreshMsg(`Done! Fetched data for ${fetched} manager(s). Reloading…`);
-      setTimeout(() => { loadManagers(); setRefreshMsg(null); }, 1500);
-    } catch (e: unknown) {
-      setRefreshMsg(`Refresh failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  const totalTracked = managers.length;
-  const withData = managers.filter((m) => m.latest_quarter).length;
+  const q = query.trim().toLowerCase();
+  const filteredManagers = q
+    ? managers.filter(
+        (m) =>
+          m.name.toLowerCase().includes(q) ||
+          m.fund.toLowerCase().includes(q)
+      )
+    : managers;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -240,39 +226,19 @@ export default function ExpertsPage() {
               13F portfolios of the world&apos;s top value investors · via Dataroma
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0 mt-1">
-            <div className="flex items-center gap-1.5 text-text-tertiary text-sm">
-              <Users className="h-4 w-4" />
-              <span>{totalTracked} tracked</span>
+          <div className="shrink-0 mt-1 w-full max-w-xs">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search funds…"
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-bg-tertiary border border-border-primary text-text-primary text-sm placeholder:text-text-tertiary focus:outline-none focus:border-green-primary/40 transition-colors"
+              />
             </div>
-            {withData > 0 && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-green-muted text-green-primary border border-green-primary/20">
-                {withData} with data
-              </span>
-            )}
-            <button
-              onClick={handleRefreshAll}
-              disabled={refreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-tertiary border border-border-primary text-text-secondary hover:text-text-primary hover:border-green-primary/40 text-xs transition-colors disabled:opacity-50"
-              title="Fetch latest holdings from Dataroma"
-            >
-              {refreshing ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              {refreshing ? "Fetching…" : "Fetch Holdings"}
-            </button>
           </div>
         </div>
-
-        {/* Refresh status */}
-        {refreshMsg && (
-          <div className="mt-3 px-4 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs flex items-center gap-2">
-            <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshMsg}
-          </div>
-        )}
 
         {/* Info banner */}
         <div className="mt-3 px-4 py-2.5 rounded-xl bg-bg-tertiary border border-border-primary text-text-tertiary text-xs leading-relaxed">
@@ -294,9 +260,13 @@ export default function ExpertsPage() {
               <CardSkeleton key={i} />
             ))}
           </div>
+        ) : filteredManagers.length === 0 ? (
+          <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
+            No funds match &ldquo;{query}&rdquo;
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {managers.map((m) => (
+            {filteredManagers.map((m) => (
               <ManagerCard key={m.id} manager={m} />
             ))}
           </div>

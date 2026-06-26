@@ -10,6 +10,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { ChevronsRight } from "lucide-react";
 import { TimeRangePicker } from "./TimeRangePicker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchQuestradeCandles } from "@/services/questrade";
@@ -68,6 +69,11 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
     load();
   }, [load]);
 
+  // Jump back to the most recent candle.
+  const goToLatest = useCallback(() => {
+    chartRef.current?.timeScale().scrollToRealTime();
+  }, []);
+
   // Create the chart + series. Recreated on theme change so canvas colors
   // (which must be resolved hex, not CSS var() strings) refresh.
   useEffect(() => {
@@ -85,7 +91,14 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       layout: { textColor: text, background: { type: ColorType.Solid, color: bg } },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
       rightPriceScale: { borderColor: grid },
-      timeScale: { borderColor: grid, secondsVisible: false },
+      timeScale: {
+        borderColor: grid,
+        secondsVisible: false,
+        // Pin data to both edges so zooming/scrolling out never leaves empty
+        // space before the first or after the last candle.
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -186,6 +199,17 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       <div className="relative h-[300px]">
         {/* Chart container stays mounted so lightweight-charts can attach. */}
         <div ref={containerRef} className="h-full w-full" />
+
+        {!loading && !error && data.length > 0 && (
+          <button
+            onClick={goToLatest}
+            title="Jump to latest candle"
+            aria-label="Jump to latest candle"
+            className="absolute top-2 right-2 z-10 flex items-center justify-center rounded-md border border-border-primary bg-bg-elevated/80 p-1.5 text-text-secondary backdrop-blur transition-colors hover:text-text-primary"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </button>
+        )}
 
         {loading ? (
           <Skeleton className="absolute inset-0 h-full w-full rounded-lg" />

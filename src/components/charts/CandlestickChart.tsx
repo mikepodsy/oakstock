@@ -180,10 +180,11 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       timeScale: {
         borderColor: grid,
         secondsVisible: false,
-        // Pin data to both edges so zooming/scrolling out never leaves empty
-        // space before the first or after the last candle.
+        // Pin the left edge so scrolling out never leaves empty space before the
+        // first candle, but leave the right edge free so you can drag ahead into
+        // empty space past the latest candle.
         fixLeftEdge: true,
-        fixRightEdge: true,
+        fixRightEdge: false,
       },
     });
 

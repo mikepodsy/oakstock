@@ -12,6 +12,14 @@ import {
   ReferenceLine,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+import { ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 import type { CotWeek } from "@/types";
 import { formatCompactNumber, formatSignedContracts } from "@/utils/formatters";
 
@@ -26,6 +34,14 @@ const tooltipStyle = {
 };
 
 type Metric = "net" | "longShort";
+
+// Selectable look-back windows so the chart fits the container width without
+// horizontal scrolling. Weeks are sliced from the end (most recent).
+const RANGES = [
+  { weeks: 13, label: "Quarter" },
+  { weeks: 26, label: "Half Year" },
+  { weeks: 52, label: "52 Weeks" },
+] as const;
 
 interface CotHistoryChartProps {
   history: CotWeek[];
@@ -43,19 +59,19 @@ function formatAxisDate(date: string): string {
 
 export function CotHistoryChart({ history, categoryNames, title }: CotHistoryChartProps) {
   const [metric, setMetric] = useState<Metric>("net");
+  const [rangeWeeks, setRangeWeeks] = useState<number>(13);
 
   const color = (name: string) => PALETTE[categoryNames.indexOf(name) % PALETTE.length];
 
-  // Thin x-axis labels to ~10 across the year so they don't overlap
-  const tickInterval = Math.max(0, Math.ceil(history.length / 10) - 1);
+  // Keep only the most recent N weeks so the bars fit without horizontal scroll.
+  const weeks = history.slice(-rangeWeeks);
+  const rangeLabel =
+    RANGES.find((r) => r.weeks === rangeWeeks)?.label ?? `${rangeWeeks} Weeks`;
 
-  // 52 weeks × multiple bars per week needs more room than the page width can
-  // give, so the chart scrolls horizontally on a wider canvas. Net mode draws
-  // one bar per category each week, so it needs proportionally more space.
-  const perWeekPx = metric === "net" ? categoryNames.length * 11 + 8 : 22;
-  const chartMinWidth = Math.max(640, history.length * perWeekPx);
+  // Thin x-axis labels to ~10 across the window so they don't overlap
+  const tickInterval = Math.max(0, Math.ceil(weeks.length / 10) - 1);
 
-  const data = history.map((week) => {
+  const data = weeks.map((week) => {
     const row: Record<string, string | number> = { date: week.reportDate };
     for (const cat of week.categories) {
       if (metric === "net") {
@@ -79,26 +95,49 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
               : "Gross longs (up) and shorts (down) per week, stacked by category."}
           </p>
         </div>
-        {/* Metric toggle */}
-        <div className="flex gap-1 shrink-0">
-          {([
-            ["net", "Net"],
-            ["longShort", "Long / Short"],
-          ] as [Metric, string][]).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={metric === value}
-              onClick={() => setMetric(value)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                metric === value
-                  ? "bg-green-muted text-green-primary"
-                  : "bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Range + metric controls */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Look-back range dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+              {rangeLabel}
+              <ChevronDown className="h-3 w-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={String(rangeWeeks)}
+                onValueChange={(v) => setRangeWeeks(Number(v))}
+              >
+                {RANGES.map((r) => (
+                  <DropdownMenuRadioItem key={r.weeks} value={String(r.weeks)}>
+                    {r.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Metric toggle */}
+          <div className="flex gap-1">
+            {([
+              ["net", "Net"],
+              ["longShort", "Long / Short"],
+            ] as [Metric, string][]).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={metric === value}
+                onClick={() => setMetric(value)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  metric === value
+                    ? "bg-green-muted text-green-primary"
+                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -115,16 +154,14 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
         ))}
       </div>
 
-      <div className="overflow-x-auto">
-        <div style={{ minWidth: chartMinWidth }}>
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart
-              data={data}
-              margin={{ top: 4, right: 8, bottom: 0, left: 4 }}
-              barGap={1}
-              barCategoryGap="12%"
-              maxBarSize={28}
-            >
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart
+          data={data}
+          margin={{ top: 4, right: 8, bottom: 0, left: 4 }}
+          barGap={1}
+          barCategoryGap="12%"
+          maxBarSize={28}
+        >
           <CartesianGrid vertical={false} stroke="var(--border-primary)" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"
@@ -170,10 +207,8 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
                   fillOpacity={0.5}
                 />,
               ])}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }

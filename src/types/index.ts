@@ -107,6 +107,15 @@ export interface HistoricalDataPoint {
   low?: number;
 }
 
+export interface QuestradeCandle {
+  time: string; // ISO timestamp (Questrade candle start)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface PortfolioChartPoint {
   date: string;
   portfolioValue: number;
@@ -291,10 +300,14 @@ export interface TreasuryBundleData {
 // ─── COT Report ───────────────────────────────────────
 export type CotReportType = "tff" | "disagg";
 
+// Instruments are bucketed into these groups for the grouped selector dropdowns.
+export type CotGroup = "Indices" | "Metals" | "FX" | "Energy";
+
 export interface CotInstrument {
   label: string;
   cftcName: string;
   reportType: CotReportType;
+  group: CotGroup;
 }
 
 export interface CotCategory {
@@ -317,10 +330,21 @@ export interface CotWeek {
   categories: CotWeekCategory[];
 }
 
+// A self-contained set of categories + history (used for the legacy report
+// shown alongside the detailed TFF/disagg breakdown).
+export interface CotGroupSet {
+  categories: CotCategory[];
+  history: CotWeek[];
+}
+
 export interface CotReport {
   instrument: string;
+  group: CotGroup;
   reportDate: string;
   reportType: CotReportType;
   categories: CotCategory[];
   history: CotWeek[];
+  // Legacy report groups (Commercial / Non-Commercial / Non-Reportable).
+  // null if the legacy dataset had no match / failed to load for this instrument.
+  legacy: CotGroupSet | null;
 }

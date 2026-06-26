@@ -11,9 +11,19 @@ interface RadarListRowProps {
   ticker: string;
   name: string;
   quote?: QuoteData;
+  /** % change over the selected timeframe (day change for "Today"). */
+  change?: number;
+  /** True while the period change is still loading. */
+  changeLoading?: boolean;
 }
 
-export function RadarListRow({ ticker, name, quote }: RadarListRowProps) {
+export function RadarListRow({
+  ticker,
+  name,
+  quote,
+  change,
+  changeLoading = false,
+}: RadarListRowProps) {
   const router = useRouter();
 
   return (
@@ -49,15 +59,21 @@ export function RadarListRow({ ticker, name, quote }: RadarListRowProps) {
             <p className="text-lg font-financial text-text-primary">
               {formatCurrency(quote.currentPrice)}
             </p>
-            <Badge
-              className={
-                quote.dayChangePercent >= 0
-                  ? "bg-green-muted text-green-primary"
-                  : "bg-red-muted text-red-primary"
-              }
-            >
-              {formatPercent(quote.dayChangePercent)}
-            </Badge>
+            {typeof change === "number" ? (
+              <Badge
+                className={
+                  change >= 0
+                    ? "bg-green-muted text-green-primary"
+                    : "bg-red-muted text-red-primary"
+                }
+              >
+                {formatPercent(change)}
+              </Badge>
+            ) : changeLoading ? (
+              <Skeleton className="h-5 w-14" />
+            ) : (
+              <Badge className="bg-bg-tertiary text-text-tertiary">—</Badge>
+            )}
           </>
         ) : (
           <>

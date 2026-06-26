@@ -6,11 +6,16 @@ const CACHE_DIR = path.join(process.cwd(), ".tmp", "logos");
 
 export async function GET(req: NextRequest) {
   const domain = req.nextUrl.searchParams.get("domain");
-  if (!domain) {
-    return NextResponse.json({ error: "domain is required" }, { status: 400 });
+  const ticker = req.nextUrl.searchParams.get("ticker");
+  if (!domain && !ticker) {
+    return NextResponse.json({ error: "domain or ticker is required" }, { status: 400 });
   }
 
-  const safeName = domain.replace(/[^a-zA-Z0-9.-]/g, "_");
+  // logo.dev resolves both a company domain and a stock ticker to a logo. Falling
+  // back to the ticker endpoint means symbols missing from ticker-domains.json
+  // still get a real logo instead of the generic initials placeholder.
+  const cacheKey = domain ? domain : `ticker_${ticker}`;
+  const safeName = cacheKey.replace(/[^a-zA-Z0-9.-]/g, "_");
   const cachePath = path.join(CACHE_DIR, `${safeName}.png`);
 
   // Serve from cache if it exists
@@ -32,9 +37,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `https://img.logo.dev/${encodeURIComponent(domain)}?token=${token}&size=128&format=png`
-    );
+    // fallback=404 makes logo.dev return a real 404 (instead of a generic monogram)
+    // when it has no logo, so callers can cleanly fall back to their own placeholder.
+    const logoDevUrl = domain
+      ? `https://img.logo.dev/${encodeURIComponent(domain)}?token=${token}&size=128&format=png&fallback=404`
+      : `https://img.logo.dev/ticker/${encodeURIComponent(ticker!)}?token=${token}&size=128&format=png&fallback=404`;
+    const res = await fetch(logoDevUrl);
     if (!res.ok) {
       return NextResponse.json({ error: "logo not found" }, { status: 404 });
     }

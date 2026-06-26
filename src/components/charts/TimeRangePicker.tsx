@@ -5,12 +5,17 @@ import { TIME_RANGES } from "@/utils/constants";
 interface TimeRangePickerProps {
   selected: string;
   onSelect: (period: string) => void;
+  ranges?: readonly { label: string; value: string }[];
 }
 
-export function TimeRangePicker({ selected, onSelect }: TimeRangePickerProps) {
+export function TimeRangePicker({
+  selected,
+  onSelect,
+  ranges = TIME_RANGES,
+}: TimeRangePickerProps) {
   return (
     <div className="flex gap-1">
-      {TIME_RANGES.map((range) => (
+      {ranges.map((range) => (
         <button
           key={range.value}
           onClick={() => onSelect(range.value)}

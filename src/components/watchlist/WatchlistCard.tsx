@@ -146,6 +146,7 @@ export function WatchlistCard({
             <div className="px-5 pb-5">
               <WatchlistCardDetail
                 ticker={item.ticker}
+                name={item.name}
                 currentPrice={quote.currentPrice}
               />
 

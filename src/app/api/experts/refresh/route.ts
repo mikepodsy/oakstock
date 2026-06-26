@@ -2,301 +2,131 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface HoldingRow {
-  cusip: string;
+interface DataromaHolding {
+  ticker: string;
   company_name: string;
-  value_usd: number;
+  pct_portfolio: number;
+  activity: string; // raw "Recent Activity" text, e.g. "Reduce 9.78%", "Add 3.46%", "Buy"
   shares: number;
-  share_class: string;
-  option_type: string | null;
+  value_usd: number;
 }
 
-interface FilingMeta {
-  accession: string;
-  filed_date: string;
-  period: string;
-  primaryDocument: string;
+interface DataromaPortfolio {
+  quarter: string;        // e.g. "Q1 2026"
+  portfolioDate: string;  // ISO date, e.g. "2026-03-31"
+  holdings: DataromaHolding[];
 }
 
-// ── EDGAR helpers ─────────────────────────────────────────────────────────────
-const EDGAR_BASE = "https://data.sec.gov";
-const WWW_EDGAR  = "https://www.sec.gov";
-const EDGAR_HEADERS = {
-  "User-Agent": "Oakstock research@oakstock.app",
-  "Accept-Encoding": "gzip, deflate",
+// ── Fetch helpers ─────────────────────────────────────────────────────────────
+const DATAROMA_BASE = "https://www.dataroma.com/m/holdings.php";
+// Dataroma rejects bare/script fetches — present as a normal browser.
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml",
 };
-const DELAY_MS = 150;
+const DELAY_MS = 400;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function edgarGet(url: string): Promise<Response> {
-  await sleep(DELAY_MS);
-  const r = await fetch(url, { headers: EDGAR_HEADERS });
-  if (!r.ok) throw new Error(`EDGAR ${r.status} for ${url}`);
-  return r;
+// ── HTML parsing ──────────────────────────────────────────────────────────────
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#8201;?/g, " ")
+    .trim();
 }
 
-async function edgarTry(url: string): Promise<Response | null> {
-  await sleep(DELAY_MS);
-  try {
-    const r = await fetch(url, { headers: EDGAR_HEADERS });
-    return r.ok ? r : null;
-  } catch {
-    return null;
-  }
+function toNumber(raw: string): number {
+  const n = parseFloat(raw.replace(/[$,%\s]/g, "").replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
 }
 
-async function getLatestFiling(cik: string): Promise<FilingMeta | null> {
-  const padded = cik.replace(/^0+/, "").padStart(10, "0");
-  const url = `${EDGAR_BASE}/submissions/CIK${padded}.json`;
-  const data = (await (await edgarGet(url)).json()) as Record<string, unknown>;
-  const recent = (data.filings as Record<string, unknown>)?.recent as Record<string, string[]>;
-  if (!recent) return null;
-
-  const forms       = recent.form            ?? [];
-  const accessions  = recent.accessionNumber ?? [];
-  const filedDates  = recent.filingDate      ?? [];
-  const periods     = recent.reportDate      ?? [];
-  const primaryDocs = recent.primaryDocument ?? [];
-
-  for (let i = 0; i < forms.length; i++) {
-    if (forms[i] === "13F-HR") {
-      return {
-        accession:       accessions[i].replace(/-/g, ""),
-        filed_date:      filedDates[i],
-        period:          periods[i],
-        primaryDocument: primaryDocs[i] ?? "",
-      };
-    }
-  }
-  return null;
+// Map Dataroma's "Recent Activity" text to the change_type values the UI expects.
+function activityToChangeType(activity: string): string {
+  const a = activity.trim().toLowerCase();
+  if (a.startsWith("buy")) return "new";
+  if (a.startsWith("add")) return "increased";
+  if (a.startsWith("reduce")) return "decreased";
+  if (a.startsWith("sell")) return "sold";
+  return "unchanged";
 }
 
-// Build a prioritised list of candidate XML filenames for the infotable.
-// Strategy:
-//   1. Derive from the primaryDocument name (most reliable)
-//   2. Try well-known convention names used by major filing agents
-//   3. Parse the filing index HTML as last resort
-function candidateInfoTableNames(primaryDocument: string): string[] {
-  const candidates: string[] = [];
-  const base = primaryDocument.replace(/\.[^.]+$/, ""); // strip extension
-
-  // Donnelley / Edgar Online pattern: d{n}form13fhr → d{n}form13fInfoTable
-  if (base) {
-    candidates.push(
-      `${base.replace(/hr$/i, "")}InfoTable.xml`,
-      `${base.replace(/hr$/i, "")}infotable.xml`,
-      `${base}InfoTable.xml`,
-    );
-  }
-
-  // Common generic names
-  candidates.push(
-    "form13fInfoTable.xml",
-    "form13finfotable.xml",
-    "informationTable.xml",
-    "informationtable.xml",
-    "infotable.xml",
-    "13F_InfoTable.xml",
-    "13f-infotable.xml",
-  );
-
-  // Deduplicate while preserving order
-  return [...new Set(candidates.filter(Boolean))];
+// Convert "31 Mar 2026" → "2026-03-31"
+const MONTHS: Record<string, string> = {
+  jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+  jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+};
+function parsePortfolioDate(raw: string): string | null {
+  const m = /(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\s+(\d{4})/.exec(raw);
+  if (!m) return null;
+  const day = m[1].padStart(2, "0");
+  const month = MONTHS[m[2].toLowerCase()];
+  if (!month) return null;
+  return `${m[3]}-${month}-${day}`;
 }
 
-async function getXmlUrlWithDiag(
-  cik: string,
-  accession: string,
-  primaryDocument: string,
-): Promise<{ url: string | null; tried: string[]; indexError?: string }> {
-  const cikRaw = cik.replace(/^0+/, "");
-  const accFmt = `${accession.slice(0, 10)}-${accession.slice(10, 12)}-${accession.slice(12)}`;
-  const archiveBase = `${EDGAR_BASE}/Archives/edgar/data/${cikRaw}/${accession}`;
-  const tried: string[] = [];
-  let indexError: string | undefined;
+function parseDataromaHoldings(html: string): DataromaPortfolio | null {
+  // Header metadata lives in <p id="p2">Period: <span>Q1 2026</span> …
+  //   Portfolio date: <span>31 Mar 2026</span> …</p>
+  const quarter =
+    /Period:\s*<span>([^<]+)<\/span>/i.exec(html)?.[1]?.trim() ?? "";
+  const portfolioDateRaw =
+    /Portfolio date:\s*<span>([^<]+)<\/span>/i.exec(html)?.[1]?.trim() ?? "";
+  const portfolioDate = parsePortfolioDate(portfolioDateRaw);
 
-  // ── Approach 1: filing index JSON (data.sec.gov) ──────────────────────────
-  const indexJsonUrl = `${archiveBase}/${accFmt}-index.json`;
-  tried.push(indexJsonUrl);
-  try {
-    const index = (await (await edgarGet(indexJsonUrl)).json()) as {
-      directory?: { item?: { name: string; type: string }[] };
-    };
-    const items = index.directory?.item ?? [];
-    const xmlNames = items.map((i) => i.name).filter((n) => n.endsWith(".xml"));
+  if (!quarter || !portfolioDate) return null;
 
-    for (const name of xmlNames) {
-      const n = name.toLowerCase();
-      if (n.includes("infotable") || n.includes("informationtable") || n.includes("13finfo")) {
-        return { url: `${archiveBase}/${name}`, tried };
-      }
+  // Isolate the holdings table body. An empty <tbody></tbody> is valid — it just
+  // means the manager reports no holdings this quarter (return [] below, not null).
+  const tbody = /<tbody>([\s\S]*?)<\/tbody>/i.exec(html)?.[1] ?? "";
+
+  const holdings: DataromaHolding[] = [];
+  const rowRe = /<tr>([\s\S]*?)<\/tr>/gi;
+  let rowMatch: RegExpExecArray | null;
+
+  while ((rowMatch = rowRe.exec(tbody)) !== null) {
+    const row = rowMatch[1];
+    if (!/class="stock"/.test(row)) continue;
+
+    // Ticker + company from the stock cell:
+    //   <a href="/m/stock.php?sym=TRMD">TRMD<span> - Torm Plc</span></a>
+    const stockMatch =
+      /sym=([^"&]+)"[^>]*>\s*([^<]+?)\s*<span>\s*-\s*([^<]*)<\/span>/i.exec(row);
+    if (!stockMatch) continue;
+    const ticker = stockMatch[1].trim();
+    const company_name = stripTags(stockMatch[3]).trim();
+
+    // Cells, in order: hist, stock, %, activity, shares, reported price, value, …
+    const cells: string[] = [];
+    const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let cellMatch: RegExpExecArray | null;
+    while ((cellMatch = cellRe.exec(row)) !== null) {
+      cells.push(stripTags(cellMatch[1]));
     }
-    // Any non-cover XML
-    const cover = new Set(["primary_doc.xml", "primarydocument.xml", "form.xml"]);
-    for (const name of xmlNames) {
-      if (!cover.has(name.toLowerCase())) {
-        return { url: `${archiveBase}/${name}`, tried };
-      }
-    }
-    if (xmlNames.length > 0) {
-      return { url: `${archiveBase}/${xmlNames[0]}`, tried };
-    }
-  } catch (e) {
-    indexError = String(e);
-  }
-
-  // ── Approach 2: filing index JSON (www.sec.gov mirror) ───────────────────
-  const wwwIndexUrl = `${WWW_EDGAR}/Archives/edgar/data/${cikRaw}/${accession}/${accFmt}-index.json`;
-  tried.push(wwwIndexUrl);
-  try {
-    const index = (await (await edgarGet(wwwIndexUrl)).json()) as {
-      directory?: { item?: { name: string; type: string }[] };
-    };
-    const items = index.directory?.item ?? [];
-    for (const item of items) {
-      const n = item.name.toLowerCase();
-      if (n.endsWith(".xml") && (n.includes("infotable") || n.includes("informationtable"))) {
-        return { url: `${archiveBase}/${item.name}`, tried };
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // ── Approach 3: probe candidate filenames directly ────────────────────────
-  const candidates = candidateInfoTableNames(primaryDocument);
-  for (const filename of candidates) {
-    const testUrl = `${archiveBase}/${filename}`;
-    tried.push(testUrl);
-    const r = await edgarTry(testUrl);
-    if (r) return { url: testUrl, tried };
-  }
-
-  // ── Approach 4: fetch & parse the index HTM ───────────────────────────────
-  const indexHtmUrl = `${WWW_EDGAR}/Archives/edgar/data/${cikRaw}/${accession}/${accFmt}-index.htm`;
-  tried.push(indexHtmUrl);
-  try {
-    const htm = await (await edgarGet(indexHtmUrl)).text();
-    // Extract href links to XML files from the HTML
-    const hrefRe = /href="([^"]+\.xml)"/gi;
-    let m: RegExpExecArray | null;
-    const xmlLinks: string[] = [];
-    while ((m = hrefRe.exec(htm)) !== null) {
-      xmlLinks.push(m[1]);
-    }
-    for (const link of xmlLinks) {
-      const filename = link.split("/").pop() ?? link;
-      const n = filename.toLowerCase();
-      if (n.includes("infotable") || n.includes("informationtable") || n.includes("13finfo")) {
-        const fullUrl = link.startsWith("http") ? link : `${archiveBase}/${filename}`;
-        return { url: fullUrl, tried };
-      }
-    }
-    // Any XML link that isn't the cover
-    const cover = new Set(["primary_doc.xml", "primarydocument.xml"]);
-    for (const link of xmlLinks) {
-      const filename = link.split("/").pop() ?? link;
-      if (!cover.has(filename.toLowerCase())) {
-        const fullUrl = link.startsWith("http") ? link : `${archiveBase}/${filename}`;
-        return { url: fullUrl, tried };
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  return { url: null, tried, indexError };
-}
-
-function parse13fXml(xmlText: string): HoldingRow[] {
-  // Strip namespaces for simpler regex parsing (avoid DOMParser in edge runtime)
-  const clean = xmlText
-    .replace(/ xmlns[^"]*"[^"]*"/g, "")
-    .replace(/<\?xml[^?]*\?>/g, "");
-
-  const holdings: HoldingRow[] = [];
-
-  // Try <infoTable> blocks first, then <informationTable> wrapper
-  const tableRe = /<infoTable>([\s\S]*?)<\/infoTable>/gi;
-  let tableMatch: RegExpExecArray | null;
-
-  while ((tableMatch = tableRe.exec(clean)) !== null) {
-    const block = tableMatch[1];
-
-    function extract(tag: string): string {
-      const m = new RegExp(`<${tag}[^>]*>([^<]*)<\/${tag}>`, "i").exec(block);
-      return m ? m[1].trim() : "";
-    }
-
-    const valueRaw = extract("value").replace(/,/g, "");
-    const sharesRaw = extract("sshPrnamt").replace(/,/g, "");
-    const putCall = extract("putCall");
+    if (cells.length < 7) continue;
 
     holdings.push({
-      cusip:        extract("cusip"),
-      company_name: extract("nameOfIssuer"),
-      value_usd:    parseInt(valueRaw || "0", 10) * 1000,
-      shares:       parseInt(sharesRaw || "0", 10),
-      share_class:  extract("sshPrnamtType"),
-      option_type:  putCall || null,
+      ticker,
+      company_name,
+      pct_portfolio: toNumber(cells[2]),
+      activity: cells[3].trim(),
+      shares: Math.round(toNumber(cells[4])),
+      value_usd: Math.round(toNumber(cells[6])),
     });
   }
 
-  return holdings;
+  // Header parsed successfully — return even if the manager currently reports
+  // zero holdings (e.g. confidential treatment / no 13F this quarter).
+  return { quarter, portfolioDate, holdings };
 }
 
-// ── CUSIP → ticker via OpenFIGI ───────────────────────────────────────────────
-async function resolveTickersOpenFigi(
-  cusips: string[]
-): Promise<Record<string, string>> {
-  const map: Record<string, string> = {};
-  const batchSize = 100;
-
-  for (let i = 0; i < cusips.length; i += batchSize) {
-    const batch = cusips.slice(i, i + batchSize);
-    const payload = batch.map((c) => ({ idType: "ID_CUSIP", idValue: c }));
-
-    try {
-      await sleep(600);
-      const r = await fetch("https://api.openfigi.com/v3/mapping", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (r.ok) {
-        const results = (await r.json()) as Array<{
-          data?: Array<{ ticker?: string; exchCode?: string }>;
-        }>;
-        results.forEach((result, idx) => {
-          const cusip = batch[idx];
-          if (result.data?.length) {
-            const preferred = result.data.find((d) =>
-              ["US", "UQ", "UN", "UA"].includes(d.exchCode ?? "")
-            );
-            map[cusip] = (preferred ?? result.data[0]).ticker ?? "";
-          }
-        });
-      }
-    } catch {
-      // OpenFIGI failures are non-critical — tickers just stay null
-    }
-  }
-
-  return map;
-}
-
-// ── Quarter label ─────────────────────────────────────────────────────────────
-function periodToQuarter(period: string): string {
-  const d = new Date(period);
-  const q = Math.floor(d.getMonth() / 3) + 1;
-  return `Q${q} ${d.getFullYear()}`;
-}
-
-// ── POST /api/experts/refresh?manager=buffett ─────────────────────────────────
+// ── POST /api/experts/refresh?manager=marks ───────────────────────────────────
 export async function POST(request: NextRequest) {
   const supabase = createServerSupabaseClient();
   const managerId = request.nextUrl.searchParams.get("manager");
@@ -312,19 +142,40 @@ export async function POST(request: NextRequest) {
 
   for (const manager of managers) {
     const mid = manager.id as string;
-    const cik = manager.cik as string;
+    const code = manager.dataroma_code as string | null;
+
+    if (!code) {
+      results[mid] = { error: "No dataroma_code set" };
+      continue;
+    }
 
     try {
-      // 1. Get latest 13F filing metadata
-      const filing = await getLatestFiling(cik);
-      if (!filing) {
-        results[mid] = { error: "No 13F filing found" };
+      // 1. Fetch the manager's holdings page
+      await sleep(DELAY_MS);
+      const res = await fetch(
+        `${DATAROMA_BASE}?m=${encodeURIComponent(code)}`,
+        { headers: BROWSER_HEADERS },
+      );
+      if (!res.ok) {
+        results[mid] = { error: `Dataroma ${res.status}` };
+        continue;
+      }
+      const html = await res.text();
+
+      // 2. Parse
+      const parsed = parseDataromaHoldings(html);
+      if (!parsed) {
+        results[mid] = { error: "Failed to parse holdings table" };
+        continue;
+      }
+      const { quarter, portfolioDate, holdings } = parsed;
+
+      if (holdings.length === 0) {
+        results[mid] = { status: "no_holdings", quarter };
         continue;
       }
 
-      const quarter = periodToQuarter(filing.period);
-
-      // 2. Check if already cached
+      // 3. Skip if this quarter is already cached
       const { data: existing } = await supabase
         .from("expert_holdings")
         .select("id")
@@ -338,88 +189,36 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // 3. Find + fetch XML
-      const { url: xmlUrl, tried, indexError } = await getXmlUrlWithDiag(
-        cik, filing.accession, filing.primaryDocument
-      );
-      if (!xmlUrl) {
-        results[mid] = {
-          error: "XML file not found in filing",
-          accession: filing.accession,
-          primaryDocument: filing.primaryDocument,
-          tried,
-          indexError,
-        };
-        continue;
-      }
+      // 4. Build rows
+      const rows = holdings.map((h) => ({
+        manager_id:       mid,
+        quarter,
+        period_of_report: portfolioDate,
+        filed_date:       portfolioDate,
+        cusip:            null,
+        ticker:           h.ticker,
+        company_name:     h.company_name,
+        value_usd:        h.value_usd,
+        shares:           h.shares,
+        share_class:      null,
+        option_type:      null,
+        change_type:      activityToChangeType(h.activity),
+        shares_prev:      null,
+        pct_portfolio:    h.pct_portfolio,
+        activity:         h.activity || null,
+      }));
 
-      const xmlText = await (await edgarGet(xmlUrl)).text();
-      const holdings = parse13fXml(xmlText);
-
-      if (holdings.length === 0) {
-        results[mid] = { error: "Parsed 0 holdings from XML", xmlUrl, tried };
-        continue;
-      }
-
-      // 4. Get previous quarter for change tracking
-      const { data: prevRows } = await supabase
-        .from("expert_holdings")
-        .select("cusip, shares, option_type")
-        .eq("manager_id", mid)
-        .order("period_of_report", { ascending: false })
-        .limit(500);
-
-      const prevMap = new Map<string, number>();
-      for (const r of prevRows ?? []) {
-        prevMap.set(`${r.cusip}__${r.option_type ?? ""}`, r.shares);
-      }
-
-      // 5. Resolve CUSIPs → tickers
-      const cusips = [...new Set(holdings.map((h) => h.cusip).filter(Boolean))];
-      const tickerMap = await resolveTickersOpenFigi(cusips);
-
-      // 6. Build rows
-      const totalValue = holdings.reduce((s, h) => s + h.value_usd, 0);
-      const rows = holdings.map((h) => {
-        const key = `${h.cusip}__${h.option_type ?? ""}`;
-        const prevShares = prevMap.get(key) ?? null;
-        let change_type = "new";
-        if (prevShares !== null) {
-          change_type =
-            h.shares > prevShares ? "increased" :
-            h.shares < prevShares ? "decreased" : "unchanged";
-        }
-
-        return {
-          manager_id:      mid,
-          quarter,
-          period_of_report: filing.period,
-          filed_date:       filing.filed_date,
-          cusip:            h.cusip || null,
-          ticker:           tickerMap[h.cusip] || null,
-          company_name:     h.company_name,
-          value_usd:        h.value_usd,
-          shares:           h.shares,
-          share_class:      h.share_class || null,
-          option_type:      h.option_type,
-          change_type,
-          shares_prev:      prevShares,
-          pct_portfolio:    totalValue > 0
-            ? Math.round((h.value_usd / totalValue) * 100000) / 1000
-            : 0,
-        };
-      });
-
-      // 7. Upsert in batches
+      // 5. Upsert in batches
       for (let i = 0; i < rows.length; i += 500) {
-        await supabase
+        const { error: upErr } = await supabase
           .from("expert_holdings")
           .upsert(rows.slice(i, i + 500), {
-            onConflict: "manager_id,quarter,cusip,option_type",
+            onConflict: "manager_id,quarter,ticker",
           });
+        if (upErr) throw new Error(upErr.message);
       }
 
-      // 8. Touch updated_at
+      // 6. Touch updated_at
       await supabase
         .from("expert_managers")
         .update({ updated_at: new Date().toISOString() })
@@ -428,11 +227,8 @@ export async function POST(request: NextRequest) {
       results[mid] = {
         status: "fetched",
         quarter,
-        filed_date:       filing.filed_date,
-        primaryDocument:  filing.primaryDocument,
-        xmlUrl,
-        holdings_count:   holdings.length,
-        tickers_resolved: Object.keys(tickerMap).length,
+        portfolio_date: portfolioDate,
+        holdings_count: holdings.length,
       };
     } catch (err) {
       results[mid] = { error: String(err) };

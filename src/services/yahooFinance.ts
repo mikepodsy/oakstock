@@ -30,6 +30,20 @@ export async function fetchTrending(count = 25): Promise<string[]> {
   return res.json();
 }
 
+export async function fetchRadarReturns(
+  tickers: string[],
+  period: string
+): Promise<Record<string, number>> {
+  if (tickers.length === 0) return {};
+  const res = await fetch(
+    `/api/radar/returns?tickers=${tickers
+      .map(encodeURIComponent)
+      .join(",")}&period=${period}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch radar returns");
+  return res.json();
+}
+
 export async function searchTickers(
   query: string
 ): Promise<

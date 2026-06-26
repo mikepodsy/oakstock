@@ -51,6 +51,19 @@ export const TIME_RANGES = [
   { label: "ALL", value: "max" },
 ] as const;
 
+// Candle granularity (Questrade HistoricalDataGranularity). The chart is one
+// continuous pan/zoom chart; these switch the candle size, not a fixed window.
+export const QUESTRADE_INTERVALS = [
+  { label: "1m", value: "OneMinute" },
+  { label: "5m", value: "FiveMinutes" },
+  { label: "15m", value: "FifteenMinutes" },
+  { label: "1h", value: "OneHour" },
+  { label: "4h", value: "FourHours" },
+  { label: "1D", value: "OneDay" },
+  { label: "1W", value: "OneWeek" },
+  { label: "1M", value: "OneMonth" },
+] as const;
+
 export const RADAR_SECTORS: Record<string, { label: string; tickers: string[] }> = {
   energy: {
     label: "Energy",
@@ -167,6 +180,11 @@ export const RADAR_RANKINGS: { key: RadarRanking; label: string }[] = [
 // Daily only for now; structured so 1W/1M/etc. can be added later.
 export const RADAR_TIMEFRAMES: { key: string; label: string }[] = [
   { key: "1d", label: "Today" },
+  { key: "1w", label: "1W" },
+  { key: "1m", label: "1M" },
+  { key: "3m", label: "3M" },
+  { key: "ytd", label: "YTD" },
+  { key: "1y", label: "1Y" },
 ];
 
 // Top-N shown for ranked views, and the cap for the unranked "All Companies" view

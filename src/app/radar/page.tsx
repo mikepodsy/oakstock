@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { LayoutGrid, List, Search, X } from "lucide-react";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useRadarSource } from "@/hooks/useRadarSource";
+import { useRadarReturns } from "@/hooks/useRadarReturns";
 import { RadarGrid, type RadarViewMode } from "@/components/radar/RadarGrid";
 import { RadarDropdown } from "@/components/radar/RadarDropdown";
 import {
@@ -47,6 +48,12 @@ export default function RadarPage() {
   const { quotes, loading: quotesLoading } = useQuotes(
     activeTickers as unknown as string[]
   );
+  // Period % return per ticker for non-"Today" timeframes (empty for "1d").
+  const { returns: periodReturns, loading: returnsLoading } = useRadarReturns(
+    activeTickers as unknown as string[],
+    timeframe
+  );
+  const isDayTimeframe = timeframe === "1d";
   const loading = sourceLoading || quotesLoading;
 
   const isTrending = activeTab === "stocks" && ranking === "trending";
@@ -63,7 +70,7 @@ export default function RadarPage() {
     let items = activeTickers.map((t) => ({
       ticker: t,
       name: quotes[t]?.name ?? t,
-      change: quotes[t]?.dayChangePercent,
+      change: isDayTimeframe ? quotes[t]?.dayChangePercent : periodReturns[t],
     }));
 
     // Sort + cap for gainers/losers (trending keeps Yahoo's order)
@@ -85,7 +92,15 @@ export default function RadarPage() {
         item.ticker.toLowerCase().includes(q) ||
         item.name.toLowerCase().includes(q)
     );
-  }, [activeTickers, quotes, searchQuery, isRanked, ranking]);
+  }, [
+    activeTickers,
+    quotes,
+    searchQuery,
+    isRanked,
+    ranking,
+    isDayTimeframe,
+    periodReturns,
+  ]);
 
   function handleToggleExpand(ticker: string) {
     setExpandedTicker((prev) => (prev === ticker ? null : ticker));
@@ -194,7 +209,6 @@ export default function RadarPage() {
                 resetView();
               }}
               minWidthClass="min-w-[120px]"
-              title="More timeframes coming soon"
             />
             {isTrending && (
               <span className="text-xs text-text-tertiary">
@@ -254,6 +268,7 @@ export default function RadarPage() {
       <RadarGrid
         tickers={tickerItems}
         quotes={quotes}
+        changeLoading={!isDayTimeframe && returnsLoading}
         expandedTicker={expandedTicker}
         onToggleExpand={handleToggleExpand}
         viewMode={viewMode}

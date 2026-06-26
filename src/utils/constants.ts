@@ -51,16 +51,17 @@ export const TIME_RANGES = [
   { label: "ALL", value: "max" },
 ] as const;
 
-// Aligned to the periods the Questrade candles route actually supports
-// (1d/5d/1m/3m/6m/1y/5y) — unsupported values would silently coerce to 1y.
-export const QUESTRADE_TIME_RANGES = [
-  { label: "1D", value: "1d" },
-  { label: "5D", value: "5d" },
-  { label: "1M", value: "1m" },
-  { label: "3M", value: "3m" },
-  { label: "6M", value: "6m" },
-  { label: "1Y", value: "1y" },
-  { label: "5Y", value: "5y" },
+// Candle granularity (Questrade HistoricalDataGranularity). The chart is one
+// continuous pan/zoom chart; these switch the candle size, not a fixed window.
+export const QUESTRADE_INTERVALS = [
+  { label: "1m", value: "OneMinute" },
+  { label: "5m", value: "FiveMinutes" },
+  { label: "15m", value: "FifteenMinutes" },
+  { label: "1h", value: "OneHour" },
+  { label: "4h", value: "FourHours" },
+  { label: "1D", value: "OneDay" },
+  { label: "1W", value: "OneWeek" },
+  { label: "1M", value: "OneMonth" },
 ] as const;
 
 export const RADAR_SECTORS: Record<string, { label: string; tickers: string[] }> = {

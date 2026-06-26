@@ -13,7 +13,7 @@ import {
 import { TimeRangePicker } from "./TimeRangePicker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchQuestradeCandles } from "@/services/questrade";
-import { QUESTRADE_TIME_RANGES } from "@/utils/constants";
+import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { useThemeStore } from "@/stores/themeStore";
 import type { QuestradeCandle } from "@/types";
 
@@ -21,8 +21,14 @@ interface CandlestickChartProps {
   ticker: string;
 }
 
-// Periods the route serves with intraday candles — show time on the axis for these.
-const INTRADAY_PERIODS = new Set(["1d", "5d"]);
+// Intraday candle sizes — show time (not just date) on the axis for these.
+const INTRADAY_INTERVALS = new Set([
+  "OneMinute",
+  "FiveMinutes",
+  "FifteenMinutes",
+  "OneHour",
+  "FourHours",
+]);
 
 function cssVar(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement)
@@ -32,7 +38,7 @@ function cssVar(name: string, fallback: string): string {
 }
 
 export function CandlestickChart({ ticker }: CandlestickChartProps) {
-  const [period, setPeriod] = useState("3m");
+  const [interval, setInterval] = useState("OneDay");
   const [data, setData] = useState<QuestradeCandle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,14 +55,14 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchQuestradeCandles(ticker, period);
+      const result = await fetchQuestradeCandles(ticker, interval);
       setData(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load chart");
     } finally {
       setLoading(false);
     }
-  }, [ticker, period]);
+  }, [ticker, interval]);
 
   useEffect(() => {
     load();
@@ -140,9 +146,9 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       }))
     );
 
-    chart.timeScale().applyOptions({ timeVisible: INTRADAY_PERIODS.has(period) });
+    chart.timeScale().applyOptions({ timeVisible: INTRADAY_INTERVALS.has(interval) });
     chart.timeScale().fitContent();
-  }, [data, theme, period]);
+  }, [data, theme, interval]);
 
   const isUp =
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;
@@ -171,9 +177,9 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
           )}
         </div>
         <TimeRangePicker
-          selected={period}
-          onSelect={setPeriod}
-          ranges={QUESTRADE_TIME_RANGES}
+          selected={interval}
+          onSelect={setInterval}
+          ranges={QUESTRADE_INTERVALS}
         />
       </div>
 

@@ -6,22 +6,21 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
 };
 
-// Questrade HistoricalDataGranularity values we accept.
-const VALID_INTERVALS = new Set([
-  "OneMinute", "FiveMinutes", "FifteenMinutes", "HalfHour", "OneHour",
-  "OneDay", "OneWeek", "OneMonth",
-]);
-
-// Map a friendly period to a lookback window + sensible default interval.
-const PERIODS: Record<string, { days: number; interval: string }> = {
-  "1d": { days: 1, interval: "FiveMinutes" },
-  "5d": { days: 5, interval: "FifteenMinutes" },
-  "1m": { days: 31, interval: "OneDay" },
-  "3m": { days: 93, interval: "OneDay" },
-  "6m": { days: 186, interval: "OneDay" },
-  "1y": { days: 366, interval: "OneDay" },
-  "5y": { days: 1827, interval: "OneWeek" },
+// Questrade HistoricalDataGranularity → lookback window (days) of history to
+// fetch for that candle size. Finer candles get a shorter window (Questrade
+// caps how many candles a single request returns); coarser ones go back years.
+const INTERVAL_WINDOWS: Record<string, number> = {
+  OneMinute: 2,
+  FiveMinutes: 10,
+  FifteenMinutes: 30,
+  OneHour: 90,
+  FourHours: 365,
+  OneDay: 1827, // ~5y
+  OneWeek: 3653, // ~10y
+  OneMonth: 7305, // ~20y
 };
+
+const DEFAULT_INTERVAL = "OneDay";
 
 interface SearchResponse {
   symbols: Array<{ symbolId: number; symbol: string; isTradable: boolean }>;
@@ -60,8 +59,7 @@ async function resolveSymbolId(ticker: string): Promise<number | null> {
 
 export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker");
-  const period = request.nextUrl.searchParams.get("period") ?? "1y";
-  const intervalParam = request.nextUrl.searchParams.get("interval");
+  const interval = request.nextUrl.searchParams.get("interval") ?? DEFAULT_INTERVAL;
 
   if (!ticker) {
     return NextResponse.json(
@@ -70,17 +68,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const periodConfig = PERIODS[period] ?? PERIODS["1y"];
-  const interval = intervalParam ?? periodConfig.interval;
-
-  if (!VALID_INTERVALS.has(interval)) {
+  const windowDays = INTERVAL_WINDOWS[interval];
+  if (windowDays === undefined) {
     return NextResponse.json(
       { error: `invalid interval '${interval}'` },
       { status: 400 }
     );
   }
 
-  const cacheKey = `${ticker.toUpperCase()}:${period}:${interval}`;
+  const cacheKey = `${ticker.toUpperCase()}:${interval}`;
   const cached = questradeCandlesCache.get(cacheKey);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });
@@ -96,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const end = new Date();
-    const start = new Date(end.getTime() - periodConfig.days * 86_400_000);
+    const start = new Date(end.getTime() - windowDays * 86_400_000);
 
     const data = await questradeGet<CandlesResponse>(
       `/v1/markets/candles/${symbolId}` +

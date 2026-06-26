@@ -14,25 +14,81 @@ const HISTORY_WEEKS = 52;
 
 // ─── Instrument Config (add more here to extend) ──────────────────────────────
 const INSTRUMENTS: CotInstrument[] = [
+  // ── Indices ──
   {
     label: "S&P 500",
     cftcName: "S&P 500 Consolidated - CHICAGO MERCANTILE EXCHANGE",
     reportType: "tff",
+    group: "Indices",
   },
   {
     label: "Nasdaq 100",
     cftcName: "NASDAQ-100 Consolidated - CHICAGO MERCANTILE EXCHANGE",
     reportType: "tff",
+    group: "Indices",
   },
+  {
+    label: "VIX",
+    cftcName: "VIX FUTURES - CBOE FUTURES EXCHANGE",
+    reportType: "tff",
+    group: "Indices",
+  },
+  // ── Metals ──
   {
     label: "Gold",
     cftcName: "GOLD - COMMODITY EXCHANGE INC.",
     reportType: "disagg",
+    group: "Metals",
   },
+  {
+    label: "Silver",
+    cftcName: "SILVER - COMMODITY EXCHANGE INC.",
+    reportType: "disagg",
+    group: "Metals",
+  },
+  {
+    label: "Copper",
+    cftcName: "COPPER- #1 - COMMODITY EXCHANGE INC.",
+    reportType: "disagg",
+    group: "Metals",
+  },
+  // ── FX ──
+  {
+    label: "US Dollar Index",
+    cftcName: "U.S. DOLLAR INDEX - ICE FUTURES U.S.",
+    reportType: "tff",
+    group: "FX",
+  },
+  {
+    label: "Euro",
+    cftcName: "EURO FX - CHICAGO MERCANTILE EXCHANGE",
+    reportType: "tff",
+    group: "FX",
+  },
+  {
+    label: "Japanese Yen",
+    cftcName: "JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE",
+    reportType: "tff",
+    group: "FX",
+  },
+  {
+    label: "British Pound",
+    cftcName: "BRITISH POUND - CHICAGO MERCANTILE EXCHANGE",
+    reportType: "tff",
+    group: "FX",
+  },
+  {
+    label: "Canadian Dollar",
+    cftcName: "CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE",
+    reportType: "tff",
+    group: "FX",
+  },
+  // ── Energy ──
   {
     label: "Crude Oil WTI",
     cftcName: "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE",
     reportType: "disagg",
+    group: "Energy",
   },
 ];
 
@@ -182,6 +238,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 
   return {
     instrument: instrument.label,
+    group: instrument.group,
     reportDate: reportDateOf(results[0]),
     reportType: instrument.reportType,
     categories: detailed.categories,
@@ -192,7 +249,9 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
 export async function GET() {
-  const CACHE_KEY = "cot-all";
+  // Versioned key — bump when the response shape changes so long-lived caches
+  // don't serve stale-shaped data after a deploy.
+  const CACHE_KEY = "cot-all-v2";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

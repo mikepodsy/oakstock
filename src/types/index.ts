@@ -300,10 +300,14 @@ export interface TreasuryBundleData {
 // ─── COT Report ───────────────────────────────────────
 export type CotReportType = "tff" | "disagg";
 
+// Instruments are bucketed into these groups for the grouped selector dropdowns.
+export type CotGroup = "Indices" | "Metals" | "FX" | "Energy";
+
 export interface CotInstrument {
   label: string;
   cftcName: string;
   reportType: CotReportType;
+  group: CotGroup;
 }
 
 export interface CotCategory {
@@ -335,6 +339,7 @@ export interface CotGroupSet {
 
 export interface CotReport {
   instrument: string;
+  group: CotGroup;
   reportDate: string;
   reportType: CotReportType;
   categories: CotCategory[];

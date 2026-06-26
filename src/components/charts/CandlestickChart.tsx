@@ -218,7 +218,9 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
     );
 
     chart.timeScale().applyOptions({ timeVisible: INTRADAY_INTERVALS.has(interval) });
-    chart.timeScale().fitContent();
+    // Open on the most recent data rather than fitting the whole history, so a
+    // fresh chart / interval change lands on the current day.
+    chart.timeScale().scrollToRealTime();
   }, [data, theme, interval]);
 
   const isUp =
@@ -300,7 +302,7 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
         <div ref={containerRef} className="h-full w-full" />
 
         {!loading && !error && data.length > 0 && (
-          <div className="absolute top-2 right-14 z-10 flex items-center gap-1.5">
+          <div className="absolute top-2 right-20 z-10 flex items-center gap-1.5">
             <button
               onClick={goToLatest}
               title="Jump to latest candle"

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFinancials } from "@/hooks/useFinancials";
-import { StockPriceChart } from "@/components/charts/StockPriceChart";
+import { CandlestickChart } from "@/components/charts/CandlestickChart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -87,7 +87,7 @@ export function WatchlistCardDetail({
   return (
     <div className="mt-4 pt-4 border-t border-border-primary space-y-5">
       {/* Price Chart */}
-      <StockPriceChart ticker={ticker} />
+      <CandlestickChart ticker={ticker} />
 
       {/* Key Financials */}
       <div>

@@ -107,6 +107,15 @@ export interface HistoricalDataPoint {
   low?: number;
 }
 
+export interface QuestradeCandle {
+  time: string; // ISO timestamp (Questrade candle start)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface PortfolioChartPoint {
   date: string;
   portfolioValue: number;

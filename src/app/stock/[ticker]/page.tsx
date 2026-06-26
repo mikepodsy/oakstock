@@ -5,7 +5,7 @@ import { useQuotes } from "@/hooks/useQuotes";
 import { useFinancials } from "@/hooks/useFinancials";
 import { useFundamentals } from "@/hooks/useFundamentals";
 import { StockHeader } from "@/components/stock/StockHeader";
-import { StockPriceChart } from "@/components/charts/StockPriceChart";
+import { CandlestickChart } from "@/components/charts/CandlestickChart";
 import { KeyStatsRow } from "@/components/stock/KeyStatsRow";
 import { FinancialChartsGrid } from "@/components/stock/FinancialChartsGrid";
 import { CompanyDescription } from "@/components/stock/CompanyDescription";
@@ -80,7 +80,7 @@ export default function StockDetailPage() {
       <StockHeader quote={quote} />
 
       <div className="mb-6">
-        <StockPriceChart ticker={ticker} />
+        <CandlestickChart ticker={ticker} />
       </div>
 
       <SentimentSection ticker={ticker} />

@@ -54,6 +54,8 @@ export const marketCache = getOrCreateCache<unknown>("market", 3600);
 export const treasuryCache = getOrCreateCache<unknown>("treasury", 3600);
 export const cotCache = getOrCreateCache<unknown[]>("cot", 86400);
 export const radarCache = getOrCreateCache<string[]>("radar", 120);
+// Period % return per ticker for Radar timeframes. null = known-failed (skip refetch).
+export const radarReturnsCache = getOrCreateCache<number | null>("radar-returns", 300);
 // Questrade symbolId rarely changes — cache it long. Candles cache stays short.
 export const questradeSymbolCache = getOrCreateCache<number | null>("questrade-symbol", 86400);
 export const questradeCandlesCache = getOrCreateCache<unknown[]>("questrade-candles", 300);

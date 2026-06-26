@@ -180,6 +180,11 @@ export const RADAR_RANKINGS: { key: RadarRanking; label: string }[] = [
 // Daily only for now; structured so 1W/1M/etc. can be added later.
 export const RADAR_TIMEFRAMES: { key: string; label: string }[] = [
   { key: "1d", label: "Today" },
+  { key: "1w", label: "1W" },
+  { key: "1m", label: "1M" },
+  { key: "3m", label: "3M" },
+  { key: "ytd", label: "YTD" },
+  { key: "1y", label: "1Y" },
 ];
 
 // Top-N shown for ranked views, and the cap for the unranked "All Companies" view

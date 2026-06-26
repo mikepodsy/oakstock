@@ -26,6 +26,10 @@ interface RadarCardProps {
   ticker: string;
   name: string;
   quote?: QuoteData;
+  /** % change over the selected timeframe (day change for "Today"). */
+  change?: number;
+  /** True while the period change is still loading. */
+  changeLoading?: boolean;
   isExpanded: boolean;
   onToggle: () => void;
 }
@@ -34,6 +38,8 @@ export function RadarCard({
   ticker,
   name,
   quote,
+  change,
+  changeLoading = false,
   isExpanded,
   onToggle,
 }: RadarCardProps) {
@@ -122,15 +128,21 @@ export function RadarCard({
                 <p className="text-xl font-financial text-text-primary">
                   {formatCurrency(quote.currentPrice)}
                 </p>
-                <Badge
-                  className={
-                    quote.dayChangePercent >= 0
-                      ? "bg-green-muted text-green-primary"
-                      : "bg-red-muted text-red-primary"
-                  }
-                >
-                  {formatPercent(quote.dayChangePercent)}
-                </Badge>
+                {typeof change === "number" ? (
+                  <Badge
+                    className={
+                      change >= 0
+                        ? "bg-green-muted text-green-primary"
+                        : "bg-red-muted text-red-primary"
+                    }
+                  >
+                    {formatPercent(change)}
+                  </Badge>
+                ) : changeLoading ? (
+                  <Skeleton className="h-5 w-16 ml-auto" />
+                ) : (
+                  <Badge className="bg-bg-tertiary text-text-tertiary">—</Badge>
+                )}
               </>
             ) : (
               <>

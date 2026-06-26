@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { cotCache } from "@/lib/cache";
-import type { CotReport, CotCategory, CotWeek, CotInstrument, CotReportType } from "@/types";
+import type {
+  CotReport,
+  CotCategory,
+  CotWeek,
+  CotInstrument,
+  CotReportType,
+  CotGroupSet,
+} from "@/types";
 
 // Weeks of history exposed for the 52-week positioning chart
 const HISTORY_WEEKS = 52;
@@ -49,11 +56,21 @@ const DISAGG_CATEGORIES: { name: string; cols: ColPair }[] = [
   { name: "Retail / Non-Reportable", cols: { long: "nonrept_positions_long_all", short: "nonrept_positions_short_all" } },
 ];
 
+// Legacy (Futures-Only) report — the classic Commercial / Non-Commercial split.
+// Same market_and_exchange_names values as the tff/disagg datasets.
+const LEGACY_CATEGORIES: { name: string; cols: ColPair }[] = [
+  { name: "Commercial",       cols: { long: "comm_positions_long_all",    short: "comm_positions_short_all" } },
+  { name: "Non-Commercial",   cols: { long: "noncomm_positions_long_all", short: "noncomm_positions_short_all" } },
+  { name: "Non-Reportable",   cols: { long: "nonrept_positions_long_all", short: "nonrept_positions_short_all" } },
+];
+
 // Socrata dataset IDs on publicreporting.cftc.gov
 const DATASET: Record<CotReportType, string> = {
   tff:    "gpe5-46if",
   disagg: "72hh-3qpy",
 };
+
+const LEGACY_DATASET = "6dca-aqww";
 
 const CFTC_BASE = "https://publicreporting.cftc.gov/resource";
 
@@ -105,38 +122,71 @@ function buildHistory(
     .reverse();
 }
 
-async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | null> {
-  const dataset = DATASET[instrument.reportType];
-  const categoryDefs = instrument.reportType === "tff" ? TFF_CATEGORIES : DISAGG_CATEGORIES;
+// Pull up to 53 weeks (52 history + 1 for week-over-week change) of records for a
+// given dataset and CFTC market name, newest-first. Returns [] on any failure.
+async function fetchRecords(
+  dataset: string,
+  cftcName: string,
+  label: string
+): Promise<Record<string, unknown>[]> {
   const params = new URLSearchParams({
-    $where: `market_and_exchange_names='${instrument.cftcName}'`,
+    $where: `market_and_exchange_names='${cftcName}'`,
     $order: "report_date_as_yyyy_mm_dd DESC",
-    // 52 weeks of history + 1 extra for the latest week's week-over-week netChange calc
     $limit: String(HISTORY_WEEKS + 1),
   });
   const url = `${CFTC_BASE}/${dataset}.json?${params}`;
 
   const res = await fetch(url, { cache: "no-store" }); // caching handled by TTLCache
   if (!res.ok) {
-    console.error(`[COT] CFTC fetch failed for ${instrument.label}: ${res.status}`);
-    return null;
+    console.error(`[COT] CFTC fetch failed for ${label} (${dataset}): ${res.status}`);
+    return [];
   }
 
   const results = (await res.json()) as Record<string, unknown>[];
-  if (!Array.isArray(results) || results.length === 0) {
+  if (!Array.isArray(results)) return [];
+  return results;
+}
+
+// Build the category + history pair for a set of column definitions.
+function buildGroupSet(
+  records: Record<string, unknown>[],
+  categoryDefs: { name: string; cols: ColPair }[]
+): CotGroupSet {
+  const latest = records[0];
+  const prev = records[1] ?? null;
+  return {
+    categories: buildCategories(latest, prev, categoryDefs),
+    history: buildHistory(records, categoryDefs),
+  };
+}
+
+async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | null> {
+  const dataset = DATASET[instrument.reportType];
+  const categoryDefs = instrument.reportType === "tff" ? TFF_CATEGORIES : DISAGG_CATEGORIES;
+
+  // Detailed (tff/disagg) and legacy reports share the same market name, so fetch
+  // both in parallel. Legacy is best-effort — its absence must not drop the instrument.
+  const [results, legacyRecords] = await Promise.all([
+    fetchRecords(dataset, instrument.cftcName, instrument.label),
+    fetchRecords(LEGACY_DATASET, instrument.cftcName, `${instrument.label} (legacy)`),
+  ]);
+
+  if (results.length === 0) {
     console.error(`[COT] No records found for ${instrument.label}`);
     return null;
   }
 
-  const latest = results[0];
-  const prev   = results[1] ?? null;
+  const detailed = buildGroupSet(results, categoryDefs);
+  const legacy =
+    legacyRecords.length > 0 ? buildGroupSet(legacyRecords, LEGACY_CATEGORIES) : null;
 
   return {
     instrument: instrument.label,
-    reportDate: reportDateOf(latest),
+    reportDate: reportDateOf(results[0]),
     reportType: instrument.reportType,
-    categories: buildCategories(latest, prev, categoryDefs),
-    history: buildHistory(results, categoryDefs),
+    categories: detailed.categories,
+    history: detailed.history,
+    legacy,
   };
 }
 

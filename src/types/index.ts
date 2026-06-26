@@ -326,10 +326,20 @@ export interface CotWeek {
   categories: CotWeekCategory[];
 }
 
+// A self-contained set of categories + history (used for the legacy report
+// shown alongside the detailed TFF/disagg breakdown).
+export interface CotGroupSet {
+  categories: CotCategory[];
+  history: CotWeek[];
+}
+
 export interface CotReport {
   instrument: string;
   reportDate: string;
   reportType: CotReportType;
   categories: CotCategory[];
   history: CotWeek[];
+  // Legacy report groups (Commercial / Non-Commercial / Non-Reportable).
+  // null if the legacy dataset had no match / failed to load for this instrument.
+  legacy: CotGroupSet | null;
 }

@@ -10,13 +10,28 @@ import { CotLoadingSkeleton } from "@/components/cot/CotLoadingSkeleton";
 import { formatDate } from "@/utils/formatters";
 import { RefreshCw } from "lucide-react";
 
+type CotView = "detailed" | "legacy";
+
 export default function CotPage() {
   const { data, loading, error, refetch } = useCotData();
   const [selected, setSelected] = useState<string | null>(null);
+  const [view, setView] = useState<CotView>("detailed");
 
   const report = data?.length
     ? (data.find((r) => r.instrument === selected) ?? data[0])
     : null;
+
+  // Pick the active category set: legacy (Commercial / Non-Commercial /
+  // Non-Reportable) when toggled on and available, otherwise the detailed report.
+  const hasLegacy = !!report?.legacy;
+  const activeView: CotView = view === "legacy" && hasLegacy ? "legacy" : "detailed";
+  const groups =
+    activeView === "legacy" && report?.legacy
+      ? report.legacy
+      : report
+        ? { categories: report.categories, history: report.history }
+        : null;
+  const viewLabel = activeView === "legacy" ? "Legacy" : "Detailed";
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -55,7 +70,7 @@ export default function CotPage() {
       )}
 
       {/* Content */}
-      {!loading && !error && data && report && (
+      {!loading && !error && data && report && groups && (
         <div className="space-y-4">
           {/* Instrument tabs */}
           <CotInstrumentTabs
@@ -64,20 +79,41 @@ export default function CotPage() {
             onSelect={setSelected}
           />
 
+          {/* Detailed / Legacy view toggle (legacy adds the Commercial group). */}
+          {hasLegacy && (
+            <div className="flex gap-2">
+              {(["detailed", "legacy"] as CotView[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={activeView === v}
+                  onClick={() => setView(v)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    activeView === v
+                      ? "bg-green-muted text-green-primary"
+                      : "bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
+                  }`}
+                >
+                  {v === "legacy" ? "Legacy (Commercial)" : "Detailed"}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Long / Short chart */}
           <CotPositionChart
-            categories={report.categories}
-            title={`${report.instrument} — Long / Short Positioning`}
+            categories={groups.categories}
+            title={`${report.instrument} — Long / Short Positioning (${viewLabel})`}
           />
 
           {/* Net position chart */}
-          <CotNetChart categories={report.categories} />
+          <CotNetChart categories={groups.categories} />
 
           {/* 52-week historical positioning */}
           <CotHistoryChart
-            history={report.history}
-            categoryNames={report.categories.map((c) => c.name)}
-            title={`${report.instrument} — 52-Week Positioning`}
+            history={groups.history}
+            categoryNames={groups.categories.map((c) => c.name)}
+            title={`${report.instrument} — 52-Week Positioning (${viewLabel})`}
           />
         </div>
       )}

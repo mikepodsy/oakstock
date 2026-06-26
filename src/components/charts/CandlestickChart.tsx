@@ -5,6 +5,8 @@ import {
   createChart,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
+  LineStyle,
   ColorType,
   type IChartApi,
   type ISeriesApi,
@@ -19,10 +21,23 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { IndicatorsMenu } from "./IndicatorsMenu";
+import { SessionBackgroundPrimitive } from "./sessionBackground";
 import { fetchQuestradeCandles } from "@/services/questrade";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
+import { useIndicatorStore } from "@/stores/indicatorStore";
+import {
+  sma as smaCalc,
+  ema as emaCalc,
+  bollinger as bollingerCalc,
+  donchian as donchianCalc,
+  rsi as rsiCalc,
+  sessionSegments,
+  type LinePoint,
+} from "@/utils/indicators";
+import { maColor, INDICATOR_COLORS } from "@/utils/indicatorConfig";
 import type { QuestradeCandle } from "@/types";
 
 interface CandlestickChartProps {
@@ -59,11 +74,24 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
   } | null>(null);
   const theme = useThemeStore((s) => s.theme);
 
+  // Indicator config (persisted globally). Selected as individual slices so each
+  // effect only re-runs when its own indicator changes.
+  const smaCfg = useIndicatorStore((s) => s.sma);
+  const emaCfg = useIndicatorStore((s) => s.ema);
+  const bollingerCfg = useIndicatorStore((s) => s.bollinger);
+  const donchianCfg = useIndicatorStore((s) => s.donchian);
+  const rsiCfg = useIndicatorStore((s) => s.rsi);
+  const volumeCfg = useIndicatorStore((s) => s.volume);
+  const sessionsCfg = useIndicatorStore((s) => s.sessions);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const colorsRef = useRef({ up: "#22C55E", down: "#EF4444" });
+  // Dynamically added overlay/oscillator line series, torn down + rebuilt on change.
+  const indicatorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const sessionPrimitiveRef = useRef<SessionBackgroundPrimitive | null>(null);
 
   // Fetch candles whenever the symbol or timeframe changes.
   const load = useCallback(async () => {
@@ -187,6 +215,9 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      // The removed chart took its indicator series + session primitive with it.
+      indicatorSeriesRef.current = [];
+      sessionPrimitiveRef.current = null;
     };
   }, [theme]);
 
@@ -223,6 +254,148 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
     chart.timeScale().scrollToRealTime();
   }, [data, theme, interval]);
 
+  // Rebuild indicator overlays + the RSI sub-pane whenever the data, theme
+  // (chart recreate) or any indicator config changes. Full teardown + rebuild
+  // is simplest and correct; the datasets are small.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    if (!chart || !candleSeries || data.length === 0) return;
+
+    // Tear down previously added series and any extra (RSI) panes.
+    for (const series of indicatorSeriesRef.current) {
+      try {
+        chart.removeSeries(series);
+      } catch {
+        /* already gone (chart was recreated) */
+      }
+    }
+    indicatorSeriesRef.current = [];
+    const panes = chart.panes();
+    for (let i = panes.length - 1; i >= 1; i--) {
+      chart.removePane(i);
+    }
+
+    const grid = cssVar("--border-primary", "#222222");
+
+    const addLine = (
+      points: LinePoint[],
+      options: Record<string, unknown>,
+      paneIndex?: number
+    ) => {
+      const series = chart.addSeries(
+        LineSeries,
+        {
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+          ...options,
+        },
+        paneIndex
+      );
+      series.setData(points);
+      indicatorSeriesRef.current.push(series);
+      return series;
+    };
+
+    if (smaCfg.enabled) {
+      smaCfg.periods.forEach((p, idx) =>
+        addLine(smaCalc(data, p), { color: maColor(idx) })
+      );
+    }
+    if (emaCfg.enabled) {
+      emaCfg.periods.forEach((p, idx) =>
+        addLine(emaCalc(data, p), {
+          color: maColor(idx),
+          lineStyle: LineStyle.Dashed,
+        })
+      );
+    }
+    if (bollingerCfg.enabled) {
+      const b = bollingerCalc(data, bollingerCfg.period, bollingerCfg.mult);
+      addLine(b.upper, { color: INDICATOR_COLORS.bollinger, lineWidth: 1 });
+      addLine(b.middle, {
+        color: INDICATOR_COLORS.bollinger,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+      });
+      addLine(b.lower, { color: INDICATOR_COLORS.bollinger, lineWidth: 1 });
+    }
+    if (donchianCfg.enabled) {
+      const d = donchianCalc(data, donchianCfg.period);
+      addLine(d.upper, { color: INDICATOR_COLORS.donchian, lineWidth: 1 });
+      addLine(d.middle, {
+        color: INDICATOR_COLORS.donchian,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+      });
+      addLine(d.lower, { color: INDICATOR_COLORS.donchian, lineWidth: 1 });
+    }
+    if (rsiCfg.enabled) {
+      const line = addLine(
+        rsiCalc(data, rsiCfg.period),
+        { color: INDICATOR_COLORS.rsi, lineWidth: 2 },
+        1
+      );
+      line.createPriceLine({
+        price: 70,
+        color: grid,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "",
+      });
+      line.createPriceLine({
+        price: 30,
+        color: grid,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "",
+      });
+      // Keep the RSI pane roughly a quarter of the height.
+      const all = chart.panes();
+      all[0]?.setStretchFactor(3);
+      all[1]?.setStretchFactor(1);
+    }
+
+    volumeSeriesRef.current?.applyOptions({ visible: volumeCfg.enabled });
+  }, [
+    data,
+    theme,
+    smaCfg,
+    emaCfg,
+    bollingerCfg,
+    donchianCfg,
+    rsiCfg,
+    volumeCfg,
+  ]);
+
+  // Attach/detach the intraday session-shading background.
+  useEffect(() => {
+    const candleSeries = candleSeriesRef.current;
+    if (!candleSeries) return;
+    const shouldShow =
+      sessionsCfg.enabled && INTRADAY_INTERVALS.has(interval) && data.length > 0;
+
+    if (shouldShow) {
+      if (!sessionPrimitiveRef.current) {
+        const primitive = new SessionBackgroundPrimitive();
+        candleSeries.attachPrimitive(primitive);
+        sessionPrimitiveRef.current = primitive;
+      }
+      sessionPrimitiveRef.current.setSegments(sessionSegments(data));
+    } else if (sessionPrimitiveRef.current) {
+      try {
+        candleSeries.detachPrimitive(sessionPrimitiveRef.current);
+      } catch {
+        /* series already removed */
+      }
+      sessionPrimitiveRef.current = null;
+    }
+  }, [sessionsCfg, interval, data, theme]);
+
   const isUp =
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;
   const priceChangePercent =
@@ -232,6 +405,29 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
 
   const intervalLabel =
     QUESTRADE_INTERVALS.find((r) => r.value === interval)?.label ?? interval;
+  const isIntraday = INTRADAY_INTERVALS.has(interval);
+
+  // Legend for the price-pane overlays so combined lines are distinguishable
+  // (RSI lives in its own labelled pane, so it's omitted here).
+  const legend: { label: string; color: string; dashed?: boolean }[] = [];
+  if (smaCfg.enabled)
+    smaCfg.periods.forEach((p, idx) =>
+      legend.push({ label: `SMA ${p}`, color: maColor(idx) })
+    );
+  if (emaCfg.enabled)
+    emaCfg.periods.forEach((p, idx) =>
+      legend.push({ label: `EMA ${p}`, color: maColor(idx), dashed: true })
+    );
+  if (bollingerCfg.enabled)
+    legend.push({
+      label: `BB ${bollingerCfg.period}, ${bollingerCfg.mult}`,
+      color: INDICATOR_COLORS.bollinger,
+    });
+  if (donchianCfg.enabled)
+    legend.push({
+      label: `DC ${donchianCfg.period}`,
+      color: INDICATOR_COLORS.donchian,
+    });
 
   return (
     <div
@@ -295,11 +491,33 @@ export function CandlestickChart({ ticker }: CandlestickChartProps) {
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Indicators (multi-select, configurable, persisted). */}
+        <IndicatorsMenu isIntraday={isIntraday} />
       </div>
 
       <div className={`relative ${fullscreen ? "flex-1" : "h-[300px]"}`}>
         {/* Chart container stays mounted so lightweight-charts can attach. */}
         <div ref={containerRef} className="h-full w-full" />
+
+        {!loading && !error && legend.length > 0 && (
+          <div className="absolute top-2 left-2 z-10 flex flex-col gap-0.5 rounded-md bg-bg-elevated/70 px-2 py-1 backdrop-blur">
+            {legend.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-1.5 text-[11px] text-text-secondary"
+              >
+                <span
+                  className="inline-block w-3"
+                  style={{
+                    borderTop: `2px ${item.dashed ? "dashed" : "solid"} ${item.color}`,
+                  }}
+                />
+                {item.label}
+              </div>
+            ))}
+          </div>
+        )}
 
         {!loading && !error && data.length > 0 && (
           <div className="absolute top-2 right-20 z-10 flex items-center gap-1.5">

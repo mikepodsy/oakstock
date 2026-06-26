@@ -9,6 +9,7 @@ import {
   LineSeries,
   LineStyle,
   ColorType,
+  CrosshairMode,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
@@ -130,10 +131,10 @@ export function CandlestickChart({
   const addLine = useDrawingStore((s) => s.addLine);
   const moveLine = useDrawingStore((s) => s.moveLine);
   const removeLine = useDrawingStore((s) => s.removeLine);
+  const clearLines = useDrawingStore((s) => s.clearLines);
 
-  // Draw-line tool state: drawMode arms a click-to-place; hover tracks the line
-  // under the cursor (for the drag handle + ✕ delete affordance).
-  const [drawMode, setDrawMode] = useState(false);
+  // Draw-line tool state: hover tracks the line under the cursor (for the drag
+  // handle + ✕ delete affordance). New lines are added by double-clicking.
   const [hover, setHover] = useState<{ id: string; y: number } | null>(null);
   const priceLineRefs = useRef<Map<string, IPriceLine>>(new Map());
   const dragRef = useRef<string | null>(null);
@@ -239,6 +240,9 @@ export function CandlestickChart({
       autoSize: true,
       layout: { textColor: text, background: { type: ColorType.Solid, color: bg } },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+      // Free-moving crosshair (don't snap to candle OHLC), so the cursor can
+      // wander into empty space above/below/beside the candles.
+      crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: grid },
       timeScale: {
         borderColor: grid,
@@ -553,15 +557,6 @@ export function CandlestickChart({
     }
   }, [lines, theme, chartType, data]);
 
-  // Disable chart pan/zoom while placing or dragging a line so the gesture
-  // doesn't scroll the chart. Re-applied after the chart is recreated.
-  useEffect(() => {
-    chartRef.current?.applyOptions({
-      handleScroll: !drawMode,
-      handleScale: !drawMode,
-    });
-  }, [drawMode, theme, chartType]);
-
   // Cursor y relative to the chart container's top, matching the coordinate
   // space lightweight-charts uses for priceToCoordinate / coordinateToPrice.
   const relativeY = useCallback((clientY: number): number | null => {
@@ -575,7 +570,7 @@ export function CandlestickChart({
       if (dragRef.current) return; // drag has its own window listener
       const series = candleSeriesRef.current;
       const yc = relativeY(e.clientY);
-      if (drawMode || yc == null || !series) {
+      if (yc == null || !series) {
         setHover((prev) => (prev ? null : prev));
         return;
       }
@@ -596,14 +591,15 @@ export function CandlestickChart({
         return best;
       });
     },
-    [drawMode, lines, relativeY]
+    [lines, relativeY]
   );
 
   // Press on a hovered line to start dragging it vertically. Live-updates the
-  // price line via applyOptions and commits to the store on release.
+  // price line via applyOptions and commits to the store on release. Pan/zoom
+  // is suspended for the duration so the drag doesn't scroll the chart.
   const onChartMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (drawMode || !hover) return;
+      if (!hover) return;
       const series = candleSeriesRef.current;
       const chart = chartRef.current;
       if (!series || !chart) return;
@@ -626,31 +622,26 @@ export function CandlestickChart({
         window.removeEventListener("mousemove", move);
         window.removeEventListener("mouseup", up);
         dragRef.current = null;
-        chartRef.current?.applyOptions({
-          handleScroll: !drawMode,
-          handleScale: !drawMode,
-        });
+        chartRef.current?.applyOptions({ handleScroll: true, handleScale: true });
         if (lastPrice != null) moveLine(ticker, id, lastPrice);
       };
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
     },
-    [drawMode, hover, lines, moveLine, relativeY, ticker]
+    [hover, lines, moveLine, relativeY, ticker]
   );
 
-  // In draw mode, a click drops a new line at the clicked price.
-  const onChartClick = useCallback(
+  // Double-click anywhere on the chart to drop a new horizontal line there.
+  const onChartDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (!drawMode) return;
       const series = candleSeriesRef.current;
       const yc = relativeY(e.clientY);
       if (yc == null || !series) return;
       const price = series.coordinateToPrice(yc);
       if (price == null) return;
       addLine(ticker, roundPrice(price));
-      setDrawMode(false);
     },
-    [addLine, drawMode, relativeY, ticker]
+    [addLine, relativeY, ticker]
   );
 
   const isUp =
@@ -800,20 +791,18 @@ export function CandlestickChart({
         {/* Candle/background colors + opacity (persisted globally). */}
         <ChartStyleMenu />
 
-        {/* Horizontal-line draw tool. Toggles click-to-place; lines persist. */}
+        {/* Horizontal lines: double-click the chart to add one. This button
+            shows the count and clears them all. */}
         <button
           type="button"
-          onClick={() => setDrawMode((v) => !v)}
+          onClick={() => lines.length > 0 && clearLines(ticker)}
+          disabled={lines.length === 0}
           title={
-            drawMode
-              ? "Click the chart to place a line"
-              : "Draw horizontal line"
+            lines.length > 0
+              ? "Clear all lines (double-click the chart to add one)"
+              : "Double-click the chart to add a horizontal line"
           }
-          className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-            drawMode
-              ? "border-green-primary bg-green-primary/10 text-text-primary"
-              : "border-border-primary bg-transparent text-text-secondary hover:text-text-primary"
-          }`}
+          className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border border-border-primary bg-transparent text-text-secondary transition-colors enabled:hover:text-text-primary enabled:cursor-pointer disabled:opacity-60"
         >
           <Minus className="h-3 w-3" />
           Lines
@@ -830,23 +819,17 @@ export function CandlestickChart({
         <div
           ref={containerRef}
           className="h-full w-full"
-          style={{
-            cursor: drawMode
-              ? "crosshair"
-              : hover
-                ? "ns-resize"
-                : undefined,
-          }}
+          style={{ cursor: hover ? "ns-resize" : undefined }}
           onMouseMove={onChartMouseMove}
           onMouseDown={onChartMouseDown}
           onMouseLeave={() => {
             if (!dragRef.current) setHover(null);
           }}
-          onClick={onChartClick}
+          onDoubleClick={onChartDoubleClick}
         />
 
         {/* ✕ delete affordance for the line under the cursor. */}
-        {hover && !drawMode && (
+        {hover && (
           <button
             type="button"
             onMouseDown={(e) => e.stopPropagation()}

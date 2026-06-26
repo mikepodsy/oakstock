@@ -15,6 +15,7 @@ interface DrawingStore {
   addLine: (ticker: string, price: number) => void;
   moveLine: (ticker: string, id: string, price: number) => void;
   removeLine: (ticker: string, id: string) => void;
+  clearLines: (ticker: string) => void;
 }
 
 const newId = () =>
@@ -50,6 +51,9 @@ export const useDrawingStore = create<DrawingStore>()(
             [ticker]: (s.lines[ticker] ?? []).filter((l) => l.id !== id),
           },
         })),
+
+      clearLines: (ticker) =>
+        set((s) => ({ lines: { ...s.lines, [ticker]: [] } })),
     }),
     { name: "oakstock-drawings" }
   )

@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
+import { ManagerLogo } from "@/components/shared/ManagerLogo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Holding {
@@ -37,6 +38,7 @@ interface Manager {
   aum_note: string;
   strategy: string;
   updated_at: string;
+  logo_domain: string | null;
 }
 
 interface Stats {
@@ -89,21 +91,6 @@ function activityColor(activity: string | null): string {
 // Yahoo uses a dash for share-class tickers (BRK.B → BRK-B).
 function yahooSymbol(ticker: string): string {
   return ticker.replace(/\./g, "-");
-}
-
-const AVATAR_COLORS = [
-  "from-emerald-500 to-teal-600", "from-blue-500 to-indigo-600",
-  "from-violet-500 to-purple-600", "from-orange-500 to-amber-600",
-  "from-rose-500 to-pink-600", "from-cyan-500 to-sky-600",
-  "from-lime-500 to-green-600", "from-fuchsia-500 to-violet-600",
-  "from-red-500 to-rose-600", "from-yellow-500 to-orange-600",
-];
-function avatarColor(id: string) {
-  const hash = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
-function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
 // ── Sector donut (simple CSS-based) ──────────────────────────────────────────
@@ -258,11 +245,13 @@ export default function ExpertDetailPage({
         {/* Manager header */}
         {manager ? (
           <div className="flex items-start gap-5 mb-5">
-            <div
-              className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${avatarColor(manager.id)} flex items-center justify-center text-white font-bold text-xl shrink-0`}
-            >
-              {getInitials(manager.name)}
-            </div>
+            <ManagerLogo
+              id={manager.id}
+              name={manager.name}
+              logoDomain={manager.logo_domain}
+              className="w-16 h-16 rounded-2xl"
+              textClassName="text-xl"
+            />
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-bold text-text-primary">{manager.name}</h1>
               <p className="text-text-secondary">{manager.fund}</p>

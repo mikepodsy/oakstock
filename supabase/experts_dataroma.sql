@@ -10,6 +10,9 @@ ALTER TABLE public.expert_managers ADD COLUMN IF NOT EXISTS dataroma_code text;
 ALTER TABLE public.expert_managers ALTER COLUMN cik DROP NOT NULL;
 -- Raw "Recent Activity" text from Dataroma, e.g. "Reduce 9.78%" / "Add 3.46%" / "Buy".
 ALTER TABLE public.expert_holdings ADD COLUMN IF NOT EXISTS activity text;
+-- Fund website domain used to resolve the manager's brand logo via logo.dev
+-- (same source as stock logos). Null managers fall back to a gradient avatar.
+ALTER TABLE public.expert_managers ADD COLUMN IF NOT EXISTS logo_domain text;
 
 -- 2. Indexes -----------------------------------------------------------------
 -- Dataroma rows have null cusip/option_type, so the original

@@ -12,6 +12,7 @@ import {
   Minus,
   Download,
 } from "lucide-react";
+import { ManagerLogo } from "@/components/shared/ManagerLogo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TopHolding {
@@ -34,6 +35,7 @@ interface ExpertManager {
   holdings_count: number;
   new_positions: number;
   top_holdings: TopHolding[];
+  logo_domain: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -42,28 +44,6 @@ function formatUSD(n: number): string {
   if (n >= 1e9)  return `$${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6)  return `$${(n / 1e6).toFixed(0)}M`;
   return `$${n.toLocaleString()}`;
-}
-
-function getInitials(name: string): string {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
-const AVATAR_COLORS = [
-  "from-emerald-500 to-teal-600",
-  "from-blue-500 to-indigo-600",
-  "from-violet-500 to-purple-600",
-  "from-orange-500 to-amber-600",
-  "from-rose-500 to-pink-600",
-  "from-cyan-500 to-sky-600",
-  "from-lime-500 to-green-600",
-  "from-fuchsia-500 to-violet-600",
-  "from-red-500 to-rose-600",
-  "from-yellow-500 to-orange-600",
-];
-
-function avatarColor(id: string): string {
-  const hash = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
 function ChangeIcon({ type }: { type: string }) {
@@ -107,12 +87,14 @@ function ManagerCard({ manager }: { manager: ExpertManager }) {
       <div className="bg-bg-secondary border border-border-primary rounded-2xl p-6 h-full transition-all duration-200 hover:border-green-primary hover:shadow-lg hover:shadow-black/10 cursor-pointer">
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
-          {/* Avatar */}
-          <div
-            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${avatarColor(manager.id)} flex items-center justify-center text-white font-bold text-lg shrink-0`}
-          >
-            {getInitials(manager.name)}
-          </div>
+          {/* Logo */}
+          <ManagerLogo
+            id={manager.id}
+            name={manager.name}
+            logoDomain={manager.logo_domain}
+            className="w-14 h-14 rounded-2xl"
+            textClassName="text-lg"
+          />
 
           <div className="flex-1 min-w-0">
             <h2 className="text-text-primary font-semibold text-base leading-tight truncate group-hover:text-green-primary transition-colors">

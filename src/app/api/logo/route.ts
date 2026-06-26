@@ -37,9 +37,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // fallback=404 makes logo.dev return a real 404 (instead of a generic monogram)
+    // when it has no logo, so callers can cleanly fall back to their own placeholder.
     const logoDevUrl = domain
-      ? `https://img.logo.dev/${encodeURIComponent(domain)}?token=${token}&size=128&format=png`
-      : `https://img.logo.dev/ticker/${encodeURIComponent(ticker!)}?token=${token}&size=128&format=png`;
+      ? `https://img.logo.dev/${encodeURIComponent(domain)}?token=${token}&size=128&format=png&fallback=404`
+      : `https://img.logo.dev/ticker/${encodeURIComponent(ticker!)}?token=${token}&size=128&format=png&fallback=404`;
     const res = await fetch(logoDevUrl);
     if (!res.ok) {
       return NextResponse.json({ error: "logo not found" }, { status: 404 });

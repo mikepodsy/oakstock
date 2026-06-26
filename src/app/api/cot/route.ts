@@ -28,6 +28,12 @@ const INSTRUMENTS: CotInstrument[] = [
     group: "Indices",
   },
   {
+    label: "Russell 2000",
+    cftcName: "RUSSELL E-MINI - CHICAGO MERCANTILE EXCHANGE",
+    reportType: "tff",
+    group: "Indices",
+  },
+  {
     label: "VIX",
     cftcName: "VIX FUTURES - CBOE FUTURES EXCHANGE",
     reportType: "tff",
@@ -87,6 +93,12 @@ const INSTRUMENTS: CotInstrument[] = [
   {
     label: "Crude Oil WTI",
     cftcName: "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE",
+    reportType: "disagg",
+    group: "Energy",
+  },
+  {
+    label: "Brent Crude",
+    cftcName: "BRENT LAST DAY - NEW YORK MERCANTILE EXCHANGE",
     reportType: "disagg",
     group: "Energy",
   },
@@ -251,7 +263,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v2";
+  const CACHE_KEY = "cot-all-v3";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

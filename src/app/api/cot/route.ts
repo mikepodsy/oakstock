@@ -60,8 +60,10 @@ const INSTRUMENTS: CotInstrument[] = [
   },
   // ── FX ──
   {
+    // ICE renamed this from "U.S. DOLLAR INDEX" (which stopped updating in 2022)
+    // to "USD INDEX" — verified current against the TFF + legacy datasets.
     label: "US Dollar Index",
-    cftcName: "U.S. DOLLAR INDEX - ICE FUTURES U.S.",
+    cftcName: "USD INDEX - ICE FUTURES U.S.",
     reportType: "tff",
     group: "FX",
   },
@@ -263,7 +265,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v3";
+  const CACHE_KEY = "cot-all-v4";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

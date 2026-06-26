@@ -2,11 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Settings, Check, RotateCcw } from "lucide-react";
-import {
-  useChartStyleStore,
-  SWATCHES,
-  type ColorGroupId,
-} from "@/stores/chartStyleStore";
+import { useChartStyleStore, type ColorGroupId } from "@/stores/chartStyleStore";
+import { ColorControl } from "./ColorControl";
 
 // Small checkbox matching the IndicatorsMenu styling.
 function CheckBox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
@@ -20,80 +17,6 @@ function CheckBox({ checked, onChange }: { checked: boolean; onChange: () => voi
     >
       {checked && <Check className="h-3 w-3 text-white" />}
     </button>
-  );
-}
-
-// A single color control: a swatch button that opens an inline row of standard
-// presets plus a native color-wheel picker and a hex field.
-function ColorControl({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (hex: string) => void;
-  label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const nativeRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        title={label}
-        aria-label={label}
-        onClick={() => setOpen((o) => !o)}
-        className="h-5 w-5 rounded border border-border-primary"
-        style={{ backgroundColor: value }}
-      />
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-40 rounded-md border border-border-primary bg-bg-elevated p-2 shadow-lg">
-          <div className="mb-2 flex flex-wrap gap-1">
-            {SWATCHES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={c}
-                onClick={() => {
-                  onChange(c);
-                  setOpen(false);
-                }}
-                className={`h-5 w-5 rounded border ${
-                  value.toLowerCase() === c.toLowerCase()
-                    ? "border-text-primary"
-                    : "border-border-primary"
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => nativeRef.current?.click()}
-              className="text-[11px] text-text-secondary hover:text-text-primary"
-            >
-              Custom
-            </button>
-            <input
-              ref={nativeRef}
-              type="color"
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              className="h-5 w-5 cursor-pointer rounded border border-border-primary bg-transparent p-0"
-            />
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              spellCheck={false}
-              className="w-16 rounded border border-border-primary bg-transparent px-1 py-0.5 text-[11px] text-text-primary outline-none"
-            />
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -153,7 +76,8 @@ export function ChartStyleMenu() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   const background = useChartStyleStore((s) => s.background);
-  const candleOpacity = useChartStyleStore((s) => s.candleOpacity);
+  const candleUpOpacity = useChartStyleStore((s) => s.candleUpOpacity);
+  const candleDownOpacity = useChartStyleStore((s) => s.candleDownOpacity);
   const backgroundOpacity = useChartStyleStore((s) => s.backgroundOpacity);
   const setBackground = useChartStyleStore((s) => s.setBackground);
   const setOpacity = useChartStyleStore((s) => s.setOpacity);
@@ -217,9 +141,14 @@ export function ChartStyleMenu() {
           <div className="my-1 border-t border-border-primary" />
 
           <OpacitySlider
-            label="Candle opacity"
-            value={candleOpacity}
-            onChange={(v) => setOpacity("candleOpacity", v)}
+            label="Up candle opacity"
+            value={candleUpOpacity}
+            onChange={(v) => setOpacity("candleUpOpacity", v)}
+          />
+          <OpacitySlider
+            label="Down candle opacity"
+            value={candleDownOpacity}
+            onChange={(v) => setOpacity("candleDownOpacity", v)}
           />
           <OpacitySlider
             label="Background opacity"

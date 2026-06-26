@@ -51,7 +51,7 @@ import {
   sessionSegments,
   type LinePoint,
 } from "@/utils/indicators";
-import { maColor, INDICATOR_COLORS } from "@/utils/indicatorConfig";
+import { maColorFor, INDICATOR_COLORS } from "@/utils/indicatorConfig";
 import type { QuestradeCandle } from "@/types";
 
 interface CandlestickChartProps {
@@ -226,8 +226,8 @@ export function CandlestickChart({
     // chart on every color tweak — the dedicated style effect below applies
     // those live. Theme CSS vars remain the fallback for unset values.
     const style = useChartStyleStore.getState();
-    const up = withAlpha(style.body.up, style.candleOpacity);
-    const down = withAlpha(style.body.down, style.candleOpacity);
+    const up = withAlpha(style.body.up, style.candleUpOpacity);
+    const down = withAlpha(style.body.down, style.candleDownOpacity);
     const lineColor = cssVar("--text-primary", "#F0EDE8");
     const text = cssVar("--text-tertiary", "#8b8b8b");
     const bg = withAlpha(style.background, style.backgroundOpacity);
@@ -309,8 +309,8 @@ export function CandlestickChart({
     const candleSeries = candleSeriesRef.current;
     if (!chart) return;
 
-    const up = withAlpha(chartStyle.body.up, chartStyle.candleOpacity);
-    const down = withAlpha(chartStyle.body.down, chartStyle.candleOpacity);
+    const up = withAlpha(chartStyle.body.up, chartStyle.candleUpOpacity);
+    const down = withAlpha(chartStyle.body.down, chartStyle.candleDownOpacity);
     colorsRef.current = { up: chartStyle.body.up, down: chartStyle.body.down };
 
     chart.applyOptions({
@@ -434,41 +434,43 @@ export function CandlestickChart({
 
     if (smaCfg.enabled) {
       smaCfg.periods.forEach((p, idx) =>
-        addLine(smaCalc(data, p), { color: maColor(idx) })
+        addLine(smaCalc(data, p), { color: maColorFor(smaCfg.colors, p, idx) })
       );
     }
     if (emaCfg.enabled) {
       emaCfg.periods.forEach((p, idx) =>
         addLine(emaCalc(data, p), {
-          color: maColor(idx),
+          color: maColorFor(emaCfg.colors, p, idx),
           lineStyle: LineStyle.Dashed,
         })
       );
     }
     if (bollingerCfg.enabled) {
+      const color = bollingerCfg.color ?? INDICATOR_COLORS.bollinger;
       const b = bollingerCalc(data, bollingerCfg.period, bollingerCfg.mult);
-      addLine(b.upper, { color: INDICATOR_COLORS.bollinger, lineWidth: 1 });
+      addLine(b.upper, { color, lineWidth: 1 });
       addLine(b.middle, {
-        color: INDICATOR_COLORS.bollinger,
+        color,
         lineWidth: 1,
         lineStyle: LineStyle.Dotted,
       });
-      addLine(b.lower, { color: INDICATOR_COLORS.bollinger, lineWidth: 1 });
+      addLine(b.lower, { color, lineWidth: 1 });
     }
     if (donchianCfg.enabled) {
+      const color = donchianCfg.color ?? INDICATOR_COLORS.donchian;
       const d = donchianCalc(data, donchianCfg.period);
-      addLine(d.upper, { color: INDICATOR_COLORS.donchian, lineWidth: 1 });
+      addLine(d.upper, { color, lineWidth: 1 });
       addLine(d.middle, {
-        color: INDICATOR_COLORS.donchian,
+        color,
         lineWidth: 1,
         lineStyle: LineStyle.Dotted,
       });
-      addLine(d.lower, { color: INDICATOR_COLORS.donchian, lineWidth: 1 });
+      addLine(d.lower, { color, lineWidth: 1 });
     }
     if (rsiCfg.enabled) {
       const line = addLine(
         rsiCalc(data, rsiCfg.period),
-        { color: INDICATOR_COLORS.rsi, lineWidth: 2 },
+        { color: rsiCfg.color ?? INDICATOR_COLORS.rsi, lineWidth: 2 },
         1
       );
       line.createPriceLine({
@@ -660,21 +662,25 @@ export function CandlestickChart({
   const legend: { label: string; color: string; dashed?: boolean }[] = [];
   if (smaCfg.enabled)
     smaCfg.periods.forEach((p, idx) =>
-      legend.push({ label: `SMA ${p}`, color: maColor(idx) })
+      legend.push({ label: `SMA ${p}`, color: maColorFor(smaCfg.colors, p, idx) })
     );
   if (emaCfg.enabled)
     emaCfg.periods.forEach((p, idx) =>
-      legend.push({ label: `EMA ${p}`, color: maColor(idx), dashed: true })
+      legend.push({
+        label: `EMA ${p}`,
+        color: maColorFor(emaCfg.colors, p, idx),
+        dashed: true,
+      })
     );
   if (bollingerCfg.enabled)
     legend.push({
       label: `BB ${bollingerCfg.period}, ${bollingerCfg.mult}`,
-      color: INDICATOR_COLORS.bollinger,
+      color: bollingerCfg.color ?? INDICATOR_COLORS.bollinger,
     });
   if (donchianCfg.enabled)
     legend.push({
       label: `DC ${donchianCfg.period}`,
-      color: INDICATOR_COLORS.donchian,
+      color: donchianCfg.color ?? INDICATOR_COLORS.donchian,
     });
 
   return (

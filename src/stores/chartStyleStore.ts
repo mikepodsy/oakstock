@@ -18,7 +18,8 @@ export interface ChartStyleState {
   border: ColorGroup;
   wick: ColorGroup;
   background: string;
-  candleOpacity: number; // 0..1 — alpha applied to the body fill colors
+  candleUpOpacity: number; // 0..1 — alpha applied to the up candle body fill
+  candleDownOpacity: number; // 0..1 — alpha applied to the down candle body fill
   backgroundOpacity: number; // 0..1 — alpha applied to the chart background
 }
 
@@ -29,7 +30,8 @@ export const DEFAULT_CHART_STYLE: ChartStyleState = {
   border: { up: "#22C55E", down: "#EF4444", visible: false },
   wick: { up: "#22C55E", down: "#EF4444", visible: true },
   background: "#000000",
-  candleOpacity: 1,
+  candleUpOpacity: 1,
+  candleDownOpacity: 1,
   backgroundOpacity: 1,
 };
 
@@ -61,7 +63,10 @@ interface ChartStyleStore extends ChartStyleState {
   setColor: (group: ColorGroupId, side: "up" | "down", hex: string) => void;
   toggleVisible: (group: ColorGroupId) => void;
   setBackground: (hex: string) => void;
-  setOpacity: (which: "candleOpacity" | "backgroundOpacity", value: number) => void;
+  setOpacity: (
+    which: "candleUpOpacity" | "candleDownOpacity" | "backgroundOpacity",
+    value: number
+  ) => void;
   reset: () => void;
 }
 
@@ -89,13 +94,26 @@ export const useChartStyleStore = create<ChartStyleStore>()(
     }),
     {
       name: "oakstock-chart-style",
+      version: 1,
+      // v0 had a single `candleOpacity`; carry it over to both up and down.
+      migrate: (persisted, version) => {
+        if (version < 1 && persisted && typeof persisted === "object") {
+          const p = persisted as Record<string, unknown>;
+          const legacy = typeof p.candleOpacity === "number" ? p.candleOpacity : 1;
+          p.candleUpOpacity = legacy;
+          p.candleDownOpacity = legacy;
+          delete p.candleOpacity;
+        }
+        return persisted as ChartStyleState;
+      },
       // Persist only the data, not the action functions.
       partialize: (s) => ({
         body: s.body,
         border: s.border,
         wick: s.wick,
         background: s.background,
-        candleOpacity: s.candleOpacity,
+        candleUpOpacity: s.candleUpOpacity,
+        candleDownOpacity: s.candleDownOpacity,
         backgroundOpacity: s.backgroundOpacity,
       }),
     }

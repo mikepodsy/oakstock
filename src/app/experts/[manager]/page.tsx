@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { ManagerLogo } from "@/components/shared/ManagerLogo";
+import { FundPerformance } from "./FundPerformance";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Holding {
@@ -39,6 +40,7 @@ interface Manager {
   strategy: string;
   updated_at: string;
   logo_domain: string | null;
+  public_ticker: string | null;
 }
 
 interface Stats {
@@ -313,7 +315,7 @@ export default function ExpertDetailPage({
             <div className="mb-3">
               <TopBar holdings={data?.holdings ?? []} />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-5">
+            <div className="grid grid-cols-2 gap-3 mb-5 max-w-md">
               <div className="bg-bg-secondary border border-border-primary rounded-xl px-4 py-3">
                 <p className="text-text-tertiary text-xs mb-1">Portfolio Value</p>
                 <p className="text-text-primary font-bold text-lg">{formatUSD(stats.total_value_usd)}</p>
@@ -322,23 +324,10 @@ export default function ExpertDetailPage({
                 <p className="text-text-tertiary text-xs mb-1">Holdings</p>
                 <p className="text-text-primary font-bold text-lg">{stats.holdings_count}</p>
               </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-xl px-4 py-3">
-                <p className="text-text-tertiary text-xs mb-1">New Positions</p>
-                <p className="text-emerald-400 font-bold text-lg">{stats.new_positions}</p>
-              </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-xl px-4 py-3">
-                <p className="text-text-tertiary text-xs mb-1">Added To</p>
-                <p className="text-blue-400 font-bold text-lg">{stats.increased_positions}</p>
-              </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-xl px-4 py-3">
-                <p className="text-text-tertiary text-xs mb-1">Reduced</p>
-                <p className="text-orange-400 font-bold text-lg">{stats.decreased_positions}</p>
-              </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-xl px-4 py-3">
-                <p className="text-text-tertiary text-xs mb-1">Unchanged</p>
-                <p className="text-text-secondary font-bold text-lg">{stats.unchanged_positions}</p>
-              </div>
             </div>
+
+            {/* Fund performance + Sharpe */}
+            <FundPerformance managerId={managerId} />
           </>
         )}
 

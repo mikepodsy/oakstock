@@ -13,6 +13,9 @@ ALTER TABLE public.expert_holdings ADD COLUMN IF NOT EXISTS activity text;
 -- Fund website domain used to resolve the manager's brand logo via logo.dev
 -- (same source as stock logos). Null managers fall back to a gradient avatar.
 ALTER TABLE public.expert_managers ADD COLUMN IF NOT EXISTS logo_domain text;
+-- Yahoo symbol of the manager's listed vehicle (e.g. buffett=BRK-B, ackman=PSH.L),
+-- used for real fund performance. Null funds use a reconstructed-portfolio backtest.
+ALTER TABLE public.expert_managers ADD COLUMN IF NOT EXISTS public_ticker text;
 
 -- 2. Indexes -----------------------------------------------------------------
 -- Dataroma rows have null cusip/option_type, so the original

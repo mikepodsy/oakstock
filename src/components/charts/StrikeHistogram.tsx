@@ -4,17 +4,23 @@ import { useEffect, useRef } from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
 import type { OptionStrikeRow } from "@/types";
 import { formatCompactNumber } from "@/utils/formatters";
+import { niceTicks } from "@/utils/ticks";
 
 // Calls/puts colors, matching the green-up / red-down convention used for the
 // volume bars elsewhere in the chart.
 const CALL_COLOR = "#22C55E";
 const PUT_COLOR = "#EF4444";
+const AXIS_COLOR = "rgba(148,163,184,0.7)";
+const SPOT_COLOR = "rgba(226,232,240,0.85)"; // current spot price line
+const AXIS_H = 16; // bottom strip reserved for the value axis labels
 
 interface StrikeHistogramProps {
   /** The candle series — used to map a strike price to a y pixel coordinate. */
   series: ISeriesApi<SeriesType> | null;
   rows: OptionStrikeRow[];
   metric: "oi" | "volume";
+  /** Current underlying price, drawn as a dashed line across the panel. */
+  spot: number | null;
   /** Bumped by the parent when the chart is recreated, to re-bind the canvas. */
   epoch: number;
   className?: string;
@@ -25,15 +31,15 @@ interface StrikeHistogramProps {
  * at the same y the chart maps that price to, so the bars line up with the
  * candles' price scale and stay aligned through zoom/pan/autoscale.
  *
- * It reads `series.priceToCoordinate` every animation frame and repaints only
- * when the mapping actually changes — cheap, and immune to which lightweight
- * event fired. Calls and puts stack into a single bar (call segment first),
- * scaled so the largest visible strike fills the panel width.
+ * Calls and puts stack into a single bar (call segment first), scaled to a fixed
+ * max across all strikes so the bottom value axis stays stable while zooming. A
+ * dashed line marks the current spot price.
  */
 export function StrikeHistogram({
   series,
   rows,
   metric,
+  spot,
   epoch,
   className,
 }: StrikeHistogramProps) {
@@ -52,6 +58,9 @@ export function StrikeHistogram({
     const callOf = (r: OptionStrikeRow) => (metric === "oi" ? r.callOI : r.callVol);
     const putOf = (r: OptionStrikeRow) => (metric === "oi" ? r.putOI : r.putVol);
 
+    // Fixed scale across all strikes (not just visible) → stable axis.
+    const maxTotal = Math.max(1, ...rows.map((r) => callOf(r) + putOf(r)));
+
     const paint = () => {
       const dpr = window.devicePixelRatio || 1;
       const cssW = canvas.clientWidth;
@@ -60,18 +69,18 @@ export function StrikeHistogram({
         raf = requestAnimationFrame(paint);
         return;
       }
+      const plotH = cssH - AXIS_H; // keep bars out of the axis strip
 
-      // Resolve each strike to a y coordinate; drop strikes off the visible range.
       const placed: Array<{ y: number; call: number; put: number }> = [];
       for (const r of rows) {
         const y = series.priceToCoordinate(r.strike);
-        if (y === null) continue;
+        if (y === null || y > plotH) continue;
         placed.push({ y, call: callOf(r), put: putOf(r) });
       }
+      const spotY = spot != null ? series.priceToCoordinate(spot) : null;
 
-      // Skip repaint when nothing visible changed (coordinates + size + data).
       const sig =
-        `${cssW}x${cssH}x${dpr}|${metric}|` +
+        `${cssW}x${cssH}x${dpr}|${metric}|${maxTotal}|${spotY}|` +
         placed.map((p) => `${Math.round(p.y)}:${p.call}:${p.put}`).join(",");
       if (sig === lastSig) {
         raf = requestAnimationFrame(paint);
@@ -79,7 +88,6 @@ export function StrikeHistogram({
       }
       lastSig = sig;
 
-      // Size the backing store for crisp lines on HiDPI.
       const wantW = Math.round(cssW * dpr);
       const wantH = Math.round(cssH * dpr);
       if (canvas.width !== wantW) canvas.width = wantW;
@@ -87,18 +95,12 @@ export function StrikeHistogram({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
 
-      if (placed.length > 0) {
-        // Scale so the largest combined (call+put) strike fills the width, with a
-        // little padding on the right.
-        const maxTotal = Math.max(
-          1,
-          ...placed.map((p) => p.call + p.put)
-        );
-        const usableW = cssW - 4;
+      const usableW = cssW - 4; // bars grow rightward from the left edge
 
-        // Bar thickness from the median gap between adjacent strikes.
+      // Bars.
+      if (placed.length > 0) {
         const ys = placed.map((p) => p.y).sort((a, b) => a - b);
-        let gap = cssH;
+        let gap = plotH;
         for (let i = 1; i < ys.length; i++) gap = Math.min(gap, ys[i] - ys[i - 1]);
         const barH = Math.max(1.5, Math.min(gap * 0.7, 10));
 
@@ -106,7 +108,6 @@ export function StrikeHistogram({
           const callW = (p.call / maxTotal) * usableW;
           const putW = (p.put / maxTotal) * usableW;
           const top = p.y - barH / 2;
-          // Calls grow from the left edge (nearest the price axis), puts continue.
           if (callW > 0) {
             ctx.fillStyle = CALL_COLOR;
             ctx.fillRect(0, top, callW, barH);
@@ -118,12 +119,35 @@ export function StrikeHistogram({
         }
       }
 
+      // Current spot price line.
+      if (spotY !== null && spotY >= 0 && spotY <= plotH) {
+        ctx.strokeStyle = SPOT_COLOR;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(spotY) + 0.5);
+        ctx.lineTo(cssW, Math.round(spotY) + 0.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Bottom value axis: 0 at the left edge, increasing to the right.
+      ctx.fillStyle = AXIS_COLOR;
+      ctx.font = "9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textBaseline = "bottom";
+      const ticks = niceTicks(maxTotal, 4);
+      for (const v of ticks) {
+        const x = (v / maxTotal) * usableW;
+        ctx.textAlign = v === 0 ? "left" : x > cssW - 14 ? "right" : "center";
+        ctx.fillText(formatCompactNumber(v), Math.min(x, cssW - 1), cssH - 2);
+      }
+
       raf = requestAnimationFrame(paint);
     };
 
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [series, rows, metric, epoch]);
+  }, [series, rows, metric, spot, epoch]);
 
   const callTotal = rows.reduce(
     (s, r) => s + (metric === "oi" ? r.callOI : r.callVol),
@@ -133,23 +157,19 @@ export function StrikeHistogram({
     (s, r) => s + (metric === "oi" ? r.putOI : r.putVol),
     0
   );
-  const label = metric === "oi" ? "OI" : "Vol";
 
   return (
     <div className={`relative ${className ?? ""}`}>
       <canvas ref={canvasRef} className="h-full w-full" />
-      {/* Total contracts for the active metric, overlaid on the empty axis
-          region at the bottom so the canvas stays full-height + price-aligned. */}
-      <div className="absolute inset-x-1 bottom-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="uppercase tracking-wide text-text-tertiary">
-            {label} contracts
-          </span>
-          <span className="font-semibold text-text-primary">
-            {formatCompactNumber(callTotal + putTotal)}
-          </span>
+      {/* Title + total contracts for the active metric. */}
+      <div className="absolute top-1 left-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
+        <div className="text-[10px] font-semibold text-text-primary">
+          Options Contracts
         </div>
         <div className="text-[9px]">
+          <span className="text-text-tertiary">
+            {metric === "oi" ? "OI" : "Vol"}{" "}
+          </span>
           <span style={{ color: CALL_COLOR }}>
             {formatCompactNumber(callTotal)} C
           </span>

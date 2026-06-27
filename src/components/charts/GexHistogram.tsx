@@ -4,11 +4,15 @@ import { useEffect, useRef } from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
 import type { OptionStrikeRow } from "@/types";
 import { formatCompactNumber } from "@/utils/formatters";
+import { niceTicks } from "@/utils/ticks";
 
 const POS_COLOR = "#22C55E"; // dealers long gamma (stabilizing)
 const NEG_COLOR = "#EF4444"; // dealers short gamma (accelerant)
 const ZERO_LINE = "rgba(148,163,184,0.35)";
 const FLIP_COLOR = "#FBBF24"; // the zero-gamma flip — the key level
+const SPOT_COLOR = "rgba(226,232,240,0.85)"; // current spot price line
+const AXIS_COLOR = "rgba(148,163,184,0.7)";
+const AXIS_H = 16; // bottom strip reserved for the value axis labels
 
 // Compact dollar formatting for the net-GEX readout, e.g. +$6.9M / -$1.2B.
 function formatGexShort(n: number): string {
@@ -27,21 +31,24 @@ interface GexHistogramProps {
   flip: number | null;
   /** Total net GEX across the window (dollars per 1% move). */
   netGex: number;
+  /** Current underlying price, drawn as a dashed line across the panel. */
+  spot: number | null;
   epoch: number;
   className?: string;
 }
 
 /**
  * Diverging gamma-exposure histogram aligned to the chart's price axis. Each
- * strike's net GEX draws from a center zero line — green right (dealers long
- * gamma), red left (short gamma) — and a dashed line marks the zero-gamma flip.
- * Coordinates come from `series.priceToCoordinate` so it tracks the price scale.
+ * strike's net GEX draws from a center zero line — green left (dealers long
+ * gamma), red right (short gamma) — with a fixed value axis along the bottom,
+ * a dashed line at the zero-gamma flip, and a dashed line at the spot price.
  */
 export function GexHistogram({
   series,
   rows,
   flip,
   netGex,
+  spot,
   epoch,
   className,
 }: GexHistogramProps) {
@@ -56,6 +63,9 @@ export function GexHistogram({
     let raf = 0;
     let lastSig = "";
 
+    // Fixed scale across all strikes (not just visible) → stable axis.
+    const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(r.gex)));
+
     const paint = () => {
       const dpr = window.devicePixelRatio || 1;
       const cssW = canvas.clientWidth;
@@ -64,18 +74,20 @@ export function GexHistogram({
         raf = requestAnimationFrame(paint);
         return;
       }
+      const plotH = cssH - AXIS_H;
 
       const placed: Array<{ y: number; gex: number }> = [];
       for (const r of rows) {
         if (r.gex === 0) continue;
         const y = series.priceToCoordinate(r.strike);
-        if (y === null) continue;
+        if (y === null || y > plotH) continue;
         placed.push({ y, gex: r.gex });
       }
       const flipY = flip != null ? series.priceToCoordinate(flip) : null;
+      const spotY = spot != null ? series.priceToCoordinate(spot) : null;
 
       const sig =
-        `${cssW}x${cssH}x${dpr}|${flipY}|` +
+        `${cssW}x${cssH}x${dpr}|${maxAbs}|${flipY}|${spotY}|` +
         placed.map((p) => `${Math.round(p.y)}:${p.gex.toFixed(0)}`).join(",");
       if (sig === lastSig) {
         raf = requestAnimationFrame(paint);
@@ -91,39 +103,37 @@ export function GexHistogram({
       ctx.clearRect(0, 0, cssW, cssH);
 
       const cx = Math.round(cssW / 2);
+      const halfW = cx - 3;
 
       // Center zero line.
       ctx.strokeStyle = ZERO_LINE;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(cx + 0.5, 0);
-      ctx.lineTo(cx + 0.5, cssH);
+      ctx.lineTo(cx + 0.5, plotH);
       ctx.stroke();
 
+      // Bars: positive (long gamma) grow left, negative grow right.
       if (placed.length > 0) {
-        const maxAbs = Math.max(1, ...placed.map((p) => Math.abs(p.gex)));
-        const halfW = cx - 3;
-
-        const ys = placed.map((p) => p.y).sort((a, b) => a - b);
-        let gap = cssH;
+        const ys = placed.map((q) => q.y).sort((a, b) => a - b);
+        let gap = plotH;
         for (let i = 1; i < ys.length; i++) gap = Math.min(gap, ys[i] - ys[i - 1]);
         const barH = Math.max(1.5, Math.min(gap * 0.7, 10));
 
         for (const p of placed) {
           const len = (Math.abs(p.gex) / maxAbs) * halfW;
-          const top = p.y - barH / 2;
           if (p.gex >= 0) {
             ctx.fillStyle = POS_COLOR;
-            ctx.fillRect(cx, top, len, barH);
+            ctx.fillRect(cx - len, p.y - barH / 2, len, barH);
           } else {
             ctx.fillStyle = NEG_COLOR;
-            ctx.fillRect(cx - len, top, len, barH);
+            ctx.fillRect(cx, p.y - barH / 2, len, barH);
           }
         }
       }
 
       // Zero-gamma flip line + price label.
-      if (flipY !== null && flipY >= 0 && flipY <= cssH) {
+      if (flipY !== null && flipY >= 0 && flipY <= plotH) {
         ctx.strokeStyle = FLIP_COLOR;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
@@ -132,11 +142,43 @@ export function GexHistogram({
         ctx.lineTo(cssW, Math.round(flipY) + 0.5);
         ctx.stroke();
         ctx.setLineDash([]);
-
         ctx.fillStyle = FLIP_COLOR;
         ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "left";
         ctx.textBaseline = "bottom";
         ctx.fillText(`flip ${flip!.toFixed(2)}`, 2, Math.round(flipY) - 1);
+      }
+
+      // Current spot price line.
+      if (spotY !== null && spotY >= 0 && spotY <= plotH) {
+        ctx.strokeStyle = SPOT_COLOR;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(spotY) + 0.5);
+        ctx.lineTo(cssW, Math.round(spotY) + 0.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Bottom value axis: 0 at center, positive left, negative right.
+      ctx.fillStyle = AXIS_COLOR;
+      ctx.font = "9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textBaseline = "bottom";
+      ctx.textAlign = "center";
+      ctx.fillText("0", cx, cssH - 2);
+      for (const v of niceTicks(maxAbs, 2)) {
+        if (v === 0) continue;
+        const dx = (v / maxAbs) * halfW;
+        const label = formatCompactNumber(v);
+        if (cx - dx > 10) {
+          ctx.textAlign = cx - dx < 14 ? "left" : "center";
+          ctx.fillText(label, Math.max(cx - dx, 1), cssH - 2);
+        }
+        if (cx + dx < cssW - 10) {
+          ctx.textAlign = cx + dx > cssW - 14 ? "right" : "center";
+          ctx.fillText(label, Math.min(cx + dx, cssW - 1), cssH - 2);
+        }
       }
 
       raf = requestAnimationFrame(paint);
@@ -144,33 +186,24 @@ export function GexHistogram({
 
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [series, rows, flip, epoch]);
+  }, [series, rows, flip, spot, epoch]);
 
   const totalOI = rows.reduce((s, r) => s + r.callOI + r.putOI, 0);
 
   return (
     <div className={`relative ${className ?? ""}`}>
       <canvas ref={canvasRef} className="h-full w-full" />
-      {/* Net-GEX readout. Green = dealers net long gamma (stabilizing). */}
+      {/* Title + net GEX + total OI contracts. */}
       <div className="absolute top-1 left-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
-        <div className="text-[9px] uppercase tracking-wide text-text-tertiary">
-          Net GEX
-        </div>
+        <div className="text-[10px] font-semibold text-text-primary">GEX</div>
         <div
           className="text-[11px] font-semibold"
           style={{ color: netGex >= 0 ? POS_COLOR : NEG_COLOR }}
         >
           {formatGexShort(netGex)}
         </div>
-      </div>
-      {/* Total open-interest contracts behind the gamma, overlaid on the empty
-          axis region at the bottom. */}
-      <div className="absolute inset-x-1 bottom-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
-        <div className="text-[9px] uppercase tracking-wide text-text-tertiary">
-          OI contracts
-        </div>
-        <div className="text-[11px] font-semibold text-text-primary">
-          {formatCompactNumber(totalOI)}
+        <div className="text-[9px] text-text-tertiary">
+          OI {formatCompactNumber(totalOI)}
         </div>
       </div>
     </div>

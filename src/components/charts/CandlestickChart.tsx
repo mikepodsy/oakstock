@@ -1038,6 +1038,7 @@ export function CandlestickChart({
               rows={optionsData.rows}
               flip={optionsData.flip}
               netGex={optionsData.netGex}
+              spot={optionsData.spot}
               epoch={chartEpoch}
               className="h-full w-full"
             />
@@ -1058,6 +1059,7 @@ export function CandlestickChart({
             series={candleSeriesRef.current}
             rows={optionsData?.rows ?? []}
             metric={optionsMetric}
+            spot={optionsData?.spot ?? null}
             epoch={chartEpoch}
             className="h-full w-full"
           />

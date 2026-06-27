@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 
 interface Row {
   rank: number;
@@ -49,6 +50,7 @@ function WidgetCard({ k, rows }: { k: WidgetKey; rows: Row[] }) {
             <div key={r.rank} className="flex items-center justify-between gap-2">
               <Link href={`/stock/${r.ticker}`} className="flex items-center gap-2 min-w-0 group/row">
                 <span className="text-text-tertiary text-xs w-4 shrink-0 text-right">{r.rank}</span>
+                <CompanyLogo ticker={r.ticker} className="w-5 h-5 rounded" textClassName="text-[8px]" />
                 <span className="text-text-primary text-xs font-semibold shrink-0 group-hover/row:text-green-primary transition-colors">{r.ticker}</span>
                 <span className="text-text-secondary text-xs truncate group-hover/row:underline">{r.company_name}</span>
               </Link>

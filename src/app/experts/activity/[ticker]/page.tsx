@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
+import { ManagerLogo } from "@/components/shared/ManagerLogo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Action = "buy" | "sell";
@@ -37,13 +38,21 @@ function FundRow({ fund, action }: { fund: FundActivity; action: Action }) {
   const tone = action === "buy" ? "text-emerald-500" : "text-red-400";
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-primary last:border-b-0">
-      <div className="min-w-0">
-        <p className="text-text-primary text-sm font-medium truncate">
-          {fund.manager}
-        </p>
-        <p className="text-text-tertiary text-xs">
-          {fund.shares.toLocaleString()} shares · {fund.pct_portfolio.toFixed(2)}% of portfolio
-        </p>
+      <div className="flex items-center gap-3 min-w-0">
+        <ManagerLogo
+          id={fund.managerCode}
+          name={fund.manager}
+          className="w-8 h-8 rounded-lg"
+          textClassName="text-[10px]"
+        />
+        <div className="min-w-0">
+          <p className="text-text-primary text-sm font-medium truncate">
+            {fund.manager}
+          </p>
+          <p className="text-text-tertiary text-xs">
+            {fund.shares.toLocaleString()} shares · {fund.pct_portfolio.toFixed(2)}% of portfolio
+          </p>
+        </div>
       </div>
       <div className="flex items-center gap-4 shrink-0">
         <span className={`text-sm font-medium ${tone}`}>{fund.activity}</span>

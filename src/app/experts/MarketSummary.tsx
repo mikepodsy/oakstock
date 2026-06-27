@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 interface Row {
@@ -31,22 +32,34 @@ const TONE: Record<"neutral" | "buy" | "sell", string> = {
 
 function WidgetCard({ k, rows }: { k: WidgetKey; rows: Row[] }) {
   const meta = META[k];
+  // Buy/sell widgets link their badge to the funds-that-traded-it page;
+  // "most owned" has no buy/sell action, so its badge stays static.
+  const action = meta.tone === "buy" ? "buy" : meta.tone === "sell" ? "sell" : null;
   return (
     <div className="bg-bg-secondary border border-border-primary rounded-2xl p-4">
       <p className="text-text-tertiary text-xs uppercase tracking-wider mb-3">{meta.title}</p>
       <div className="space-y-1.5">
-        {rows.map((r) => (
-          <div key={r.rank} className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-text-tertiary text-xs w-4 shrink-0 text-right">{r.rank}</span>
-              <span className="text-text-primary text-xs font-semibold shrink-0">{r.ticker}</span>
-              <span className="text-text-secondary text-xs truncate">{r.company_name}</span>
-            </div>
-            <span className={`text-xs font-medium px-1.5 py-0.5 rounded shrink-0 ${TONE[meta.tone]}`}>
+        {rows.map((r) => {
+          const badge = (
+            <span className={`text-xs font-medium px-1.5 py-0.5 rounded shrink-0 ${TONE[meta.tone]} ${action ? "hover:brightness-125 transition" : ""}`}>
               {r.metric} {meta.verb}
             </span>
-          </div>
-        ))}
+          );
+          return (
+            <div key={r.rank} className="flex items-center justify-between gap-2">
+              <Link href={`/stock/${r.ticker}`} className="flex items-center gap-2 min-w-0 group/row">
+                <span className="text-text-tertiary text-xs w-4 shrink-0 text-right">{r.rank}</span>
+                <span className="text-text-primary text-xs font-semibold shrink-0 group-hover/row:text-green-primary transition-colors">{r.ticker}</span>
+                <span className="text-text-secondary text-xs truncate group-hover/row:underline">{r.company_name}</span>
+              </Link>
+              {action ? (
+                <Link href={`/experts/activity/${r.ticker}?action=${action}`}>{badge}</Link>
+              ) : (
+                badge
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

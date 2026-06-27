@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase";
 import {
   parseStockActivity,
   type Action,
@@ -43,11 +44,32 @@ export async function GET(
     }
 
     const parsed = parseStockActivity(await res.text());
+    const funds = parsed.funds[action];
+
+    // Resolve real fund logos: Dataroma's firm code (?m=CODE) matches our roster's
+    // expert_managers.dataroma_code, which carries the brand logo domain. Funds
+    // outside the roster have no known domain and fall back to an initials avatar.
+    const codes = [...new Set(funds.map((f) => f.managerCode))];
+    const logoByCode = new Map<string, string>();
+    if (codes.length) {
+      const supabase = createServerSupabaseClient();
+      const { data: rows } = await supabase
+        .from("expert_managers")
+        .select("dataroma_code, logo_domain")
+        .in("dataroma_code", codes);
+      for (const r of rows ?? []) {
+        if (r.logo_domain) logoByCode.set(r.dataroma_code, r.logo_domain);
+      }
+    }
+
     return NextResponse.json({
       ticker: parsed.ticker || ticker,
       company_name: parsed.company_name,
       action,
-      funds: parsed.funds[action],
+      funds: funds.map((f) => ({
+        ...f,
+        logoDomain: logoByCode.get(f.managerCode) ?? null,
+      })),
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 502 });

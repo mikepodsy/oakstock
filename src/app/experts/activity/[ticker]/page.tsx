@@ -16,6 +16,7 @@ interface FundActivity {
   pct_portfolio: number;
   shares: number;
   value_usd: number;
+  logoDomain: string | null;
 }
 
 interface ActivityResponse {
@@ -42,6 +43,7 @@ function FundRow({ fund, action }: { fund: FundActivity; action: Action }) {
         <ManagerLogo
           id={fund.managerCode}
           name={fund.manager}
+          logoDomain={fund.logoDomain}
           className="w-8 h-8 rounded-lg"
           textClassName="text-[10px]"
         />

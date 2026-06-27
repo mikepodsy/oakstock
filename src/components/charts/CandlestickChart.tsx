@@ -34,8 +34,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { IndicatorsMenu } from "./IndicatorsMenu";
 import { ChartStyleMenu } from "./ChartStyleMenu";
+import { StrikeHistogram } from "./StrikeHistogram";
 import { SessionBackgroundPrimitive } from "./sessionBackground";
-import { fetchQuestradeCandles } from "@/services/questrade";
+import { fetchQuestradeCandles, fetchOptionStrikes } from "@/services/questrade";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
@@ -52,7 +53,11 @@ import {
   type LinePoint,
 } from "@/utils/indicators";
 import { maColorFor, INDICATOR_COLORS } from "@/utils/indicatorConfig";
-import type { QuestradeCandle } from "@/types";
+import type {
+  QuestradeCandle,
+  ExpiryWindow,
+  OptionsChainResponse,
+} from "@/types";
 
 interface CandlestickChartProps {
   ticker: string;
@@ -89,6 +94,14 @@ const EMPTY_LINES: { id: string; price: number }[] = [];
 // How close (px) the cursor must be to a line to grab it.
 const LINE_HIT_PX = 6;
 
+// Expiry windows for the options strike-breakdown panel.
+const EXPIRY_WINDOW_OPTIONS: { value: ExpiryWindow; label: string }[] = [
+  { value: "front", label: "Front expiry" },
+  { value: "2w", label: "Next 2 weeks" },
+  { value: "monthly", label: "Next month" },
+  { value: "all", label: "All expiries" },
+];
+
 // Round a clicked/dragged price to a sensible precision for its magnitude.
 function roundPrice(p: number): number {
   const decimals = Math.abs(p) >= 1 ? 2 : 4;
@@ -108,6 +121,18 @@ export function CandlestickChart({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+
+  // Options strike-breakdown panel (fullscreen only). Lazily fetched so the
+  // embedded chart never pays the options API cost.
+  const [optionsMetric, setOptionsMetric] = useState<"oi" | "volume">("oi");
+  const [optionsWindow, setOptionsWindow] = useState<ExpiryWindow>("2w");
+  const [optionsData, setOptionsData] = useState<OptionsChainResponse | null>(
+    null
+  );
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  // Bumped whenever the chart is recreated, so the histogram re-binds to the new
+  // series instance (refs alone don't trigger a re-render).
+  const [chartEpoch, setChartEpoch] = useState(0);
   // Latest price + today's change (last daily close vs prior daily close).
   // Fetched independently of the chart interval so it stays a true day change.
   const [quote, setQuote] = useState<{
@@ -200,6 +225,30 @@ export function CandlestickChart({
     chartRef.current?.timeScale().scrollToRealTime();
   }, []);
 
+  // Lazily fetch the options strike breakdown — only while fullscreen, and
+  // re-fetch on ticker/window change. Keeps the embedded chart off the options
+  // API entirely.
+  useEffect(() => {
+    if (!fullscreen) return;
+
+    let cancelled = false;
+    setOptionsLoading(true);
+    fetchOptionStrikes(ticker, optionsWindow)
+      .then((res) => {
+        if (!cancelled) setOptionsData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setOptionsData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fullscreen, ticker, optionsWindow]);
+
   // While expanded: exit on Escape and lock background scroll. The chart uses
   // autoSize (ResizeObserver), so growing the wrapper resizes it automatically —
   // no need to recreate the chart.
@@ -291,6 +340,8 @@ export function CandlestickChart({
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
+    // Let the strike histogram re-bind to this fresh series instance.
+    setChartEpoch((e) => e + 1);
 
     return () => {
       chart.remove();
@@ -823,8 +874,63 @@ export function CandlestickChart({
             </span>
           )}
         </button>
+
+        {/* Options strike-breakdown controls (fullscreen only): OI⇄Volume toggle,
+            expiry window, and a calls/puts color legend. */}
+        {fullscreen && (
+          <span className="ml-auto flex items-center gap-2">
+            <span className="flex items-center gap-2 text-[11px] text-text-secondary">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-sm bg-green-primary" />
+                Calls
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-sm bg-red-primary" />
+                Puts
+              </span>
+            </span>
+
+            <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
+              {(["oi", "volume"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setOptionsMetric(m)}
+                  className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
+                    optionsMetric === m
+                      ? "bg-bg-elevated text-text-primary"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  {m === "oi" ? "OI" : "Volume"}
+                </button>
+              ))}
+            </span>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                {EXPIRY_WINDOW_OPTIONS.find((o) => o.value === optionsWindow)
+                  ?.label ?? "Expiry"}
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={optionsWindow}
+                  onValueChange={(v) => setOptionsWindow(v as ExpiryWindow)}
+                >
+                  {EXPIRY_WINDOW_OPTIONS.map((opt) => (
+                    <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </span>
+        )}
       </div>
 
+      <div className={fullscreen ? "flex flex-1 gap-2 min-h-0" : undefined}>
       <div className={`relative ${fullscreen ? "flex-1" : "h-[300px]"}`}>
         {/* Chart container stays mounted so lightweight-charts can attach. */}
         <div
@@ -918,6 +1024,33 @@ export function CandlestickChart({
             <p className="text-sm text-text-secondary">No price data available</p>
           </div>
         ) : null}
+      </div>
+
+      {/* Options strike breakdown, aligned to the price axis (fullscreen only). */}
+      {fullscreen && (
+        <div className="relative w-[230px] shrink-0 border-l border-border-primary pl-1">
+          <StrikeHistogram
+            series={candleSeriesRef.current}
+            rows={optionsData?.rows ?? []}
+            metric={optionsMetric}
+            epoch={chartEpoch}
+            className="h-full w-full"
+          />
+          {optionsLoading && !optionsData && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-xs text-text-secondary">Loading options…</p>
+            </div>
+          )}
+          {!optionsLoading &&
+            (!optionsData || optionsData.rows.length === 0) && (
+              <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
+                <p className="text-xs text-text-secondary">
+                  No options data for {ticker}
+                </p>
+              </div>
+            )}
+        </div>
+      )}
       </div>
     </div>
   );

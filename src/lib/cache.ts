@@ -59,3 +59,6 @@ export const radarReturnsCache = getOrCreateCache<number | null>("radar-returns"
 // Questrade symbolId rarely changes — cache it long. Candles cache stays short.
 export const questradeSymbolCache = getOrCreateCache<number | null>("questrade-symbol", 86400);
 export const questradeCandlesCache = getOrCreateCache<unknown[]>("questrade-candles", 300);
+// Options strike breakdown. Short TTL so intraday volume stays fresh; open
+// interest only changes once a day so the rest of the payload is stable.
+export const questradeOptionsCache = getOrCreateCache<unknown>("questrade-options", 60);

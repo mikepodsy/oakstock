@@ -116,6 +116,35 @@ export interface QuestradeCandle {
   volume: number;
 }
 
+// ─── Options Strike Breakdown ────────────────────────
+// Which expiries to aggregate for the strike-breakdown histogram.
+export type ExpiryWindow = "front" | "2w" | "monthly" | "all";
+
+// One row per strike, with call/put open-interest and volume summed across the
+// selected expiry window.
+export interface OptionStrikeRow {
+  strike: number;
+  callOI: number;
+  putOI: number;
+  callVol: number;
+  putVol: number;
+}
+
+export interface OptionsExpiry {
+  date: string; // ISO expiry date
+  label: string; // e.g. "Jun 27"
+}
+
+export interface OptionsChainResponse {
+  rows: OptionStrikeRow[];
+  expiries: OptionsExpiry[]; // every listed expiry (for the window dropdown)
+  spot: number | null; // underlying last price
+  asOf: string; // ISO timestamp of this aggregation
+  // True when at least one contract reported a non-null gamma — a cheap signal
+  // for whether the Phase 2 GEX panel will have data to work with.
+  hasGreeks: boolean;
+}
+
 export interface PortfolioChartPoint {
   date: string;
   portfolioValue: number;

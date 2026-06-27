@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { questradeSymbolCache } from "@/lib/cache";
 
 // Questrade OAuth + market-data helper.
 //
@@ -186,4 +187,59 @@ export async function questradeGet<T>(path: string): Promise<T> {
   }
 
   return res.json() as Promise<T>;
+}
+
+/** Authenticated POST against the account's Questrade api_server (JSON body). */
+export async function questradePost<T>(path: string, body: unknown): Promise<T> {
+  const send = (auth: QuestradeAuth) =>
+    fetchWithTimeout(`${auth.apiServer}${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${auth.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+  let auth = await getQuestradeAuth();
+  let res = await send(auth);
+
+  // Same premature-401 handling as questradeGet: force a refresh once and retry.
+  if (res.status === 401) {
+    auth = await getQuestradeAuth(true);
+    res = await send(auth);
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Questrade POST ${path} failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+interface SymbolSearchResponse {
+  symbols: Array<{ symbolId: number; symbol: string; isTradable: boolean }>;
+}
+
+/**
+ * Resolves a ticker to its Questrade symbolId, preferring an exact symbol match.
+ * Cached for 24h (symbolIds rarely change). Returns null when nothing matches.
+ */
+export async function resolveSymbolId(ticker: string): Promise<number | null> {
+  const cacheKey = ticker.toUpperCase();
+  const cached = questradeSymbolCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const data = await questradeGet<SymbolSearchResponse>(
+    `/v1/symbols/search?prefix=${encodeURIComponent(ticker)}`
+  );
+
+  const match =
+    data.symbols.find((s) => s.symbol.toUpperCase() === cacheKey) ??
+    data.symbols[0];
+  const symbolId = match ? match.symbolId : null;
+
+  questradeSymbolCache.set(cacheKey, symbolId);
+  return symbolId;
 }

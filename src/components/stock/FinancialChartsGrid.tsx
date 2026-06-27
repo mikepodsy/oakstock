@@ -24,8 +24,11 @@ export function FinancialChartsGrid({
   const revenueData = statements.map((s) => ({ date: s.date, value: s.revenue }));
   const ebitdaData = statements.map((s) => ({ date: s.date, value: s.ebitda }));
   const fcfData = statements.map((s) => ({ date: s.date, value: s.freeCashFlow }));
+  const ocfData = statements.map((s) => ({ date: s.date, value: s.operatingCashFlow }));
+  const capexData = statements.map((s) => ({ date: s.date, value: s.capex }));
   const netIncomeData = statements.map((s) => ({ date: s.date, value: s.netIncome }));
   const epsData = statements.map((s) => ({ date: s.date, value: s.eps }));
+  const epsBasicData = statements.map((s) => ({ date: s.date, value: s.epsBasic }));
 
   const buybackDividendData = statements.map((s) => ({
     date: s.date,
@@ -83,9 +86,21 @@ export function FinancialChartsGrid({
           loading={loading}
         />
         <FinancialBarChart
+          title="Operating Cash Flow"
+          data={ocfData}
+          color="#14b8a6"
+          loading={loading}
+        />
+        <FinancialBarChart
           title="Free Cash Flow"
           data={fcfData}
           color="#22c55e"
+          loading={loading}
+        />
+        <FinancialBarChart
+          title="Capital Expenditure"
+          data={capexData}
+          color="#64748b"
           loading={loading}
         />
         <FinancialBarChart
@@ -98,6 +113,14 @@ export function FinancialChartsGrid({
           title="EPS (Diluted)"
           data={epsData}
           color="#ec4899"
+          loading={loading}
+          valuePrefix=""
+          formatValue={(v) => v.toFixed(2)}
+        />
+        <FinancialBarChart
+          title="EPS (Basic)"
+          data={epsBasicData}
+          color="#f43f5e"
           loading={loading}
           valuePrefix=""
           formatValue={(v) => v.toFixed(2)}

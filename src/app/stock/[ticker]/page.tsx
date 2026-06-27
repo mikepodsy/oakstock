@@ -8,6 +8,7 @@ import { StockHeader } from "@/components/stock/StockHeader";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
 import { KeyStatsRow } from "@/components/stock/KeyStatsRow";
 import { FinancialChartsGrid } from "@/components/stock/FinancialChartsGrid";
+import { FinancialsSummaryTable } from "@/components/stock/FinancialsSummaryTable";
 import { CompanyDescription } from "@/components/stock/CompanyDescription";
 import { SentimentSection } from "@/components/stock/SentimentSection";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -120,7 +121,10 @@ export default function StockDetailPage() {
           </button>
         </div>
       ) : fundamentals ? (
-        <FinancialChartsGrid data={fundamentals} />
+        <>
+          <FinancialsSummaryTable data={fundamentals} />
+          <FinancialChartsGrid data={fundamentals} />
+        </>
       ) : null}
 
       <CompanyDescription description={financials?.description ?? null} />

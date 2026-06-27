@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { questradeGet } from "@/lib/questrade";
-import { questradeSymbolCache, questradeCandlesCache } from "@/lib/cache";
+import { questradeGet, resolveSymbolId } from "@/lib/questrade";
+import { questradeCandlesCache } from "@/lib/cache";
 
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
@@ -22,10 +22,6 @@ const INTERVAL_WINDOWS: Record<string, number> = {
 
 const DEFAULT_INTERVAL = "OneDay";
 
-interface SearchResponse {
-  symbols: Array<{ symbolId: number; symbol: string; isTradable: boolean }>;
-}
-
 interface CandlesResponse {
   candles: Array<{
     start: string;
@@ -36,25 +32,6 @@ interface CandlesResponse {
     close: number;
     volume: number;
   }>;
-}
-
-async function resolveSymbolId(ticker: string): Promise<number | null> {
-  const cacheKey = ticker.toUpperCase();
-  const cached = questradeSymbolCache.get(cacheKey);
-  if (cached !== undefined) return cached;
-
-  const data = await questradeGet<SearchResponse>(
-    `/v1/symbols/search?prefix=${encodeURIComponent(ticker)}`
-  );
-
-  // Prefer an exact ticker match, else the first result.
-  const match =
-    data.symbols.find((s) => s.symbol.toUpperCase() === cacheKey) ??
-    data.symbols[0];
-  const symbolId = match ? match.symbolId : null;
-
-  questradeSymbolCache.set(cacheKey, symbolId);
-  return symbolId;
 }
 
 export async function GET(request: NextRequest) {

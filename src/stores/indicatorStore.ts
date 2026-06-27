@@ -6,6 +6,7 @@ import {
   DEFAULT_INDICATORS,
   type IndicatorState,
   type MultiLineId,
+  type SingleColorId,
 } from "@/utils/indicatorConfig";
 
 interface IndicatorStore extends IndicatorState {
@@ -17,6 +18,10 @@ interface IndicatorStore extends IndicatorState {
   ) => void;
   addPeriod: (id: MultiLineId, period: number) => void;
   removePeriod: (id: MultiLineId, period: number) => void;
+  // Color of a single-line indicator (Bollinger / Donchian / RSI).
+  setLineColor: (id: SingleColorId, hex: string) => void;
+  // Color of one SMA/EMA length.
+  setPeriodColor: (id: MultiLineId, period: number, hex: string) => void;
 }
 
 export const useIndicatorStore = create<IndicatorStore>()(
@@ -48,10 +53,26 @@ export const useIndicatorStore = create<IndicatorStore>()(
         }),
 
       removePeriod: (id, period) =>
+        set((s) => {
+          const colors = { ...(s[id].colors ?? {}) };
+          delete colors[period];
+          return {
+            [id]: {
+              ...s[id],
+              periods: s[id].periods.filter((p) => p !== period),
+              colors,
+            },
+          } as Partial<IndicatorStore>;
+        }),
+
+      setLineColor: (id, hex) =>
+        set((s) => ({ [id]: { ...s[id], color: hex } }) as Partial<IndicatorStore>),
+
+      setPeriodColor: (id, period, hex) =>
         set(
           (s) =>
             ({
-              [id]: { ...s[id], periods: s[id].periods.filter((p) => p !== period) },
+              [id]: { ...s[id], colors: { ...(s[id].colors ?? {}), [period]: hex } },
             }) as Partial<IndicatorStore>
         ),
     }),

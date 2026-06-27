@@ -116,6 +116,43 @@ export interface QuestradeCandle {
   volume: number;
 }
 
+// ─── Options Strike Breakdown ────────────────────────
+// Which expiries to aggregate for the strike-breakdown histogram.
+export type ExpiryWindow = "front" | "2w" | "monthly" | "all";
+
+// One row per strike, with call/put open-interest and volume summed across the
+// selected expiry window.
+export interface OptionStrikeRow {
+  strike: number;
+  callOI: number;
+  putOI: number;
+  callVol: number;
+  putVol: number;
+  // Net dealer gamma exposure at this strike (call GEX − put GEX), in dollars of
+  // hedging per 1% move in spot. 0 when greeks/spot are unavailable.
+  gex: number;
+}
+
+export interface OptionsExpiry {
+  date: string; // ISO expiry date
+  label: string; // e.g. "Jun 27"
+}
+
+export interface OptionsChainResponse {
+  rows: OptionStrikeRow[];
+  expiries: OptionsExpiry[]; // every listed expiry (for the window dropdown)
+  spot: number | null; // underlying last price
+  asOf: string; // ISO timestamp of this aggregation
+  // True when at least one contract reported a non-null gamma — i.e. the GEX
+  // panel has data to work with.
+  hasGreeks: boolean;
+  // Sum of per-strike net GEX across the window (dollars per 1% move).
+  netGex: number;
+  // Approximate zero-gamma flip price (cumulative net GEX crosses zero), or null
+  // when it never crosses within the strike band.
+  flip: number | null;
+}
+
 export interface PortfolioChartPoint {
   date: string;
   portfolioValue: number;
@@ -129,11 +166,14 @@ export interface FinancialStatement {
   revenue: number | null;
   ebitda: number | null;
   freeCashFlow: number | null;
+  operatingCashFlow: number | null;
+  capex: number | null;
   netIncome: number | null;
   grossProfit: number | null;
   operatingIncome: number | null;
   costOfRevenue: number | null;
   eps: number | null;
+  epsBasic: number | null;
   buybacks: number | null;
   dividendsPaid: number | null;
   totalDebt: number | null;

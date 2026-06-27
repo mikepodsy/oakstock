@@ -1,4 +1,8 @@
-import type { QuestradeCandle } from "@/types";
+import type {
+  QuestradeCandle,
+  ExpiryWindow,
+  OptionsChainResponse,
+} from "@/types";
 
 // Fetches OHLCV candles from Questrade at the given candle granularity
 // (Questrade HistoricalDataGranularity, e.g. "OneMinute", "OneDay"). The route
@@ -11,5 +15,18 @@ export async function fetchQuestradeCandles(
     `/api/questrade/candles?ticker=${encodeURIComponent(ticker)}&interval=${interval}`
   );
   if (!res.ok) throw new Error(`Failed to fetch Questrade candles for ${ticker}`);
+  return res.json();
+}
+
+// Fetches the options strike breakdown (open interest + volume per strike, split
+// call/put) aggregated over the given expiry window.
+export async function fetchOptionStrikes(
+  ticker: string,
+  window: ExpiryWindow = "2w"
+): Promise<OptionsChainResponse> {
+  const res = await fetch(
+    `/api/questrade/options?ticker=${encodeURIComponent(ticker)}&window=${window}`
+  );
+  if (!res.ok) throw new Error(`Failed to fetch options for ${ticker}`);
   return res.json();
 }

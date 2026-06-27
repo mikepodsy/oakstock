@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, X, Plus } from "lucide-react";
 import { useIndicatorStore } from "@/stores/indicatorStore";
+import { ColorControl } from "./ColorControl";
 import {
   PARAM_BOUNDS,
-  maColor,
+  maColorFor,
   INDICATOR_COLORS,
   type MultiLineId,
+  type SingleColorId,
 } from "@/utils/indicatorConfig";
 
 interface IndicatorsMenuProps {
@@ -109,32 +111,58 @@ function PeriodAdder({ onAdd }: { onAdd: (v: number) => void }) {
   );
 }
 
-// Editable list of length chips for SMA / EMA.
+// Editable list of length chips for SMA / EMA. Each chip carries an editable
+// color swatch (defaults to the auto-cycled palette).
 function PeriodChips({ id }: { id: MultiLineId }) {
   const periods = useIndicatorStore((s) => s[id].periods);
+  const colors = useIndicatorStore((s) => s[id].colors);
   const addPeriod = useIndicatorStore((s) => s.addPeriod);
   const removePeriod = useIndicatorStore((s) => s.removePeriod);
+  const setPeriodColor = useIndicatorStore((s) => s.setPeriodColor);
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1 pl-6">
-      {periods.map((p, idx) => (
-        <span
-          key={p}
-          className="flex items-center gap-1 rounded-full border border-border-primary px-2 py-0.5 text-xs font-medium"
-          style={{ color: maColor(idx) }}
-        >
-          {p}
-          <button
-            type="button"
-            onClick={() => removePeriod(id, p)}
-            aria-label={`Remove ${p}`}
-            className="text-text-tertiary hover:text-text-primary"
+      {periods.map((p, idx) => {
+        const color = maColorFor(colors, p, idx);
+        return (
+          <span
+            key={p}
+            className="flex items-center gap-1 rounded-full border border-border-primary px-2 py-0.5 text-xs font-medium"
+            style={{ color }}
           >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
+            <ColorControl
+              value={color}
+              onChange={(hex) => setPeriodColor(id, p, hex)}
+              label={`${id.toUpperCase()} ${p} color`}
+              size="sm"
+            />
+            {p}
+            <button
+              type="button"
+              onClick={() => removePeriod(id, p)}
+              aria-label={`Remove ${p}`}
+              className="text-text-tertiary hover:text-text-primary"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        );
+      })}
       <PeriodAdder onAdd={(v) => addPeriod(id, v)} />
     </div>
+  );
+}
+
+// A color swatch for a single-line indicator (Bollinger / Donchian / RSI).
+function LineColorControl({ id, fallback }: { id: SingleColorId; fallback: string }) {
+  const color = useIndicatorStore((s) => s[id].color) ?? fallback;
+  const setLineColor = useIndicatorStore((s) => s.setLineColor);
+  return (
+    <ColorControl
+      value={color}
+      onChange={(hex) => setLineColor(id, hex)}
+      label={`${id} color`}
+      size="sm"
+    />
   );
 }
 
@@ -220,6 +248,12 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
                 color={INDICATOR_COLORS.bollinger}
               />
               <span className="text-sm text-text-primary">Bollinger Bands</span>
+              <span className="ml-auto">
+                <LineColorControl
+                  id="bollinger"
+                  fallback={INDICATOR_COLORS.bollinger}
+                />
+              </span>
             </div>
             {s.bollinger.enabled && (
               <div className="mt-1 flex flex-wrap items-center gap-2 pl-6">
@@ -248,6 +282,12 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
                 color={INDICATOR_COLORS.donchian}
               />
               <span className="text-sm text-text-primary">Donchian Channels</span>
+              <span className="ml-auto">
+                <LineColorControl
+                  id="donchian"
+                  fallback={INDICATOR_COLORS.donchian}
+                />
+              </span>
             </div>
             {s.donchian.enabled && (
               <div className="mt-1 flex flex-wrap items-center gap-2 pl-6">
@@ -271,6 +311,9 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
               />
               <span className="text-sm text-text-primary">RSI</span>
               <span className="text-[10px] text-text-tertiary">(sub-pane)</span>
+              <span className="ml-auto">
+                <LineColorControl id="rsi" fallback={INDICATOR_COLORS.rsi} />
+              </span>
             </div>
             {s.rsi.enabled && (
               <div className="mt-1 flex flex-wrap items-center gap-2 pl-6">

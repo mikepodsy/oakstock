@@ -23,11 +23,12 @@ export interface ChartStyleState {
   backgroundOpacity: number; // 0..1 — alpha applied to the chart background
 }
 
-// Defaults reproduce the current chart appearance (green/red on black, hidden
-// borders) so existing users see no change until they customize.
+// Defaults: green/red on black. Borders are on by default in a darker shade of
+// the body so candles have a visible, editable outline out of the box (matching
+// the body color would make the border invisible / look like it never renders).
 export const DEFAULT_CHART_STYLE: ChartStyleState = {
   body: { up: "#22C55E", down: "#EF4444", visible: true },
-  border: { up: "#22C55E", down: "#EF4444", visible: false },
+  border: { up: "#16A34A", down: "#DC2626", visible: true },
   wick: { up: "#22C55E", down: "#EF4444", visible: true },
   background: "#000000",
   candleUpOpacity: 1,
@@ -94,15 +95,32 @@ export const useChartStyleStore = create<ChartStyleStore>()(
     }),
     {
       name: "oakstock-chart-style",
-      version: 1,
-      // v0 had a single `candleOpacity`; carry it over to both up and down.
+      version: 2,
       migrate: (persisted, version) => {
-        if (version < 1 && persisted && typeof persisted === "object") {
-          const p = persisted as Record<string, unknown>;
+        if (!persisted || typeof persisted !== "object") {
+          return persisted as ChartStyleState;
+        }
+        const p = persisted as Record<string, unknown>;
+        // v0 had a single `candleOpacity`; carry it over to both up and down.
+        if (version < 1) {
           const legacy = typeof p.candleOpacity === "number" ? p.candleOpacity : 1;
           p.candleUpOpacity = legacy;
           p.candleDownOpacity = legacy;
           delete p.candleOpacity;
+        }
+        // v1 hid borders behind body-matching colors, so editing them looked like
+        // a no-op. Upgrade users still on that untouched default to the new
+        // visible, distinct border; leave anyone who customized borders alone.
+        if (version < 2) {
+          const border = p.border as ColorGroup | undefined;
+          if (
+            border &&
+            border.visible === false &&
+            border.up === "#22C55E" &&
+            border.down === "#EF4444"
+          ) {
+            p.border = { ...DEFAULT_CHART_STYLE.border };
+          }
         }
         return persisted as ChartStyleState;
       },

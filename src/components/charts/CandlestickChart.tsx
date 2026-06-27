@@ -834,7 +834,9 @@ export function CandlestickChart({
           onDoubleClick={onChartDoubleClick}
         />
 
-        {/* ✕ delete affordance for the line under the cursor. */}
+        {/* ✕ delete affordance for the line under the cursor, sitting on the
+            right side of the line just inside the price scale (offset by the
+            axis width so it never overlaps the line's price label). */}
         {hover && (
           <button
             type="button"
@@ -844,10 +846,13 @@ export function CandlestickChart({
               removeLine(ticker, hover.id);
               setHover(null);
             }}
-            style={{ top: hover.y - 10 }}
+            style={{
+              top: hover.y - 10,
+              right: (chartRef.current?.priceScale("right").width() ?? 0) + 6,
+            }}
             title="Remove line"
             aria-label="Remove line"
-            className="absolute left-2 z-20 flex h-5 w-5 items-center justify-center rounded border border-border-primary bg-bg-elevated/90 text-text-secondary backdrop-blur transition-colors hover:text-red-primary"
+            className="absolute z-20 flex h-5 w-5 items-center justify-center rounded border border-border-primary bg-bg-elevated/90 text-text-secondary backdrop-blur transition-colors hover:text-red-primary"
           >
             <X className="h-3 w-3" />
           </button>

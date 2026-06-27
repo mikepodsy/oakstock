@@ -932,7 +932,7 @@ export function CandlestickChart({
       </div>
 
       <div className={fullscreen ? "flex flex-1 gap-2 min-h-0" : undefined}>
-      <div className={`relative ${fullscreen ? "flex-1" : "h-[300px]"}`}>
+      <div className={`relative ${fullscreen ? "flex-[2] min-w-0" : "h-[300px]"}`}>
         {/* Chart container stays mounted so lightweight-charts can attach. */}
         <div
           ref={containerRef}
@@ -1031,7 +1031,7 @@ export function CandlestickChart({
           zero-gamma flip level (fullscreen only). Sits between the chart and the
           OI/volume panel, matching the reference layout. */}
       {fullscreen && (
-        <div className="w-[150px] shrink-0 border-l border-border-primary">
+        <div className="flex-[0.4] min-w-[120px] border-l border-border-primary">
           {optionsData && optionsData.hasGreeks ? (
             <GexHistogram
               series={candleSeriesRef.current}
@@ -1053,7 +1053,7 @@ export function CandlestickChart({
 
       {/* Options strike breakdown, aligned to the price axis (fullscreen only). */}
       {fullscreen && (
-        <div className="relative w-[230px] shrink-0 border-l border-border-primary pl-1">
+        <div className="relative flex-[0.6] min-w-[160px] border-l border-border-primary pl-1">
           <StrikeHistogram
             series={candleSeriesRef.current}
             rows={optionsData?.rows ?? []}

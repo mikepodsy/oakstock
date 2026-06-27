@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
 import type { OptionStrikeRow } from "@/types";
+import { formatCompactNumber } from "@/utils/formatters";
 
 const POS_COLOR = "#22C55E"; // dealers long gamma (stabilizing)
 const NEG_COLOR = "#EF4444"; // dealers short gamma (accelerant)
@@ -145,6 +146,8 @@ export function GexHistogram({
     return () => cancelAnimationFrame(raf);
   }, [series, rows, flip, epoch]);
 
+  const totalOI = rows.reduce((s, r) => s + r.callOI + r.putOI, 0);
+
   return (
     <div className={`relative ${className ?? ""}`}>
       <canvas ref={canvasRef} className="h-full w-full" />
@@ -158,6 +161,16 @@ export function GexHistogram({
           style={{ color: netGex >= 0 ? POS_COLOR : NEG_COLOR }}
         >
           {formatGexShort(netGex)}
+        </div>
+      </div>
+      {/* Total open-interest contracts behind the gamma, overlaid on the empty
+          axis region at the bottom. */}
+      <div className="absolute inset-x-1 bottom-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
+        <div className="text-[9px] uppercase tracking-wide text-text-tertiary">
+          OI contracts
+        </div>
+        <div className="text-[11px] font-semibold text-text-primary">
+          {formatCompactNumber(totalOI)}
         </div>
       </div>
     </div>

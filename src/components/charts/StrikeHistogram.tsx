@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
 import type { OptionStrikeRow } from "@/types";
+import { formatCompactNumber } from "@/utils/formatters";
 
 // Calls/puts colors, matching the green-up / red-down convention used for the
 // volume bars elsewhere in the chart.
@@ -124,5 +125,40 @@ export function StrikeHistogram({
     return () => cancelAnimationFrame(raf);
   }, [series, rows, metric, epoch]);
 
-  return <canvas ref={canvasRef} className={className} />;
+  const callTotal = rows.reduce(
+    (s, r) => s + (metric === "oi" ? r.callOI : r.callVol),
+    0
+  );
+  const putTotal = rows.reduce(
+    (s, r) => s + (metric === "oi" ? r.putOI : r.putVol),
+    0
+  );
+  const label = metric === "oi" ? "OI" : "Vol";
+
+  return (
+    <div className={`relative ${className ?? ""}`}>
+      <canvas ref={canvasRef} className="h-full w-full" />
+      {/* Total contracts for the active metric, overlaid on the empty axis
+          region at the bottom so the canvas stays full-height + price-aligned. */}
+      <div className="absolute inset-x-1 bottom-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="uppercase tracking-wide text-text-tertiary">
+            {label} contracts
+          </span>
+          <span className="font-semibold text-text-primary">
+            {formatCompactNumber(callTotal + putTotal)}
+          </span>
+        </div>
+        <div className="text-[9px]">
+          <span style={{ color: CALL_COLOR }}>
+            {formatCompactNumber(callTotal)} C
+          </span>
+          <span className="text-text-tertiary"> · </span>
+          <span style={{ color: PUT_COLOR }}>
+            {formatCompactNumber(putTotal)} P
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }

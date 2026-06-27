@@ -517,6 +517,11 @@ export function CandlestickChart({
       options: Record<string, unknown>,
       paneIndex?: number
     ) => {
+      // Price-pane overlays (SMA/EMA/Bollinger/Donchian) must share the candle
+      // series' vertical pan offset, otherwise autoscale stretches to cover both
+      // the shifted candles and the unshifted lines (compressing the view). RSI
+      // lives in its own pane/scale, so it keeps the default autoscale.
+      const onPricePane = paneIndex === undefined || paneIndex === 0;
       const series = chart.addSeries(
         LineSeries,
         {
@@ -524,6 +529,12 @@ export function CandlestickChart({
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
+          ...(onPricePane
+            ? {
+                autoscaleInfoProvider: (d: () => AutoscaleInfo | null) =>
+                  autoscaleProvider(d),
+              }
+            : {}),
           ...options,
         },
         paneIndex
@@ -607,6 +618,7 @@ export function CandlestickChart({
     donchianCfg,
     rsiCfg,
     volumeCfg,
+    autoscaleProvider,
   ]);
 
   // Attach/detach the intraday session-shading background.

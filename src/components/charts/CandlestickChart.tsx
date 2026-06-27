@@ -233,7 +233,7 @@ export function CandlestickChart({
     const down = withAlpha(style.body.down, style.candleDownOpacity);
     const barUp = withAlpha(style.bar.up, style.candleUpOpacity);
     const barDown = withAlpha(style.bar.down, style.candleDownOpacity);
-    const lineColor = cssVar("--text-primary", "#F0EDE8");
+    const lineColor = style.line;
     const text = cssVar("--text-tertiary", "#8b8b8b");
     const bg = withAlpha(style.background, style.backgroundOpacity);
     const grid = cssVar("--border-primary", "#222222");
@@ -343,6 +343,10 @@ export function CandlestickChart({
         (candleSeries as ISeriesApi<"Bar">).applyOptions({
           upColor: barUp,
           downColor: barDown,
+        });
+      } else if (chartType === "line") {
+        (candleSeries as ISeriesApi<"Line">).applyOptions({
+          color: chartStyle.line,
         });
       }
     }

@@ -67,6 +67,19 @@ function BarColorRow() {
   );
 }
 
+// Line chart color — a single swatch (no up/down or visibility).
+function LineColorRow() {
+  const line = useChartStyleStore((s) => s.line);
+  const setLineColor = useChartStyleStore((s) => s.setLineColor);
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="flex-1 pl-6 text-sm text-text-primary">Line</span>
+      <ColorControl value={line} onChange={setLineColor} label="Line color" />
+    </div>
+  );
+}
+
 function OpacitySlider({
   label,
   value,
@@ -102,6 +115,7 @@ export function ChartStyleMenu({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const isBars = chartType === "bars";
+  const isLine = chartType === "line";
 
   const background = useChartStyleStore((s) => s.background);
   const candleUpOpacity = useChartStyleStore((s) => s.candleUpOpacity);
@@ -145,17 +159,23 @@ export function ChartStyleMenu({
         <div className="absolute right-0 z-50 mt-1 w-64 rounded-lg border border-border-primary bg-bg-elevated p-2 shadow-lg">
           <div className="mb-1 flex items-center justify-between px-0.5">
             <span className="text-xs font-medium text-text-tertiary">
-              {isBars ? "Bars" : "Candles"}
+              {isBars ? "Bars" : isLine ? "Line" : "Candles"}
             </span>
-            <span className="flex gap-2 pr-0.5 text-[10px] text-text-tertiary">
-              <span className="w-5 text-center">Up</span>
-              <span className="w-5 text-center">Down</span>
-            </span>
+            {/* The Up/Down column header only applies to candles/bars; a line
+                has a single color. */}
+            {!isLine && (
+              <span className="flex gap-2 pr-0.5 text-[10px] text-text-tertiary">
+                <span className="w-5 text-center">Up</span>
+                <span className="w-5 text-center">Down</span>
+              </span>
+            )}
           </div>
 
-          {/* Bar charts only have up/down colors; the candle body/border/wick
-              controls don't apply, so swap them for a single Bars row. */}
-          {isBars ? (
+          {/* Each chart type exposes only the controls that apply to it: a line
+              has one color, bars have up/down, candles have body/border/wick. */}
+          {isLine ? (
+            <LineColorRow />
+          ) : isBars ? (
             <BarColorRow />
           ) : (
             <>

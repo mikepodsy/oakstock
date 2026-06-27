@@ -21,6 +21,8 @@ import {
   Maximize2,
   Minimize2,
   Minus,
+  PanelRightClose,
+  PanelRightOpen,
   X,
 } from "lucide-react";
 import {
@@ -131,6 +133,8 @@ export function CandlestickChart({
     null
   );
   const [optionsLoading, setOptionsLoading] = useState(false);
+  // Collapse the options panels out of the way so the price chart goes full width.
+  const [panelsCollapsed, setPanelsCollapsed] = useState(false);
   // Bumped whenever the chart is recreated, so the histogram re-binds to the new
   // series instance (refs alone don't trigger a re-render).
   const [chartEpoch, setChartEpoch] = useState(0);
@@ -880,6 +884,8 @@ export function CandlestickChart({
             expiry window, and a calls/puts color legend. */}
         {fullscreen && (
           <span className="ml-auto flex items-center gap-2">
+            {!panelsCollapsed && (
+              <>
             <span className="flex items-center gap-2 text-[11px] text-text-secondary">
               <span className="flex items-center gap-1">
                 <span className="inline-block h-2 w-2 rounded-sm bg-green-primary" />
@@ -927,6 +933,23 @@ export function CandlestickChart({
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setPanelsCollapsed((v) => !v)}
+              title={panelsCollapsed ? "Show options panels" : "Hide options panels"}
+              aria-label={
+                panelsCollapsed ? "Show options panels" : "Hide options panels"
+              }
+              className="flex items-center justify-center rounded-md border border-border-primary bg-bg-elevated/80 p-1.5 text-text-secondary backdrop-blur transition-colors hover:text-text-primary"
+            >
+              {panelsCollapsed ? (
+                <PanelRightOpen className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </button>
           </span>
         )}
       </div>
@@ -1030,8 +1053,8 @@ export function CandlestickChart({
       {/* Gamma exposure by strike, diverging from a center zero line, with the
           zero-gamma flip level (fullscreen only). Sits between the chart and the
           OI/volume panel, matching the reference layout. */}
-      {fullscreen && (
-        <div className="flex-[0.4] min-w-[120px] border-l border-border-primary">
+      {fullscreen && !panelsCollapsed && (
+        <div className="flex-[0.6] min-w-[150px] border-l border-border-primary">
           {optionsData && optionsData.hasGreeks ? (
             <GexHistogram
               series={candleSeriesRef.current}
@@ -1053,7 +1076,7 @@ export function CandlestickChart({
       )}
 
       {/* Options strike breakdown, aligned to the price axis (fullscreen only). */}
-      {fullscreen && (
+      {fullscreen && !panelsCollapsed && (
         <div className="relative flex-[0.6] min-w-[160px] border-l border-border-primary pl-1">
           <StrikeHistogram
             series={candleSeriesRef.current}

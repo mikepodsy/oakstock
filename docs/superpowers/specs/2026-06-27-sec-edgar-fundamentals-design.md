@@ -1,8 +1,41 @@
 # SEC EDGAR Fundamentals — Design
 
 **Date:** 2026-06-27
-**Status:** Approved (brainstorm), ready for implementation plan
+**Status:** Implemented (see Revision below)
 **Author:** Mike + Claude
+
+> **Revision 2026-06-27 — implemented with Supabase persistence + expanded metrics.**
+> The original design (below) deliberately deferred Supabase and used on-demand
+> caching only. Per a follow-up request, the build now **persists to Supabase**
+> via a **lazy-on-demand** strategy (fetch+parse+store on first view, serve from
+> the DB after, refresh when older than 7 days) and adds three metrics
+> (EPS basic, Operating Cash Flow, CapEx) plus a recent-annual summary table.
+> What actually shipped:
+>
+> - **`src/lib/edgar/`** — `cik.ts`, `client.ts`, `concepts.ts`, `compute.ts`,
+>   `parse.ts`, `store.ts`, `index.ts`. Pure parser validated against real AAPL
+>   companyfacts: 72 quarters (2008→2026) + 19 annual years (2007→2025).
+> - **Supabase** (`oakstock` project) — wide `company_financials` table (one row
+>   per ticker/period_type/period_end, a column per metric, USD) +
+>   `company_financials_sync` (per-ticker freshness/source log so non-SEC and
+>   no-data tickers aren't re-fetched every load). SQL in
+>   `supabase/company_financials.sql`.
+> - **`/api/fundamentals`** flow: in-memory cache → Supabase (if `fetched_at`
+>   < 7d) → EDGAR (persist `source='edgar'`) → Yahoo fallback (persist
+>   `source='yahoo'`) → record `source='none'` if nothing. Public contract and
+>   response shape unchanged.
+> - **Frontend** — extended the existing **recharts** `FinancialChartsGrid`
+>   (Operating Cash Flow, CapEx, EPS Basic charts) and added
+>   `FinancialsSummaryTable` (latest 1–2 fiscal years, with derived gross/net
+>   margin and debt/equity). Lightweight-charts remains price-chart-only.
+> - **Type** — `FinancialStatement` gained `operatingCashFlow`, `capex`,
+>   `epsBasic`; Yahoo `mapStatement` populates them too.
+> - **Coverage decision** — lazy growth to exactly the companies users view; the
+>   full-universe batch pipeline was explicitly **not** built (cost/runtime), but
+>   the parser + store are batch-ready if wanted later.
+>
+> The sections below are the original (pre-revision) design and remain accurate
+> for the parsing core.
 
 ## Problem
 

@@ -166,11 +166,14 @@ export interface FinancialStatement {
   revenue: number | null;
   ebitda: number | null;
   freeCashFlow: number | null;
+  operatingCashFlow: number | null;
+  capex: number | null;
   netIncome: number | null;
   grossProfit: number | null;
   operatingIncome: number | null;
   costOfRevenue: number | null;
   eps: number | null;
+  epsBasic: number | null;
   buybacks: number | null;
   dividendsPaid: number | null;
   totalDebt: number | null;

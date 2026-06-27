@@ -53,6 +53,9 @@ export const economicCache = getOrCreateCache<unknown>("economic", 3600);
 export const marketCache = getOrCreateCache<unknown>("market", 3600);
 export const treasuryCache = getOrCreateCache<unknown>("treasury", 3600);
 export const cotCache = getOrCreateCache<unknown[]>("cot", 86400);
+// SEC EDGAR ticker→CIK map rarely changes — cache the whole map for a day.
+// null = ticker known to have no CIK (skip refetch within TTL).
+export const edgarCikCache = getOrCreateCache<Record<string, string> | null>("edgar-cik", 86400);
 export const radarCache = getOrCreateCache<string[]>("radar", 120);
 // Period % return per ticker for Radar timeframes. null = known-failed (skip refetch).
 export const radarReturnsCache = getOrCreateCache<number | null>("radar-returns", 300);

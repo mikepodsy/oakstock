@@ -17,6 +17,9 @@ export interface ChartStyleState {
   body: ColorGroup;
   border: ColorGroup;
   wick: ColorGroup;
+  // OHLC bar up/down colors, independent of the candle body so the Bars chart
+  // type can be colored separately. No visibility toggle — bars are the series.
+  bar: { up: string; down: string };
   background: string;
   candleUpOpacity: number; // 0..1 — alpha applied to the up candle body fill
   candleDownOpacity: number; // 0..1 — alpha applied to the down candle body fill
@@ -30,6 +33,7 @@ export const DEFAULT_CHART_STYLE: ChartStyleState = {
   body: { up: "#22C55E", down: "#EF4444", visible: true },
   border: { up: "#16A34A", down: "#DC2626", visible: true },
   wick: { up: "#22C55E", down: "#EF4444", visible: true },
+  bar: { up: "#22C55E", down: "#EF4444" },
   background: "#000000",
   candleUpOpacity: 1,
   candleDownOpacity: 1,
@@ -62,6 +66,7 @@ export function withAlpha(hex: string, alpha: number): string {
 
 interface ChartStyleStore extends ChartStyleState {
   setColor: (group: ColorGroupId, side: "up" | "down", hex: string) => void;
+  setBarColor: (side: "up" | "down", hex: string) => void;
   toggleVisible: (group: ColorGroupId) => void;
   setBackground: (hex: string) => void;
   setOpacity: (
@@ -80,6 +85,8 @@ export const useChartStyleStore = create<ChartStyleStore>()(
 
       setColor: (group, side, hex) =>
         set((s) => ({ [group]: { ...s[group], [side]: hex } }) as Partial<ChartStyleStore>),
+
+      setBarColor: (side, hex) => set((s) => ({ bar: { ...s.bar, [side]: hex } })),
 
       toggleVisible: (group) =>
         set(
@@ -129,6 +136,7 @@ export const useChartStyleStore = create<ChartStyleStore>()(
         body: s.body,
         border: s.border,
         wick: s.wick,
+        bar: s.bar,
         background: s.background,
         candleUpOpacity: s.candleUpOpacity,
         candleDownOpacity: s.candleDownOpacity,

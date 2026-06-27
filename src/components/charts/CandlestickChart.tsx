@@ -79,6 +79,10 @@ function cssVar(name: string, fallback: string): string {
 // Drawn horizontal lines: a distinct cyan so they read differently from the
 // indicator overlays (blue/amber/purple).
 const DRAW_LINE_COLOR = "#22d3ee";
+// Volume bars stay a fixed green/red regardless of how candles/bars are
+// recolored, so the histogram remains a consistent up/down read.
+const VOLUME_UP = "#22C55E";
+const VOLUME_DOWN = "#EF4444";
 // Stable empty reference so the store selector doesn't churn when a ticker has
 // no lines yet (avoids re-render loops).
 const EMPTY_LINES: { id: string; price: number }[] = [];
@@ -145,7 +149,6 @@ export function CandlestickChart({
   > | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const colorsRef = useRef({ up: "#22C55E", down: "#EF4444" });
   // Dynamically added overlay/oscillator line series, torn down + rebuilt on change.
   const indicatorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const sessionPrimitiveRef = useRef<SessionBackgroundPrimitive | null>(null);
@@ -228,13 +231,12 @@ export function CandlestickChart({
     const style = useChartStyleStore.getState();
     const up = withAlpha(style.body.up, style.candleUpOpacity);
     const down = withAlpha(style.body.down, style.candleDownOpacity);
+    const barUp = withAlpha(style.bar.up, style.candleUpOpacity);
+    const barDown = withAlpha(style.bar.down, style.candleDownOpacity);
     const lineColor = cssVar("--text-primary", "#F0EDE8");
     const text = cssVar("--text-tertiary", "#8b8b8b");
     const bg = withAlpha(style.background, style.backgroundOpacity);
     const grid = cssVar("--border-primary", "#222222");
-    // Volume bars track the candle body colors (opaque, regardless of body fill
-    // opacity) so they stay legible.
-    colorsRef.current = { up: style.body.up, down: style.body.down };
 
     const chart = createChart(containerRef.current, {
       autoSize: true,
@@ -257,7 +259,7 @@ export function CandlestickChart({
 
     const candleSeries =
       chartType === "bars"
-        ? chart.addSeries(BarSeries, { upColor: up, downColor: down })
+        ? chart.addSeries(BarSeries, { upColor: barUp, downColor: barDown })
         : chartType === "line"
           ? chart.addSeries(LineSeries, {
               color: lineColor,
@@ -311,7 +313,8 @@ export function CandlestickChart({
 
     const up = withAlpha(chartStyle.body.up, chartStyle.candleUpOpacity);
     const down = withAlpha(chartStyle.body.down, chartStyle.candleDownOpacity);
-    colorsRef.current = { up: chartStyle.body.up, down: chartStyle.body.down };
+    const barUp = withAlpha(chartStyle.bar.up, chartStyle.candleUpOpacity);
+    const barDown = withAlpha(chartStyle.bar.down, chartStyle.candleDownOpacity);
 
     chart.applyOptions({
       layout: {
@@ -338,8 +341,8 @@ export function CandlestickChart({
         });
       } else if (chartType === "bars") {
         (candleSeries as ISeriesApi<"Bar">).applyOptions({
-          upColor: up,
-          downColor: down,
+          upColor: barUp,
+          downColor: barDown,
         });
       }
     }
@@ -351,8 +354,6 @@ export function CandlestickChart({
     const volumeSeries = volumeSeriesRef.current;
     const chart = chartRef.current;
     if (!candleSeries || !volumeSeries || !chart || data.length === 0) return;
-
-    const { up, down } = colorsRef.current;
 
     if (chartType === "line") {
       (candleSeries as ISeriesApi<"Line">).setData(
@@ -377,7 +378,7 @@ export function CandlestickChart({
       data.map((c) => ({
         time: (Date.parse(c.time) / 1000) as UTCTimestamp,
         value: c.volume,
-        color: c.close >= c.open ? up : down,
+        color: c.close >= c.open ? VOLUME_UP : VOLUME_DOWN,
       }))
     );
 
@@ -795,7 +796,7 @@ export function CandlestickChart({
         <IndicatorsMenu isIntraday={isIntraday} />
 
         {/* Candle/background colors + opacity (persisted globally). */}
-        <ChartStyleMenu />
+        <ChartStyleMenu chartType={chartType} />
 
         {/* Horizontal lines: double-click the chart to add one. This button
             shows the count and clears them all. */}

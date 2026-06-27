@@ -44,6 +44,29 @@ function CandlePartRow({ id, label }: { id: ColorGroupId; label: string }) {
   );
 }
 
+// OHLC bar up/down colors — no visibility toggle (bars are the series itself).
+// Indented to align with the candle rows, which carry a leading checkbox.
+function BarColorRow() {
+  const bar = useChartStyleStore((s) => s.bar);
+  const setBarColor = useChartStyleStore((s) => s.setBarColor);
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="flex-1 pl-6 text-sm text-text-primary">Bars</span>
+      <ColorControl
+        value={bar.up}
+        onChange={(hex) => setBarColor("up", hex)}
+        label="Bar up"
+      />
+      <ColorControl
+        value={bar.down}
+        onChange={(hex) => setBarColor("down", hex)}
+        label="Bar down"
+      />
+    </div>
+  );
+}
+
 function OpacitySlider({
   label,
   value,
@@ -71,9 +94,14 @@ function OpacitySlider({
   );
 }
 
-export function ChartStyleMenu() {
+export function ChartStyleMenu({
+  chartType,
+}: {
+  chartType: "candles" | "bars" | "line";
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const isBars = chartType === "bars";
 
   const background = useChartStyleStore((s) => s.background);
   const candleUpOpacity = useChartStyleStore((s) => s.candleUpOpacity);
@@ -116,16 +144,26 @@ export function ChartStyleMenu() {
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-64 rounded-lg border border-border-primary bg-bg-elevated p-2 shadow-lg">
           <div className="mb-1 flex items-center justify-between px-0.5">
-            <span className="text-xs font-medium text-text-tertiary">Candles</span>
+            <span className="text-xs font-medium text-text-tertiary">
+              {isBars ? "Bars" : "Candles"}
+            </span>
             <span className="flex gap-2 pr-0.5 text-[10px] text-text-tertiary">
               <span className="w-5 text-center">Up</span>
               <span className="w-5 text-center">Down</span>
             </span>
           </div>
 
-          <CandlePartRow id="body" label="Body" />
-          <CandlePartRow id="border" label="Borders" />
-          <CandlePartRow id="wick" label="Wick" />
+          {/* Bar charts only have up/down colors; the candle body/border/wick
+              controls don't apply, so swap them for a single Bars row. */}
+          {isBars ? (
+            <BarColorRow />
+          ) : (
+            <>
+              <CandlePartRow id="body" label="Body" />
+              <CandlePartRow id="border" label="Borders" />
+              <CandlePartRow id="wick" label="Wick" />
+            </>
+          )}
 
           <div className="my-1 border-t border-border-primary" />
 

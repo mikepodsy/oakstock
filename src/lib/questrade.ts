@@ -39,6 +39,38 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
+// Cap how long we wait on any Questrade HTTP call. Without this, a stalled
+// endpoint (e.g. the OAuth token host hanging) leaves the request — and the
+// chart waiting on it — hung indefinitely. With it, the call fails fast and the
+// caller can surface an error instead of spinning forever.
+const REQUEST_TIMEOUT_MS = 12_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      const host = (() => {
+        try {
+          return new URL(url).host;
+        } catch {
+          return url;
+        }
+      })();
+      throw new Error(
+        `Questrade request to ${host} timed out after ${REQUEST_TIMEOUT_MS}ms`
+      );
+    }
+    throw err;
+  }
+}
+
 async function loadAuthRow(): Promise<AuthRow> {
   const supabase = createServerSupabaseClient();
 
@@ -74,7 +106,7 @@ async function loadAuthRow(): Promise<AuthRow> {
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<QuestradeAuth> {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${LOGIN_HOST}/oauth2/token?grant_type=refresh_token&refresh_token=${refreshToken}`,
     { method: "GET" }
   );
@@ -135,7 +167,7 @@ export async function getQuestradeAuth(forceRefresh = false): Promise<QuestradeA
 /** Authenticated GET against the account's Questrade api_server. */
 export async function questradeGet<T>(path: string): Promise<T> {
   let auth = await getQuestradeAuth();
-  let res = await fetch(`${auth.apiServer}${path}`, {
+  let res = await fetchWithTimeout(`${auth.apiServer}${path}`, {
     headers: { Authorization: `Bearer ${auth.accessToken}` },
   });
 
@@ -143,7 +175,7 @@ export async function questradeGet<T>(path: string): Promise<T> {
   // a newer token is issued). On 401, force a refresh once and retry.
   if (res.status === 401) {
     auth = await getQuestradeAuth(true);
-    res = await fetch(`${auth.apiServer}${path}`, {
+    res = await fetchWithTimeout(`${auth.apiServer}${path}`, {
       headers: { Authorization: `Bearer ${auth.accessToken}` },
     });
   }

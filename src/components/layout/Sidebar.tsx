@@ -39,7 +39,7 @@ const NAV_LINKS = [
   { href: "/economic", label: "Economic", icon: TrendingUp },
   { href: "/cot", label: "COT Report", icon: BarChart2 },
   { href: "/dcf", label: "DCF", icon: Calculator },
-  { href: "/experts", label: "Experts", icon: Users },
+  { href: "/experts", label: "Superinvestors", icon: Users },
 ];
 
 const STORAGE_KEY = "oakstock-sidebar-collapsed";

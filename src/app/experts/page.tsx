@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { ManagerLogo } from "@/components/shared/ManagerLogo";
+import { MarketSummary } from "./MarketSummary";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TopHolding {
@@ -221,7 +222,7 @@ export default function ExpertsPage() {
       <div className="shrink-0 px-6 pt-6 pb-4">
         <div className="flex items-start justify-between gap-4 mb-1">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">Experts</h1>
+            <h1 className="text-2xl font-bold text-text-primary">Superinvestors</h1>
             <p className="text-text-secondary text-sm mt-1">
               13F portfolios of the world&apos;s top value investors · via Dataroma
             </p>
@@ -250,6 +251,7 @@ export default function ExpertsPage() {
 
       {/* Grid */}
       <div className="flex-1 px-6 pb-6">
+        <MarketSummary />
         {error ? (
           <div className="flex items-center justify-center h-48 text-red-400 text-sm">
             Failed to load data: {error}

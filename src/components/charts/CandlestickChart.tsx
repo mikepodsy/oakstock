@@ -14,6 +14,7 @@ import {
   type ISeriesApi,
   type IPriceLine,
   type UTCTimestamp,
+  type AutoscaleInfo,
 } from "lightweight-charts";
 import {
   ChevronsRight,
@@ -172,6 +173,37 @@ export function CandlestickChart({
   const [hover, setHover] = useState<{ id: string; y: number } | null>(null);
   const priceLineRefs = useRef<Map<string, IPriceLine>>(new Map());
   const dragRef = useRef<string | null>(null);
+  // Vertical price-pan offset (price units) added to the autoscaled range so the
+  // user can drag the candles up/down into empty space. 0 = normal autoscale.
+  const priceOffsetRef = useRef(0);
+
+  // Shift the autoscaled price range by priceOffsetRef so the candles can be
+  // dragged vertically into empty space. lightweight-charts has no direct price
+  // pan, so we customize its autoscale instead.
+  const autoscaleProvider = useCallback(
+    (getDefault: () => AutoscaleInfo | null): AutoscaleInfo | null => {
+      const base = getDefault();
+      const off = priceOffsetRef.current;
+      if (!base || !base.priceRange || off === 0) return base;
+      return {
+        priceRange: {
+          minValue: base.priceRange.minValue + off,
+          maxValue: base.priceRange.maxValue + off,
+        },
+        margins: base.margins,
+      };
+    },
+    []
+  );
+
+  // Re-run autoscale so the offset above takes effect (a fresh closure forces
+  // lightweight-charts to recompute rather than skip an unchanged provider).
+  const forceRefit = useCallback(() => {
+    candleSeriesRef.current?.applyOptions({
+      autoscaleInfoProvider: (d: () => AutoscaleInfo | null) =>
+        autoscaleProvider(d),
+    });
+  }, [autoscaleProvider]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<ISeriesApi<
@@ -311,14 +343,21 @@ export function CandlestickChart({
       },
     });
 
+    const autoscaleInfoProvider = (d: () => AutoscaleInfo | null) =>
+      autoscaleProvider(d);
     const candleSeries =
       chartType === "bars"
-        ? chart.addSeries(BarSeries, { upColor: barUp, downColor: barDown })
+        ? chart.addSeries(BarSeries, {
+            upColor: barUp,
+            downColor: barDown,
+            autoscaleInfoProvider,
+          })
         : chartType === "line"
           ? chart.addSeries(LineSeries, {
               color: lineColor,
               lineWidth: 2,
               priceLineVisible: false,
+              autoscaleInfoProvider,
             })
           : chart.addSeries(CandlestickSeries, {
               upColor: up,
@@ -329,6 +368,7 @@ export function CandlestickChart({
               wickVisible: style.wick.visible,
               wickUpColor: style.wick.up,
               wickDownColor: style.wick.down,
+              autoscaleInfoProvider,
             });
     candleSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.1, bottom: 0.25 },
@@ -357,7 +397,7 @@ export function CandlestickChart({
       indicatorSeriesRef.current = [];
       sessionPrimitiveRef.current = null;
     };
-  }, [theme, chartType]);
+  }, [theme, chartType, autoscaleProvider]);
 
   // Apply candle/background style live to the existing chart + series. Runs on
   // any style change (and after the chart is recreated, since the candle series
@@ -662,50 +702,100 @@ export function CandlestickChart({
   // is suspended for the duration so the drag doesn't scroll the chart.
   const onChartMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (!hover) return;
       const series = candleSeriesRef.current;
       const chart = chartRef.current;
       if (!series || !chart) return;
-      const id = hover.id;
-      e.preventDefault();
-      dragRef.current = id;
-      chart.applyOptions({ handleScroll: false, handleScale: false });
-      let lastPrice = lines.find((l) => l.id === id)?.price ?? null;
 
+      // On a line → drag the line vertically (existing behavior).
+      if (hover) {
+        const id = hover.id;
+        e.preventDefault();
+        dragRef.current = id;
+        chart.applyOptions({ handleScroll: false, handleScale: false });
+        let lastPrice = lines.find((l) => l.id === id)?.price ?? null;
+
+        const move = (ev: MouseEvent) => {
+          const yc = relativeY(ev.clientY);
+          if (yc == null) return;
+          const price = series.coordinateToPrice(yc);
+          if (price == null) return;
+          lastPrice = roundPrice(price);
+          priceLineRefs.current.get(id)?.applyOptions({ price: lastPrice });
+          setHover({ id, y: yc });
+        };
+        const up = () => {
+          window.removeEventListener("mousemove", move);
+          window.removeEventListener("mouseup", up);
+          dragRef.current = null;
+          chartRef.current?.applyOptions({ handleScroll: true, handleScale: true });
+          if (lastPrice != null) moveLine(ticker, id, lastPrice);
+        };
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+        return;
+      }
+
+      // Otherwise → drag the chart body up/down to pan price into empty space.
+      // Skip the price axis itself so its native scaling still works.
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const axisW = chart.priceScale("right").width() ?? 0;
+      if (e.clientX - rect.left > rect.width - axisW) return;
+
+      // Price-per-pixel from two sample coordinates (independent of margins).
+      const pA = series.coordinateToPrice(100);
+      const pB = series.coordinateToPrice(200);
+      if (pA == null || pB == null) return;
+      const pricePerPixel = (pA - pB) / 100;
+
+      const startY = e.clientY;
+      const off0 = priceOffsetRef.current;
+      dragRef.current = "__pan__"; // suppresses line hover while panning
+
+      // Leave native scrolling enabled: a horizontal drag still scrolls time
+      // while this adds the vertical price offset — diagonal drags do both.
       const move = (ev: MouseEvent) => {
-        const yc = relativeY(ev.clientY);
-        if (yc == null) return;
-        const price = series.coordinateToPrice(yc);
-        if (price == null) return;
-        lastPrice = roundPrice(price);
-        priceLineRefs.current.get(id)?.applyOptions({ price: lastPrice });
-        setHover({ id, y: yc });
+        priceOffsetRef.current = off0 + (ev.clientY - startY) * pricePerPixel;
+        forceRefit();
       };
       const up = () => {
         window.removeEventListener("mousemove", move);
         window.removeEventListener("mouseup", up);
         dragRef.current = null;
-        chartRef.current?.applyOptions({ handleScroll: true, handleScale: true });
-        if (lastPrice != null) moveLine(ticker, id, lastPrice);
       };
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
     },
-    [hover, lines, moveLine, relativeY, ticker]
+    [hover, lines, moveLine, relativeY, ticker, forceRefit]
   );
 
-  // Double-click anywhere on the chart to drop a new horizontal line there.
+  // Double-click the price axis to reset the vertical pan back to autoscale;
+  // double-click anywhere else to drop a new horizontal line.
   const onChartDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       const series = candleSeriesRef.current;
       const yc = relativeY(e.clientY);
       if (yc == null || !series) return;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      const axisW = chartRef.current?.priceScale("right").width() ?? 0;
+      if (rect && e.clientX - rect.left > rect.width - axisW) {
+        priceOffsetRef.current = 0;
+        forceRefit();
+        return;
+      }
+
       const price = series.coordinateToPrice(yc);
       if (price == null) return;
       addLine(ticker, roundPrice(price));
     },
-    [addLine, relativeY, ticker]
+    [addLine, relativeY, ticker, forceRefit]
   );
+
+  // A fresh symbol or timeframe should start from a clean autoscale.
+  useEffect(() => {
+    priceOffsetRef.current = 0;
+  }, [ticker, interval]);
 
   const isUp =
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;

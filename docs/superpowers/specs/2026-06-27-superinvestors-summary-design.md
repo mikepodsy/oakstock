@@ -38,7 +38,7 @@ Notes:
 
 | column | type | notes |
 |--------|------|-------|
-| `id` | uuid / bigint PK | |
+| `id` | uuid PK (`gen_random_uuid()`) | follows existing table convention |
 | `widget_key` | text | one of the five keys above |
 | `rank` | int | 1–10 |
 | `ticker` | text | |
@@ -47,20 +47,22 @@ Notes:
 | `quarter` | text null | label like "Q1 2026" |
 | `updated_at` | timestamptz | set on each refresh |
 
-Unique constraint on `(widget_key, rank)` for idempotent upserts. Migration created via Supabase (mirrors how `expert_holdings` was set up).
+Unique constraint on `(widget_key, rank)`. Refresh uses a plain **upsert on `(widget_key, rank)`** (exactly 10 rows replace 10 rows — no delete/insert race). Migration created via Supabase (mirrors how `expert_holdings` was set up).
 
 **New route `POST/GET /api/superinvestors/summary/refresh`:**
 - Iterates the five URLs (throttled by `DELAY_MS`), fetches with browser headers, parses the top 10 rows of each.
 - Per-URL `try/catch`: a failed fetch/parse **leaves that widget's existing rows intact** (does not wipe), and is reported in the JSON result. Only successfully-parsed widgets are replaced.
-- Replace strategy per widget: delete the widget's 10 rows, insert the fresh 10 (or upsert on `(widget_key, rank)`), then stamp `updated_at`.
+- Replace strategy per widget: upsert the fresh 10 rows on `(widget_key, rank)`, then stamp `updated_at`.
 - GET delegates to POST for easy browser/cron triggering (same pattern as the existing experts refresh).
 
 **New route `GET /api/superinvestors/summary`:**
 - Reads all rows, groups by `widget_key`, returns `{ widgets: { most_owned: [...], buys_1q: [...], ... }, quarter, updated_at }`.
 - **Staleness handling (auto-refresh):**
-  - If the table is **empty** → trigger refresh **synchronously**, then return fresh data.
-  - If data is **stale** (`max(updated_at)` older than ~24h) → return cached rows **immediately** and fire the refresh in the **background** (fire-and-forget), so the read path stays fast.
+  - If the table is **empty** (first-ever load) → trigger refresh **synchronously**, then return fresh data. This cold path fetches 5 throttled URLs and can take ~2–5s; acceptable because it only happens once.
+  - If data is **stale** (`max(updated_at)` — the freshest widget — older than ~24h) → return cached rows **immediately** and trigger the refresh in the **background** via Next.js `waitUntil` (from `next/server` / `@vercel/functions`), so the work survives the response returning on serverless and the read path stays fast.
   - If fresh → return cached rows.
+
+  Staleness keys off the freshest widget's `updated_at`; with per-widget failure isolation an individual widget may lag, which is acceptable.
 - Sets `Cache-Control: s-maxage=3600, stale-while-revalidate=86400` like `GET /api/experts`.
 
 ## UI

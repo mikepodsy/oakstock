@@ -35,6 +35,7 @@ import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { IndicatorsMenu } from "./IndicatorsMenu";
 import { ChartStyleMenu } from "./ChartStyleMenu";
 import { StrikeHistogram } from "./StrikeHistogram";
+import { GexHistogram } from "./GexHistogram";
 import { SessionBackgroundPrimitive } from "./sessionBackground";
 import { fetchQuestradeCandles, fetchOptionStrikes } from "@/services/questrade";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
@@ -1025,6 +1026,30 @@ export function CandlestickChart({
           </div>
         ) : null}
       </div>
+
+      {/* Gamma exposure by strike, diverging from a center zero line, with the
+          zero-gamma flip level (fullscreen only). Sits between the chart and the
+          OI/volume panel, matching the reference layout. */}
+      {fullscreen && (
+        <div className="w-[150px] shrink-0 border-l border-border-primary">
+          {optionsData && optionsData.hasGreeks ? (
+            <GexHistogram
+              series={candleSeriesRef.current}
+              rows={optionsData.rows}
+              flip={optionsData.flip}
+              netGex={optionsData.netGex}
+              epoch={chartEpoch}
+              className="h-full w-full"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-3 text-center">
+              <p className="text-xs text-text-secondary">
+                {optionsLoading ? "Loading GEX…" : "No gamma data"}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Options strike breakdown, aligned to the price axis (fullscreen only). */}
       {fullscreen && (

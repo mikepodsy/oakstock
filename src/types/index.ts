@@ -128,6 +128,9 @@ export interface OptionStrikeRow {
   putOI: number;
   callVol: number;
   putVol: number;
+  // Net dealer gamma exposure at this strike (call GEX − put GEX), in dollars of
+  // hedging per 1% move in spot. 0 when greeks/spot are unavailable.
+  gex: number;
 }
 
 export interface OptionsExpiry {
@@ -140,9 +143,14 @@ export interface OptionsChainResponse {
   expiries: OptionsExpiry[]; // every listed expiry (for the window dropdown)
   spot: number | null; // underlying last price
   asOf: string; // ISO timestamp of this aggregation
-  // True when at least one contract reported a non-null gamma — a cheap signal
-  // for whether the Phase 2 GEX panel will have data to work with.
+  // True when at least one contract reported a non-null gamma — i.e. the GEX
+  // panel has data to work with.
   hasGreeks: boolean;
+  // Sum of per-strike net GEX across the window (dollars per 1% move).
+  netGex: number;
+  // Approximate zero-gamma flip price (cumulative net GEX crosses zero), or null
+  // when it never crosses within the strike band.
+  flip: number | null;
 }
 
 export interface PortfolioChartPoint {

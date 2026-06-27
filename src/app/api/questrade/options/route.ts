@@ -46,6 +46,23 @@ interface SymbolQuotesResponse {
   quotes: Array<{ lastTradePrice: number | null }>;
 }
 
+// Approximate zero-gamma flip: walk strikes low→high accumulating net GEX and
+// linearly interpolate the price where the running total crosses zero.
+function computeFlip(rows: OptionStrikeRow[]): number | null {
+  let cum = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const prev = cum;
+    cum += rows[i].gex;
+    if (i > 0 && prev !== 0 && Math.sign(cum) !== Math.sign(prev)) {
+      const s0 = rows[i - 1].strike;
+      const s1 = rows[i].strike;
+      const t = prev / (prev - cum); // fraction of the gap where cum hits 0
+      return Number((s0 + t * (s1 - s0)).toFixed(2));
+    }
+  }
+  return null;
+}
+
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -165,8 +182,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Aggregate quotes into per-strike rows.
+    // Aggregate quotes into per-strike rows. Gamma×OI is summed separately per
+    // side so we can derive net GEX once spot is known.
     const byStrike = new Map<number, OptionStrikeRow>();
+    const gammaAcc = new Map<number, { call: number; put: number }>();
     let hasGreeks = false;
 
     for (const batch of chunk(ids, QUOTE_BATCH_SIZE)) {
@@ -178,11 +197,10 @@ export async function GET(request: NextRequest) {
         const strike = strikeOf.get(q.symbolId);
         const side = sideOf.get(q.symbolId);
         if (strike === undefined || side === undefined) continue;
-        if (q.gamma != null) hasGreeks = true;
 
         let row = byStrike.get(strike);
         if (!row) {
-          row = { strike, callOI: 0, putOI: 0, callVol: 0, putVol: 0 };
+          row = { strike, callOI: 0, putOI: 0, callVol: 0, putVol: 0, gex: 0 };
           byStrike.set(strike, row);
         }
         const oi = q.openInterest ?? 0;
@@ -194,10 +212,28 @@ export async function GET(request: NextRequest) {
           row.putOI += oi;
           row.putVol += vol;
         }
+
+        if (q.gamma != null) {
+          hasGreeks = true;
+          const g = gammaAcc.get(strike) ?? { call: 0, put: 0 };
+          if (side === "call") g.call += q.gamma * oi;
+          else g.put += q.gamma * oi;
+          gammaAcc.set(strike, g);
+        }
       }
     }
 
     const rows = [...byStrike.values()].sort((a, b) => a.strike - b.strike);
+
+    // Net dealer GEX per strike (dollars hedged per 1% move): calls add, puts
+    // subtract, scaled by spot²·0.01·contract-multiplier.
+    const gexScale = spot != null ? spot * spot * 0.01 * 100 : 0;
+    for (const r of rows) {
+      const g = gammaAcc.get(r.strike);
+      r.gex = g ? gexScale * (g.call - g.put) : 0;
+    }
+    const netGex = rows.reduce((sum, r) => sum + r.gex, 0);
+    const flip = gexScale > 0 ? computeFlip(rows) : null;
 
     const payload: OptionsChainResponse = {
       rows,
@@ -205,6 +241,8 @@ export async function GET(request: NextRequest) {
       spot,
       asOf: new Date().toISOString(),
       hasGreeks,
+      netGex,
+      flip,
     };
 
     questradeOptionsCache.set(cacheKey, payload);

@@ -257,10 +257,13 @@ export function CandlestickChart({
     };
   }, [ticker]);
 
-  // Jump back to the most recent candle.
+  // Jump back to the most recent candle: scroll to real time and clear any
+  // vertical price pan so the latest candle re-centers in the frame.
   const goToLatest = useCallback(() => {
+    priceOffsetRef.current = 0;
+    forceRefit();
     chartRef.current?.timeScale().scrollToRealTime();
-  }, []);
+  }, [forceRefit]);
 
   // Lazily fetch the options strike breakdown — only while fullscreen, and
   // re-fetch on ticker/window change. Keeps the embedded chart off the options

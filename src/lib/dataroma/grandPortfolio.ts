@@ -3,6 +3,7 @@
 
 export type WidgetKey =
   | "most_owned"
+  | "most_owned_pct"
   | "buys_1q"
   | "buys_2q"
   | "sells_1q"
@@ -20,7 +21,8 @@ export interface WidgetConfig {
 }
 
 export const WIDGETS: WidgetConfig[] = [
-  { key: "most_owned", title: "Most Owned",         path: "g/portfolio.php?o=c",        metricHeader: "Ownership", metricVerb: "own"  },
+  { key: "most_owned",     title: "Most Owned",          path: "g/portfolio.php?o=c",        metricHeader: "Ownership", metricVerb: "own"  },
+  { key: "most_owned_pct", title: "Most Owned · % Port", path: "g/portfolio.php?pct=0&o=p",  metricHeader: "%",         metricVerb: "%"    },
   { key: "buys_1q",    title: "Buys · Last Qtr",     path: "g/portfolio_b.php?q=q&o=c",  metricHeader: "Buys",      metricVerb: "buy"  },
   { key: "buys_2q",    title: "Buys · Last 2 Qtrs",  path: "g/portfolio_b.php?q=h&o=c",  metricHeader: "Buys",      metricVerb: "buy"  },
   { key: "sells_1q",   title: "Sells · Last Qtr",    path: "g/portfolio_s.php?q=q&o=c",  metricHeader: "Sells",     metricVerb: "sell" },
@@ -49,8 +51,10 @@ function stripTags(html: string): string {
     .trim();
 }
 
-function toInt(raw: string): number {
-  const n = parseInt(raw.replace(/[^0-9-]/g, ""), 10);
+// Metrics are usually integer counts (owners/buyers/sellers) but "Most Owned · %"
+// is fractional (e.g. 2.049% of aggregate portfolio), so keep the decimal.
+function toNum(raw: string): number {
+  const n = parseFloat(raw.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -103,7 +107,7 @@ export function parseGrandPortfolio(
       rank: rows.length + 1,
       ticker,
       company_name: stockIdx >= 0 ? (cells[stockIdx] ?? "").trim() : "",
-      metric: toInt(cells[metricIdx] ?? ""),
+      metric: toNum(cells[metricIdx] ?? ""),
     });
     if (rows.length >= limit) break;
   }

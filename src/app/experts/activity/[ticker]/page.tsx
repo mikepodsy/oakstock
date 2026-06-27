@@ -3,16 +3,18 @@
 import { use, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Building2 } from "lucide-react";
 import { ManagerLogo } from "@/components/shared/ManagerLogo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Action = "buy" | "sell";
+type View = "own" | "buy" | "sell";
 
 interface FundActivity {
   manager: string;
   managerCode: string;
   activity: string;
+  action: Action | null;
   pct_portfolio: number;
   shares: number;
   value_usd: number;
@@ -22,7 +24,7 @@ interface FundActivity {
 interface ActivityResponse {
   ticker: string;
   company_name: string;
-  action: Action;
+  action: View;
   funds: FundActivity[];
 }
 
@@ -35,8 +37,15 @@ function formatUSD(n: number): string {
 }
 
 // ── Row ───────────────────────────────────────────────────────────────────────
-function FundRow({ fund, action }: { fund: FundActivity; action: Action }) {
-  const tone = action === "buy" ? "text-emerald-500" : "text-red-400";
+function FundRow({ fund }: { fund: FundActivity }) {
+  // Colour the recent-activity label by the fund's own move (green buy / red sell);
+  // holders with no recent trade (own view) simply omit the label.
+  const tone =
+    fund.action === "buy"
+      ? "text-emerald-500"
+      : fund.action === "sell"
+        ? "text-red-400"
+        : "text-text-tertiary";
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-primary last:border-b-0">
       <div className="flex items-center gap-3 min-w-0">
@@ -57,7 +66,9 @@ function FundRow({ fund, action }: { fund: FundActivity; action: Action }) {
         </div>
       </div>
       <div className="flex items-center gap-4 shrink-0">
-        <span className={`text-sm font-medium ${tone}`}>{fund.activity}</span>
+        {fund.activity.trim() && (
+          <span className={`text-sm font-medium ${tone}`}>{fund.activity}</span>
+        )}
         <span className="text-text-secondary text-sm w-20 text-right">
           {formatUSD(fund.value_usd)}
         </span>
@@ -74,7 +85,8 @@ export default function StockActivityPage({
 }) {
   const { ticker } = use(params);
   const searchParams = useSearchParams();
-  const action: Action = searchParams.get("action") === "sell" ? "sell" : "buy";
+  const param = searchParams.get("action");
+  const action: View = param === "sell" ? "sell" : param === "own" ? "own" : "buy";
 
   const [data, setData] = useState<ActivityResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,9 +116,21 @@ export default function StockActivityPage({
     };
   }, [ticker, action]);
 
-  const verb = action === "buy" ? "buying" : "selling";
-  const Icon = action === "buy" ? TrendingUp : TrendingDown;
-  const tone = action === "buy" ? "text-emerald-500" : "text-red-400";
+  const verb = action === "buy" ? "buying" : action === "sell" ? "selling" : "holding";
+  const Icon =
+    action === "buy" ? TrendingUp : action === "sell" ? TrendingDown : Building2;
+  const tone =
+    action === "buy"
+      ? "text-emerald-500"
+      : action === "sell"
+        ? "text-red-400"
+        : "text-text-secondary";
+  const subtitle =
+    action === "buy"
+      ? "added to or opened"
+      : action === "sell"
+        ? "trimmed or closed"
+        : "currently hold";
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -132,7 +156,7 @@ export default function StockActivityPage({
         </div>
         <p className="text-text-secondary text-sm">
           {data?.company_name ? `${data.company_name} · ` : ""}
-          Superinvestors who {action === "buy" ? "added to or opened" : "trimmed or closed"} this position last quarter · via Dataroma
+          Superinvestors who {subtitle} this position{action === "own" ? "" : " last quarter"} · via Dataroma
         </p>
       </div>
 
@@ -159,12 +183,12 @@ export default function StockActivityPage({
           </div>
         ) : !data || data.funds.length === 0 ? (
           <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
-            No funds {verb} {data?.ticker || ticker.toUpperCase()} last quarter.
+            No funds {verb} {data?.ticker || ticker.toUpperCase()}{action === "own" ? "." : " last quarter."}
           </div>
         ) : (
           <div className="bg-bg-secondary border border-border-primary rounded-2xl overflow-hidden">
             {data.funds.map((fund) => (
-              <FundRow key={fund.managerCode} fund={fund} action={action} />
+              <FundRow key={fund.managerCode} fund={fund} />
             ))}
           </div>
         )}

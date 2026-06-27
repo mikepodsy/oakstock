@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import {
   parseStockActivity,
-  type Action,
+  selectFunds,
+  type ActivityView,
 } from "@/lib/dataroma/stockActivity";
 
 const DATAROMA_STOCK = "https://www.dataroma.com/m/stock.php?sym=";
@@ -29,7 +30,8 @@ export async function GET(
   }
 
   const actionParam = request.nextUrl.searchParams.get("action");
-  const action: Action = actionParam === "sell" ? "sell" : "buy";
+  const action: ActivityView =
+    actionParam === "sell" ? "sell" : actionParam === "own" ? "own" : "buy";
 
   try {
     const res = await fetch(DATAROMA_STOCK + encodeURIComponent(ticker), {
@@ -44,7 +46,7 @@ export async function GET(
     }
 
     const parsed = parseStockActivity(await res.text());
-    const funds = parsed.funds[action];
+    const funds = selectFunds(parsed, action);
 
     // Resolve real fund logos: Dataroma's firm code (?m=CODE) matches our roster's
     // expert_managers.dataroma_code, which carries the brand logo domain. Funds

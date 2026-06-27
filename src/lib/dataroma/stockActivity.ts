@@ -2,15 +2,20 @@
 // No fetching here — keeps it trivially testable and reusable, mirroring
 // grandPortfolio.ts.
 
+/** Recent-trade classification of a holder. `null` = held with no recent change. */
 export type Action = "buy" | "sell";
+/** A page "view": the funds that own / bought / sold the stock. */
+export type ActivityView = "own" | "buy" | "sell";
 
 export interface FundActivity {
   /** Full label, e.g. "Warren Buffett - Berkshire Hathaway". */
   manager: string;
   /** Dataroma fund code from holdings.php?m=CODE, e.g. "BRK". */
   managerCode: string;
-  /** Raw activity label, e.g. "Buy", "Add 4.41%", "Reduce 10.55%". */
+  /** Raw activity label, e.g. "Buy", "Add 4.41%", "Reduce 10.55%", or "". */
   activity: string;
+  /** buy/sell classification of the activity label, or null if no recent trade. */
+  action: Action | null;
   pct_portfolio: number;
   shares: number;
   value_usd: number;
@@ -21,7 +26,17 @@ export interface ParsedStockActivity {
   ticker: string;
   /** Clean company name without the ticker suffix, e.g. "Apple Inc.". */
   company_name: string;
-  funds: Record<Action, FundActivity[]>;
+  /** Every superinvestor holding the stock, in Dataroma's order (% of portfolio desc). */
+  holders: FundActivity[];
+}
+
+/** Filter parsed holders down to a page view (own = all, buy/sell = by activity). */
+export function selectFunds(
+  parsed: ParsedStockActivity,
+  view: ActivityView,
+): FundActivity[] {
+  if (view === "own") return parsed.holders;
+  return parsed.holders.filter((f) => f.action === view);
 }
 
 function stripTags(html: string): string {
@@ -61,11 +76,11 @@ export function parseStockActivity(html: string): ParsedStockActivity {
   const company_name = nameMatch ? nameMatch[1].trim() : stripTags(nameRaw);
   const ticker = nameMatch ? nameMatch[2].trim() : "";
 
-  const funds: Record<Action, FundActivity[]> = { buy: [], sell: [] };
+  const holders: FundActivity[] = [];
 
   // Holdings live in <table id="grid"> … the <tbody> holds one <tr> per fund.
   const grid = /<table[^>]*id="grid"[^>]*>([\s\S]*?)<\/table>/i.exec(html)?.[1];
-  if (!grid) return { ticker, company_name, funds };
+  if (!grid) return { ticker, company_name, holders };
   const tbody = /<tbody>([\s\S]*?)<\/tbody>/i.exec(grid)?.[1] ?? "";
 
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
@@ -84,18 +99,16 @@ export function parseStockActivity(html: string): ParsedStockActivity {
     if (cells.length < 6) continue;
 
     const activity = cells[3];
-    const action = classifyActivity(activity);
-    if (!action) continue;
-
-    funds[action].push({
+    holders.push({
       manager: stripTags(firm[2]).trim(),
       managerCode: firm[1].trim(),
       activity,
+      action: classifyActivity(activity),
       pct_portfolio: toNumber(cells[2]),
       shares: Math.round(toNumber(cells[4])),
       value_usd: Math.round(toNumber(cells[5])),
     });
   }
 
-  return { ticker, company_name, funds };
+  return { ticker, company_name, holders };
 }

@@ -9,7 +9,7 @@ type WidgetRow = SummaryRow & { quarter: string | null };
 type SummaryDbRow = WidgetRow & { widget_key: string; updated_at: string };
 
 function emptyWidgets(): Record<WidgetKey, WidgetRow[]> {
-  return { most_owned: [], buys_1q: [], buys_2q: [], sells_1q: [], sells_2q: [] };
+  return { most_owned: [], most_owned_pct: [], buys_1q: [], buys_2q: [], sells_1q: [], sells_2q: [] };
 }
 
 async function readRows(

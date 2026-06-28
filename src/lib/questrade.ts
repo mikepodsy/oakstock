@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { questradeSymbolCache } from "@/lib/cache";
+import { singleFlight } from "@/lib/singleFlight";
 
 // Questrade OAuth + market-data helper.
 //
@@ -143,6 +144,16 @@ async function refreshAccessToken(refreshToken: string): Promise<QuestradeAuth> 
   return { accessToken: token.access_token, apiServer };
 }
 
+// Coalesce concurrent refreshes. Questrade refresh tokens are SINGLE-USE, so if
+// several parallel requests (e.g. the Mag 7 alerts route fetching 7 tickers at
+// once) each kick off their own refresh, the first rotates the token and the
+// rest fail with "Access token is invalid". Funnelling every concurrent caller
+// through one in-flight refresh fixes that stampede.
+const refreshAuth = singleFlight(async (): Promise<QuestradeAuth> => {
+  const row = await loadAuthRow();
+  return refreshAccessToken(row.refresh_token);
+});
+
 /**
  * Returns a valid access token + api_server. Reuses the cached one until it is
  * within EXPIRY_MARGIN_MS of expiry, otherwise refreshes (rotating the
@@ -150,19 +161,19 @@ async function refreshAccessToken(refreshToken: string): Promise<QuestradeAuth> 
  * Questrade rejects a token that our clock still considers valid.
  */
 export async function getQuestradeAuth(forceRefresh = false): Promise<QuestradeAuth> {
-  const row = await loadAuthRow();
-
-  if (
-    !forceRefresh &&
-    row.access_token &&
-    row.api_server &&
-    row.expires_at &&
-    new Date(row.expires_at).getTime() - Date.now() > EXPIRY_MARGIN_MS
-  ) {
-    return { accessToken: row.access_token, apiServer: stripTrailingSlash(row.api_server) };
+  if (!forceRefresh) {
+    const row = await loadAuthRow();
+    if (
+      row.access_token &&
+      row.api_server &&
+      row.expires_at &&
+      new Date(row.expires_at).getTime() - Date.now() > EXPIRY_MARGIN_MS
+    ) {
+      return { accessToken: row.access_token, apiServer: stripTrailingSlash(row.api_server) };
+    }
   }
 
-  return refreshAccessToken(row.refresh_token);
+  return refreshAuth();
 }
 
 /** Authenticated GET against the account's Questrade api_server. */

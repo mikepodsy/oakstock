@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { CrossState, MomentumStatus } from "@/utils/momentum";
 import {
   fmtPrice,
@@ -95,19 +96,24 @@ export function MomentumTable({ statuses }: { statuses: MomentumStatus[] }) {
                   fresh ? "bg-bg-tertiary/40" : ""
                 }`}
               >
-                <td className="px-4 py-3">
-                  <span className="font-display text-sm text-text-primary">{s.ticker}</span>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <Link
+                    href={`/stock/${s.ticker}`}
+                    className="font-display text-sm text-text-primary hover:text-green-primary transition-colors"
+                  >
+                    {s.ticker}
+                  </Link>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <span className="text-sm tabular-nums text-text-primary">{fmtPrice(s.close)}</span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <MaCell ma={s.sma50} distancePct={s.distance50Pct} cross={s.priceVs50} />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <MaCell ma={s.sma200} distancePct={s.distance200Pct} cross={s.priceVs200} />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <TrendCell status={s} />
                 </td>
               </tr>

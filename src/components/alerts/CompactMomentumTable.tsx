@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { StoredMomentum } from "@/app/api/alerts/sp400/route";
 import type { CrossState } from "@/utils/momentum";
 import {
@@ -59,7 +60,12 @@ export function CompactMomentumTable({ statuses }: { statuses: StoredMomentum[] 
               >
                 <td className="px-3 py-1.5">
                   <div className="flex flex-col leading-tight">
-                    <span className="font-display text-[13px] text-text-primary">{s.ticker}</span>
+                    <Link
+                      href={`/stock/${s.ticker}`}
+                      className="font-display text-[13px] text-text-primary hover:text-green-primary transition-colors"
+                    >
+                      {s.ticker}
+                    </Link>
                     <span className="text-[10px] text-text-tertiary">{fmtMarketCap(s.marketCap)}</span>
                   </div>
                 </td>

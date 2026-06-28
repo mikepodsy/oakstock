@@ -80,7 +80,10 @@ class VolumeProfilePaneRenderer implements IPrimitivePaneRenderer {
       // Bars: grow leftward from the right edge; up segment inner, down outer.
       for (const b of bins) {
         const barTop = b.top;
-        const barH = Math.max(1, b.bottom - b.top - 1);
+        // Only carve out an inter-bar gap when bins are tall enough; with many
+        // rows the bins are ~1px and must fill completely or they disappear.
+        const h = b.bottom - b.top;
+        const barH = h > 3 ? h - 1 : Math.max(1, h);
         const upLen = (b.up / maxBinTotal) * profileW;
         const downLen = (b.down / maxBinTotal) * profileW;
         if (upLen > 0) {

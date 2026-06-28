@@ -1,6 +1,9 @@
+import YahooFinance from "yahoo-finance2";
 import { questradeGet, resolveSymbolId } from "@/lib/questrade";
 import { questradeCandlesCache } from "@/lib/cache";
 import type { QuestradeCandle } from "@/types";
+
+const yf = new YahooFinance();
 
 // Questrade HistoricalDataGranularity → lookback window (days) of history to
 // fetch for that candle size. Finer candles get a shorter window (Questrade
@@ -82,4 +85,31 @@ export function fetchDailyCandles(
   ticker: string
 ): Promise<QuestradeCandle[] | null> {
   return fetchCandles(ticker, "OneDay");
+}
+
+/**
+ * Daily candles via Yahoo (`chart`) for the bulk momentum refresh. Yahoo's chart
+ * endpoint is batch-friendly and doesn't lean on the personal Questrade account,
+ * so it's the right source when refreshing hundreds of tickers. Returns ~2y of
+ * daily bars (enough for a 200d MA) shaped as QuestradeCandle, or null when the
+ * ticker has no data. Only `time` and `close` are consumed by evaluateMomentum.
+ */
+export async function fetchDailyCandlesYahoo(
+  ticker: string
+): Promise<QuestradeCandle[] | null> {
+  const period1 = new Date(Date.now() - 730 * 86_400_000); // ~2y
+  const result = await yf.chart(ticker, { period1, interval: "1d" });
+
+  const candles: QuestradeCandle[] = result.quotes
+    .filter((q) => q.close != null || q.adjclose != null)
+    .map((q) => ({
+      time: q.date.toISOString(),
+      open: q.open ?? 0,
+      high: q.high ?? 0,
+      low: q.low ?? 0,
+      close: (q.close ?? q.adjclose)!,
+      volume: q.volume ?? 0,
+    }));
+
+  return candles.length > 0 ? candles : null;
 }

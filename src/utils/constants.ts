@@ -46,6 +46,57 @@ export const MAG7 = [
   "TSLA",
 ] as const;
 
+// Large-cap US universe for the /alerts page right panel — roughly the S&P 500
+// minus the Mag 7 (which get their own live-computed left panel). Momentum for
+// these is precomputed in bulk and stored in the `momentum_status` table; the
+// panel sorts by live market cap, so the order here doesn't matter. Yahoo dash
+// format for class shares (e.g. BRK-B). Acquired/delisted tickers are simply
+// skipped during refresh, so the list degrades gracefully.
+export const LARGECAP_UNIVERSE = [
+  "BRK-B", "LLY", "JPM", "V", "AVGO", "XOM", "UNH", "MA", "JNJ", "COST",
+  "HD", "PG", "WMT", "NFLX", "BAC", "CRM", "ORCL", "MRK", "CVX", "KO",
+  "AMD", "ADBE", "PEP", "ABBV", "ACN", "LIN", "MCD", "CSCO", "WFC", "TMO",
+  "ABT", "DHR", "GE", "DIS", "INTC", "INTU", "VZ", "QCOM", "IBM", "CAT",
+  "AMGN", "TXN", "NOW", "PM", "NKE", "SPGI", "UNP", "AXP", "GS", "MS",
+  "RTX", "NEE", "HON", "LOW", "COP", "BKNG", "PFE", "T", "UPS", "ELV",
+  "SCHW", "BLK", "SYK", "LMT", "MDT", "BA", "DE", "PLD", "ADP", "GILD",
+  "TJX", "MMC", "VRTX", "CB", "ADI", "REGN", "C", "CI", "AMT", "BMY",
+  "SBUX", "MO", "SO", "ZTS", "BSX", "DUK", "PGR", "EOG", "ISRG", "FI",
+  "NOC", "SLB", "BDX", "ITW", "AON", "WM", "CME", "MU", "GD", "CSX",
+  "PNC", "FCX", "CL", "EQIX", "MMM", "MCK", "EW", "HUM", "APD", "USB",
+  "EMR", "MPC", "NSC", "FDX", "GM", "MAR", "PSX", "ORLY", "ROP", "AJG",
+  "TGT", "MCO", "F", "PYPL", "VLO", "MET", "AEP", "AZO", "TT", "CARR",
+  "OXY", "TFC", "SRE", "PH", "DXCM", "A", "TDG", "MSI", "ECL", "KMB",
+  "ADM", "GIS", "STZ", "HCA", "NXPI", "CTAS", "MCHP", "CDNS", "PCAR", "ANET",
+  "CHTR", "EXC", "KLAC", "SNPS", "IDXX", "WELL", "AIG", "ON", "COF", "TEL",
+  "D", "ROST", "KMI", "MNST", "PSA", "AFL", "HLT", "NUE", "DOW", "CMG",
+  "FTNT", "SPG", "EL", "JCI", "TRV", "BK", "KDP", "ODFL", "AMP", "O",
+  "CNC", "NEM", "OKE", "GWW", "WMB", "PAYX", "MRNA", "FAST", "KHC", "AME",
+  "CMI", "ALL", "DG", "VRSK", "OTIS", "CTSH", "PRU", "ED", "LHX", "DLTR",
+  "GEHC", "KR", "DLR", "YUM", "BIIB", "IQV", "PPG", "CSGP", "DD", "EA",
+  "ACGL", "EFX", "FIS", "RMD", "MLM", "WST", "KVUE", "VMC", "DVN", "AVB",
+  "HSY", "CPRT", "XEL", "FANG", "GLW", "MTD", "EBAY", "ROK", "HPQ", "WBD",
+  "TROW", "ANSS", "EIX", "WEC", "DFS", "CBRE", "ETR", "APH", "FTV", "KEYS",
+  "CHD", "ZBH", "HIG", "WTW", "TSCO", "STT", "PFG", "DAL", "NDAQ", "GPN",
+  "AWK", "MPWR", "EXR", "WY", "ULTA", "DTE", "VICI", "FE", "ES", "ALGN",
+  "RJF", "STE", "INVH", "BR", "MKC", "CDW", "HAL", "PPL", "ROL", "COO",
+  "ARE", "GRMN", "PWR", "BAX", "K", "NVR", "MAA", "OMC", "IFF", "CTRA",
+  "LYB", "AEE", "DOV", "EXPD", "J", "CNP", "HBAN", "TYL", "FITB", "WAB",
+  "VLTO", "TDY", "CMS", "BALL", "MOH", "ATO", "LH", "NTRS", "SWKS", "EQR",
+  "DRI", "PHM", "AVY", "SYY", "JBHT", "CAH", "HPE", "VTR", "CCL", "WAT",
+  "EG", "IT", "NTAP", "TXT", "BRO", "CLX", "AKAM", "RF", "PKG", "LUV",
+  "JBL", "SBAC", "HOLX", "IEX", "SWK", "CFG", "DGX", "ALB", "POOL", "MAS",
+  "EXPE", "KIM", "AES", "NDSN", "GEN", "L", "BG", "TER", "UAL", "INCY",
+  "ZBRA", "CE", "JKHY", "AMCR", "SNA", "FDS", "DPZ", "RVTY", "CINF", "VRSN",
+  "MGM", "TRMB", "PNR", "EPAM", "APA", "CPB", "UDR", "BBY", "TFX", "KEY",
+  "WRB", "NI", "LDOS", "WDC", "STX", "MOS", "CF", "HST", "GL", "FOXA",
+  "FOX", "TAP", "MKTX", "ESS", "DOC", "PODD", "CAG", "HRL", "LKQ", "JNPR",
+  "REG", "AOS", "ALLE", "EMN", "KMX", "BWA", "NRG", "HII", "CHRW", "FFIV",
+  "TPR", "GNRC", "AIZ", "BXP", "ETSY", "CPT", "NWSA", "NWS", "HAS", "BEN",
+  "MTCH", "IPG", "PNW", "CRL", "BIO", "WBA", "SJM", "FMC", "IVZ", "CZR",
+  "PARA", "MHK", "RL", "AAL", "DVA", "NCLH", "FRT", "QRVO", "HSIC", "WYNN",
+] as const;
+
 export const MARKET_INDICES = [
   { ticker: "^GSPC", name: "S&P 500" },
   { ticker: "^GSPTSE", name: "TSX" },

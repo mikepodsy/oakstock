@@ -1,49 +1,13 @@
 "use client";
 
-import { ArrowUp, ArrowDown } from "lucide-react";
 import type { CrossState, MomentumStatus } from "@/utils/momentum";
-
-function fmtPrice(v: number | null): string {
-  return v === null ? "—" : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtPct(v: number): string {
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(1)}%`;
-}
-
-// "crossed today" / "crossed Nd ago" / "no recent cross"
-function crossLabel(cross: CrossState): string {
-  if (cross.sessionsSinceCross === null) return "no recent cross";
-  if (cross.sessionsSinceCross === 0) return "crossed today";
-  return `crossed ${cross.sessionsSinceCross}d ago`;
-}
-
-// Above/below pill for a price-vs-MA relationship. Fresh same-session crosses
-// get a ring + arrow so they stand out.
-function RelationBadge({ cross, maNull }: { cross: CrossState; maNull: boolean }) {
-  if (maNull) {
-    return <span className="text-xs text-text-tertiary">n/a</span>;
-  }
-  const above = cross.relation === "above";
-  const color = above
-    ? "bg-green-muted text-green-primary"
-    : "bg-red-muted text-red-primary";
-  const ring = cross.crossedThisBar ? "ring-2 ring-offset-1 ring-offset-bg-secondary " : "";
-  const ringColor = cross.crossedThisBar
-    ? above
-      ? "ring-green-primary"
-      : "ring-red-primary"
-    : "";
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${color} ${ring}${ringColor}`}
-    >
-      {above ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-      {above ? "Above" : "Below"}
-    </span>
-  );
-}
+import {
+  fmtPrice,
+  fmtPct,
+  crossLabel,
+  RelationBadge,
+  TrendPill,
+} from "./momentumDisplay";
 
 function MaCell({
   ma,
@@ -85,33 +49,22 @@ function MaCell({
   );
 }
 
-// 50d-vs-200d trend: golden cross (50 above 200) vs death cross.
 function TrendCell({ status }: { status: MomentumStatus }) {
-  if (status.sma200 === null) {
-    return <span className="text-xs text-text-tertiary">n/a</span>;
-  }
-  const golden = status.cross50v200.relation === "above";
+  const sma200Null = status.sma200 === null;
   const cross = status.cross50v200;
-  const color = golden
-    ? "bg-green-muted text-green-primary"
-    : "bg-red-muted text-red-primary";
-  const ring = cross.crossedThisBar
-    ? `ring-2 ring-offset-1 ring-offset-bg-secondary ${golden ? "ring-green-primary" : "ring-red-primary"} `
-    : "";
+  const golden = cross.relation === "above";
   return (
     <div className="flex flex-col gap-1">
-      <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${color} ${ring}`}>
-        {golden ? "Golden" : "Death"}
-      </span>
-      <span
-        className={`text-[11px] ${
-          cross.crossedThisBar ? "font-semibold text-text-primary" : "text-text-tertiary"
-        }`}
-      >
-        {cross.crossedThisBar
-          ? `${golden ? "Golden" : "Death"} cross today`
-          : crossLabel(cross)}
-      </span>
+      <TrendPill cross={cross} sma200Null={sma200Null} />
+      {!sma200Null && (
+        <span
+          className={`text-[11px] ${
+            cross.crossedThisBar ? "font-semibold text-text-primary" : "text-text-tertiary"
+          }`}
+        >
+          {cross.crossedThisBar ? `${golden ? "Golden" : "Death"} cross today` : crossLabel(cross)}
+        </span>
+      )}
     </div>
   );
 }
@@ -119,7 +72,7 @@ function TrendCell({ status }: { status: MomentumStatus }) {
 export function MomentumTable({ statuses }: { statuses: MomentumStatus[] }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border-primary bg-bg-secondary">
-      <table className="w-full min-w-[640px] text-left">
+      <table className="w-full min-w-[560px] text-left">
         <thead>
           <tr className="border-b border-border-primary text-xs uppercase tracking-wide text-text-tertiary">
             <th className="px-4 py-3 font-medium">Stock</th>

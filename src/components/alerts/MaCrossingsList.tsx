@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import type { StoredMomentum } from "@/app/api/alerts/sp400/route";
 import type { CrossState } from "@/utils/momentum";
 import { recentCrossDirection, RECENT_CROSS_WINDOW } from "@/utils/momentum";
@@ -156,8 +157,9 @@ export function MaCrossingsList({ statuses }: { statuses: StoredMomentum[] }) {
                   <td className="px-3 py-1.5">
                     <Link
                       href={`/stock/${stock.ticker}`}
-                      className="font-display text-[13px] text-text-primary hover:text-green-primary transition-colors"
+                      className="flex items-center gap-2 font-display text-[13px] text-text-primary hover:text-green-primary transition-colors"
                     >
+                      <CompanyLogo ticker={stock.ticker} className="w-5 h-5 rounded" textClassName="text-[8px]" />
                       {stock.ticker}
                     </Link>
                   </td>

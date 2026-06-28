@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import type { CrossState, MomentumStatus } from "@/utils/momentum";
 import {
   fmtPrice,
@@ -99,8 +100,9 @@ export function MomentumTable({ statuses }: { statuses: MomentumStatus[] }) {
                 <td className="px-4 py-3 whitespace-nowrap">
                   <Link
                     href={`/stock/${s.ticker}`}
-                    className="font-display text-sm text-text-primary hover:text-green-primary transition-colors"
+                    className="group flex items-center gap-2 font-display text-sm text-text-primary hover:text-green-primary transition-colors"
                   >
+                    <CompanyLogo ticker={s.ticker} className="w-6 h-6 rounded" textClassName="text-[9px]" />
                     {s.ticker}
                   </Link>
                 </td>

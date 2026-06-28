@@ -1,8 +1,9 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TickerSearch } from "@/components/search/TickerSearch";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { OptionsTabs } from "@/components/options/OptionsTabs";
 import { useOptionsTickerStore } from "@/stores/optionsTickerStore";
@@ -30,6 +31,7 @@ function randomId() {
 
 export default function OptionsBuilderPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const ticker = (params.ticker as string)?.toUpperCase() ?? "";
 
@@ -207,6 +209,9 @@ export default function OptionsBuilderPage() {
         <div className="flex items-center gap-3">
           <OptionsTabs ticker={ticker} />
           <StrategySelector value={strategy} onChange={handleStrategyChange} />
+          <div className="w-56">
+            <TickerSearch onSelect={(r) => router.push(`/options/${r.ticker}`)} />
+          </div>
         </div>
       </div>
 

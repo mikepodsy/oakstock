@@ -197,6 +197,7 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
     s.donchian.enabled,
     s.rsi.enabled,
     s.volume.enabled,
+    s.volumeProfile.enabled,
     s.sessions.enabled && isIntraday,
   ].filter(Boolean).length;
 
@@ -338,6 +339,37 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
               />
               <span className="text-sm text-text-primary">Volume</span>
             </div>
+          </div>
+
+          {/* Volume Profile */}
+          <div className="py-1">
+            <div className="flex items-center gap-2">
+              <CheckBox
+                checked={s.volumeProfile.enabled}
+                onChange={() => s.toggle("volumeProfile")}
+              />
+              <span className="text-sm text-text-primary">Volume Profile</span>
+              <span className="text-[10px] text-text-tertiary">
+                (visible range)
+              </span>
+            </div>
+            {s.volumeProfile.enabled && (
+              <div className="mt-1 flex flex-wrap items-center gap-3 pl-6">
+                <NumberField
+                  label="Rows"
+                  value={s.volumeProfile.rows}
+                  bounds={PARAM_BOUNDS.rows}
+                  onChange={(v) => s.setVpRows(v)}
+                />
+                <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+                  <CheckBox
+                    checked={s.volumeProfile.showValueArea}
+                    onChange={() => s.toggleVpValueArea()}
+                  />
+                  Value area
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Sessions */}

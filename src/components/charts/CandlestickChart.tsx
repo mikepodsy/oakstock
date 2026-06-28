@@ -57,6 +57,8 @@ import {
   type Trendline,
 } from "@/stores/drawingStore";
 import { TrendlinePrimitive } from "./trendlinePrimitive";
+import { VolumeProfilePrimitive } from "./volumeProfilePrimitive";
+import { computeVolumeProfile } from "@/utils/volumeProfile";
 import { distanceToSegment, midpoint } from "@/utils/geometry";
 import {
   sma as smaCalc,
@@ -178,6 +180,7 @@ export function CandlestickChart({
   const donchianCfg = useIndicatorStore((s) => s.donchian);
   const rsiCfg = useIndicatorStore((s) => s.rsi);
   const volumeCfg = useIndicatorStore((s) => s.volume);
+  const volumeProfileCfg = useIndicatorStore((s) => s.volumeProfile);
   const sessionsCfg = useIndicatorStore((s) => s.sessions);
 
   // User-drawn horizontal lines for this ticker (persisted, per-symbol).
@@ -259,6 +262,7 @@ export function CandlestickChart({
   // Dynamically added overlay/oscillator line series, torn down + rebuilt on change.
   const indicatorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const sessionPrimitiveRef = useRef<SessionBackgroundPrimitive | null>(null);
+  const volumeProfilePrimitiveRef = useRef<VolumeProfilePrimitive | null>(null);
 
   // Fetch candles whenever the symbol or timeframe changes.
   const load = useCallback(async () => {
@@ -441,9 +445,10 @@ export function CandlestickChart({
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
-      // The removed chart took its indicator series + session primitive with it.
+      // The removed chart took its indicator series + primitives with it.
       indicatorSeriesRef.current = [];
       sessionPrimitiveRef.current = null;
+      volumeProfilePrimitiveRef.current = null;
     };
   }, [theme, chartType, autoscaleProvider]);
 
@@ -692,6 +697,72 @@ export function CandlestickChart({
       sessionPrimitiveRef.current = null;
     }
   }, [sessionsCfg, interval, data, theme, chartType]);
+
+  // Volume Profile: aggregate the candles in the visible range into a
+  // volume-by-price histogram and hand it to the overlay primitive. Recomputes
+  // on pan/zoom (time-scale subscription) and whenever the data/config/chart
+  // changes. Detached entirely when the indicator is off.
+  useEffect(() => {
+    const candleSeries = candleSeriesRef.current;
+    const chart = chartRef.current;
+    if (!candleSeries || !chart) return;
+
+    if (!volumeProfileCfg.enabled || data.length === 0) {
+      if (volumeProfilePrimitiveRef.current) {
+        try {
+          candleSeries.detachPrimitive(volumeProfilePrimitiveRef.current);
+        } catch {
+          /* series already removed */
+        }
+        volumeProfilePrimitiveRef.current = null;
+      }
+      return;
+    }
+
+    if (!volumeProfilePrimitiveRef.current) {
+      const primitive = new VolumeProfilePrimitive();
+      candleSeries.attachPrimitive(primitive);
+      volumeProfilePrimitiveRef.current = primitive;
+    }
+
+    const timeScale = chart.timeScale();
+    const recompute = () => {
+      const range = timeScale.getVisibleRange();
+      const visible = range
+        ? data.filter((c) => {
+            const t = Date.parse(c.time) / 1000;
+            return t >= (range.from as number) && t <= (range.to as number);
+          })
+        : data;
+      const profile = computeVolumeProfile(visible, volumeProfileCfg.rows);
+      volumeProfilePrimitiveRef.current?.setProfile(
+        profile,
+        volumeProfileCfg.showValueArea
+      );
+    };
+
+    // Throttle the pan/zoom handler to one recompute per frame.
+    let raf = 0;
+    const onRangeChange = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        recompute();
+      });
+    };
+
+    recompute();
+    timeScale.subscribeVisibleLogicalRangeChange(onRangeChange);
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      try {
+        timeScale.unsubscribeVisibleLogicalRangeChange(onRangeChange);
+      } catch {
+        /* chart already removed */
+      }
+    };
+  }, [volumeProfileCfg, data, theme, chartType, chartEpoch]);
 
   // Render the drawn horizontal lines as native price lines on the candle
   // series — they span the full width, get a right-axis price label for free,

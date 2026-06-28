@@ -12,6 +12,7 @@ export interface IndicatorState {
   donchian: { enabled: boolean; period: number; color: string };
   rsi: { enabled: boolean; period: number; color: string };
   volume: { enabled: boolean };
+  volumeProfile: { enabled: boolean; rows: number; showValueArea: boolean };
   sessions: { enabled: boolean };
 }
 
@@ -28,6 +29,7 @@ export const DEFAULT_INDICATORS: IndicatorState = {
   donchian: { enabled: false, period: 20, color: "#f59e0b" },
   rsi: { enabled: false, period: 14, color: "#a855f7" },
   volume: { enabled: true },
+  volumeProfile: { enabled: false, rows: 24, showValueArea: true },
   sessions: { enabled: false },
 };
 
@@ -59,6 +61,7 @@ export const SESSION_TINTS: Record<"pre" | "regular" | "after", string> = {
 export const PARAM_BOUNDS = {
   period: { min: 1, max: 400, step: 1 },
   mult: { min: 0.5, max: 5, step: 0.5 },
+  rows: { min: 5, max: 100, step: 1 },
 };
 
 export function maColor(index: number): string {

@@ -22,6 +22,9 @@ interface IndicatorStore extends IndicatorState {
   setLineColor: (id: SingleColorId, hex: string) => void;
   // Color of one SMA/EMA length.
   setPeriodColor: (id: MultiLineId, period: number, hex: string) => void;
+  // Volume Profile settings.
+  setVpRows: (rows: number) => void;
+  toggleVpValueArea: () => void;
 }
 
 export const useIndicatorStore = create<IndicatorStore>()(
@@ -75,6 +78,20 @@ export const useIndicatorStore = create<IndicatorStore>()(
               [id]: { ...s[id], colors: { ...(s[id].colors ?? {}), [period]: hex } },
             }) as Partial<IndicatorStore>
         ),
+
+      setVpRows: (rows) =>
+        set((s) => {
+          if (!Number.isFinite(rows) || rows < 1) return {} as Partial<IndicatorStore>;
+          return { volumeProfile: { ...s.volumeProfile, rows } };
+        }),
+
+      toggleVpValueArea: () =>
+        set((s) => ({
+          volumeProfile: {
+            ...s.volumeProfile,
+            showValueArea: !s.volumeProfile.showValueArea,
+          },
+        })),
     }),
     {
       name: "oakstock-indicators",
@@ -86,6 +103,7 @@ export const useIndicatorStore = create<IndicatorStore>()(
         donchian: s.donchian,
         rsi: s.rsi,
         volume: s.volume,
+        volumeProfile: s.volumeProfile,
         sessions: s.sessions,
       }),
     }

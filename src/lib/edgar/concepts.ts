@@ -35,7 +35,14 @@ export const DURATION_FIELDS = {
   operatingIncome: { candidates: ["OperatingIncomeLoss"], derivable: true },
   netIncome: { candidates: ["NetIncomeLoss"], derivable: true },
   operatingCashFlow: {
-    candidates: ["NetCashProvidedByUsedInOperatingActivities"],
+    // The base tag is modern; the ...ContinuingOperations variant is what many
+    // issuers (e.g. MSFT FY2014–2015) used in certain years, and is the usual
+    // cause of operating-cash-flow (and the FCF derived from it) dropping out of
+    // otherwise-complete histories for "random" years.
+    candidates: [
+      "NetCashProvidedByUsedInOperatingActivities",
+      "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
+    ],
     derivable: true,
   },
   capex: {
@@ -55,7 +62,13 @@ export const DURATION_FIELDS = {
     derivable: true,
   },
   dividendsPaid: {
-    candidates: ["PaymentsOfDividendsCommon", "PaymentsOfDividends"],
+    // PaymentsOfDividendsCommonStock is the tag MSFT (and others) use for the
+    // common dividend; without it those payers show no dividend in any year.
+    candidates: [
+      "PaymentsOfDividendsCommonStock",
+      "PaymentsOfDividendsCommon",
+      "PaymentsOfDividends",
+    ],
     derivable: true,
   },
 } satisfies Record<string, DurationField>;

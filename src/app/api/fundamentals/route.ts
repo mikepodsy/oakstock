@@ -3,6 +3,7 @@ import YahooFinance from "yahoo-finance2";
 import { fundamentalsCache } from "@/lib/cache";
 import { getCik } from "@/lib/edgar/cik";
 import { getEdgarFundamentals } from "@/lib/edgar";
+import { mergeFundamentals } from "@/lib/edgar/merge";
 import {
   markSync,
   persistFundamentals,
@@ -44,6 +45,44 @@ function mapStatement(raw: Record<string, unknown>): FinancialStatement {
   };
 }
 
+// Fetch Yahoo fundamentals as a FundamentalsData. Used both as the standalone
+// fallback (tickers EDGAR doesn't cover) and as a gap-filler layered on top of
+// EDGAR. period1 reaches well back so Yahoo can backfill older years too;
+// Yahoo simply returns whatever history it has.
+async function fetchYahooFundamentals(
+  ticker: string,
+): Promise<FundamentalsData | null> {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const [quarterlyRaw, annualRaw] = await Promise.all([
+      yf.fundamentalsTimeSeries(ticker, {
+        period1: "2001-01-01",
+        period2: today,
+        type: "quarterly",
+        module: "all",
+      }),
+      yf.fundamentalsTimeSeries(ticker, {
+        period1: "2001-01-01",
+        period2: today,
+        type: "annual",
+        module: "all",
+      }),
+    ]);
+
+    const quarterly = (quarterlyRaw as Record<string, unknown>[])
+      .map(mapStatement)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const annual = (annualRaw as Record<string, unknown>[])
+      .map(mapStatement)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (quarterly.length === 0 && annual.length === 0) return null;
+    return { ticker, quarterly, annual };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker");
 
@@ -79,14 +118,18 @@ export async function GET(request: NextRequest) {
     // DB unavailable — fall through to a live fetch.
   }
 
-  // 2. Primary source: SEC EDGAR (~15+ years of history). Persist on success.
+  // 2. Primary source: SEC EDGAR (~15+ years of history). Where EDGAR leaves
+  //    cells null (tags it doesn't cover, or metrics like EBITDA it can't
+  //    derive), fill them from Yahoo so years aren't left partially blank.
   try {
     const cik = await getCik(ticker);
     if (cik) {
       const edgar = await getEdgarFundamentals(ticker);
       if (edgar) {
-        await persistFundamentals(cik, "edgar", edgar);
-        return respond(edgar);
+        const yahoo = await fetchYahooFundamentals(ticker);
+        const data = yahoo ? mergeFundamentals(edgar, yahoo) : edgar;
+        await persistFundamentals(cik, "edgar", data);
+        return respond(data);
       }
     }
   } catch {
@@ -94,40 +137,16 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Fallback: Yahoo (for tickers EDGAR doesn't cover). Persist on success.
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const [quarterlyRaw, annualRaw] = await Promise.all([
-      yf.fundamentalsTimeSeries(ticker, {
-        period1: "2018-01-01",
-        period2: today,
-        type: "quarterly",
-        module: "all",
-      }),
-      yf.fundamentalsTimeSeries(ticker, {
-        period1: "2018-01-01",
-        period2: today,
-        type: "annual",
-        module: "all",
-      }),
-    ]);
-
-    const quarterly = (quarterlyRaw as Record<string, unknown>[])
-      .map(mapStatement)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    const annual = (annualRaw as Record<string, unknown>[])
-      .map(mapStatement)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    const data: FundamentalsData = { ticker, quarterly, annual };
-    await persistFundamentals(null, "yahoo", data);
-    return respond(data);
-  } catch {
-    // 4. Nothing anywhere — record so we don't retry on every load.
-    await markSync(ticker, null, "none");
-    return NextResponse.json(
-      { error: `Failed to fetch fundamentals for ${ticker}` },
-      { status: 500 }
-    );
+  const yahoo = await fetchYahooFundamentals(ticker);
+  if (yahoo) {
+    await persistFundamentals(null, "yahoo", yahoo);
+    return respond(yahoo);
   }
+
+  // 4. Nothing anywhere — record so we don't retry on every load.
+  await markSync(ticker, null, "none");
+  return NextResponse.json(
+    { error: `Failed to fetch fundamentals for ${ticker}` },
+    { status: 500 }
+  );
 }

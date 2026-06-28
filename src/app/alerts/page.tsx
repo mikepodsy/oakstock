@@ -1,11 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MomentumTable } from "@/components/alerts/MomentumTable";
 import { CompactMomentumTable } from "@/components/alerts/CompactMomentumTable";
+import { MaCrossingsList } from "@/components/alerts/MaCrossingsList";
 import { useMomentumAlerts } from "@/hooks/useMomentumAlerts";
 import { useSp400Momentum } from "@/hooks/useSp400Momentum";
+import type { StoredMomentum } from "@/app/api/alerts/sp400/route";
 
 function fmtUpdated(iso: string | null): string {
   if (!iso) return "never";
@@ -21,6 +24,20 @@ function fmtUpdated(iso: string | null): string {
 export default function AlertsPage() {
   const mag7 = useMomentumAlerts();
   const sp = useSp400Momentum();
+
+  // Combined universe for the recent-crossings list (large caps already exclude
+  // the Mag 7, but dedupe defensively; the precomputed sp row wins).
+  const combined = useMemo<StoredMomentum[]>(() => {
+    const map = new Map<string, StoredMomentum>();
+    for (const s of sp.statuses) map.set(s.ticker, s);
+    for (const s of mag7.statuses) {
+      if (!map.has(s.ticker)) map.set(s.ticker, { ...s, name: null, marketCap: null });
+    }
+    return [...map.values()];
+  }, [sp.statuses, mag7.statuses]);
+
+  const crossingsLoading =
+    mag7.loading && sp.loading && combined.length === 0;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
@@ -62,6 +79,23 @@ export default function AlertsPage() {
           ) : (
             <MomentumTable statuses={mag7.statuses} />
           )}
+
+          {/* Recent MA crossings across the Mag 7 + large-cap universe */}
+          <div className="mt-8">
+            <div className="mb-2">
+              <h2 className="font-display text-sm uppercase tracking-wide text-text-secondary">
+                Recent MA crossings
+              </h2>
+              <p className="text-xs text-text-tertiary mt-0.5">
+                Stocks that rose above or fell below their 50d / 200d MA in the last 5 trading days.
+              </p>
+            </div>
+            {crossingsLoading ? (
+              <div className="text-sm text-text-secondary">Loading crossings…</div>
+            ) : (
+              <MaCrossingsList statuses={combined} />
+            )}
+          </div>
         </section>
 
         {/* Right: large-cap universe */}

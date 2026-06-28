@@ -75,6 +75,24 @@ export function crossState(a: number[], b: number[]): CrossState {
   return { relation, crossedThisBar, direction, sessionsSinceCross };
 }
 
+/** How many trading days back still counts as a "recent" cross. */
+export const RECENT_CROSS_WINDOW = 5;
+
+/**
+ * Direction of a recent price-vs-MA cross within `window` sessions, else null.
+ * "up" = price rose above the MA, "down" = price fell below it. Derived from the
+ * current `relation` (the most-recent flip is the only one tracked), so it works
+ * for any cross in the window — unlike `CrossState.direction`, which is only set
+ * for same-bar crosses.
+ */
+export function recentCrossDirection(
+  cross: CrossState,
+  window: number = RECENT_CROSS_WINDOW
+): "up" | "down" | null {
+  if (cross.sessionsSinceCross === null || cross.sessionsSinceCross > window) return null;
+  return cross.relation === "above" ? "up" : "down";
+}
+
 /** Tail of `values` aligned to the last `len` bars. */
 function tail(values: number[], len: number): number[] {
   return len >= values.length ? values : values.slice(values.length - len);

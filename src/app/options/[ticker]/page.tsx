@@ -11,6 +11,7 @@ import { StrategySelector } from "@/components/options/StrategySelector";
 import { LegBuilder } from "@/components/options/LegBuilder";
 import { PayoffChart } from "@/components/options/PayoffChart";
 import { TimeDecaySlider } from "@/components/options/TimeDecaySlider";
+import { ZoomSlider } from "@/components/options/ZoomSlider";
 import { PositionSummary } from "@/components/options/PositionSummary";
 import { useOptionChain } from "@/hooks/useOptionChain";
 import { computePayoff } from "@/lib/options/payoff";
@@ -47,6 +48,7 @@ export default function OptionsBuilderPage() {
   const [strategy, setStrategy] = useState<StrategyType>("long_call");
   const [legs, setLegs] = useState<OptionLeg[]>([]);
   const [valuationFraction, setValuationFraction] = useState(0);
+  const [rangePct, setRangePct] = useState(0.15);
   const [spotOverride, setSpotOverride] = useState<number | null>(null);
   const [overlays, setOverlays] = useState({
     today: true,
@@ -156,8 +158,9 @@ export default function OptionsBuilderPage() {
       spot: effectiveSpot,
       valuationFraction,
       atmIV: atmIv ?? undefined,
+      rangePct,
     });
-  }, [payoffLegs, effectiveSpot, valuationFraction, atmIv]);
+  }, [payoffLegs, effectiveSpot, valuationFraction, atmIv, rangePct]);
 
   const handleShare = useCallback(() => {
     const qs = encodeLegs(legs);
@@ -242,14 +245,19 @@ export default function OptionsBuilderPage() {
 
         {result && effectiveSpot ? (
           <>
-            <PayoffChart
-              result={result}
-              spot={effectiveSpot}
-              showToday={overlays.today}
-              showIntermediate={overlays.intermediate}
-              sigma1={overlays.sigma1 ? sigmaBands.sigma1 : null}
-              sigma2={overlays.sigma2 ? sigmaBands.sigma2 : null}
-            />
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1 min-w-0">
+                <PayoffChart
+                  result={result}
+                  spot={effectiveSpot}
+                  showToday={overlays.today}
+                  showIntermediate={overlays.intermediate}
+                  sigma1={overlays.sigma1 ? sigmaBands.sigma1 : null}
+                  sigma2={overlays.sigma2 ? sigmaBands.sigma2 : null}
+                />
+              </div>
+              <ZoomSlider rangePct={rangePct} onChange={setRangePct} />
+            </div>
             {maxDteDaysVal > 0 && (
               <div className="mt-3">
                 <TimeDecaySlider

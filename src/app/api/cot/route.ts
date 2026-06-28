@@ -12,6 +12,11 @@ import type {
 // Weeks of history exposed for the 52-week positioning chart
 const HISTORY_WEEKS = 52;
 
+// Weeks of history pulled to compute the 3-year net-positioning index (COT Index).
+// CFTC publishes weekly, so 156 ≈ 3 years. Only a single number per category is
+// derived from this window — the 52-week chart payload is unaffected.
+const INDEX_WEEKS = 156;
+
 // ─── Instrument Config (add more here to extend) ──────────────────────────────
 const INSTRUMENTS: CotInstrument[] = [
   // ── Indices ──
@@ -155,17 +160,34 @@ function num(record: Record<string, unknown>, col: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// COT Index: places the current net position within its 3-year high/low range,
+// scaled 0–100. ≥80 = near the 3yr high (bullish), ≤20 = near the 3yr low (bearish).
+// Returns null when the range is flat or there are no records.
+function cotIndex(records: Record<string, unknown>[], cols: ColPair): number | null {
+  if (records.length === 0) return null;
+  const nets = records
+    .slice(0, INDEX_WEEKS)
+    .map((rec) => num(rec, cols.long) - num(rec, cols.short));
+  const current = nets[0];
+  const min = Math.min(...nets);
+  const max = Math.max(...nets);
+  if (max === min) return null;
+  const idx = ((current - min) / (max - min)) * 100;
+  return Math.min(Math.max(idx, 0), 100);
+}
+
 function buildCategories(
-  latest: Record<string, unknown>,
-  prev: Record<string, unknown> | null,
+  records: Record<string, unknown>[],
   categoryDefs: { name: string; cols: ColPair }[]
 ): CotCategory[] {
+  const latest = records[0];
+  const prev = records[1] ?? null;
   return categoryDefs.map(({ name, cols }) => {
     const longs  = num(latest, cols.long);
     const shorts = num(latest, cols.short);
     const net    = longs - shorts;
     const prevNet = prev ? num(prev, cols.long) - num(prev, cols.short) : 0;
-    return { name, longs, shorts, net, netChange: net - prevNet };
+    return { name, longs, shorts, net, netChange: net - prevNet, index: cotIndex(records, cols) };
   });
 }
 
@@ -192,8 +214,9 @@ function buildHistory(
     .reverse();
 }
 
-// Pull up to 53 weeks (52 history + 1 for week-over-week change) of records for a
-// given dataset and CFTC market name, newest-first. Returns [] on any failure.
+// Pull up to INDEX_WEEKS (≈3 years) of records for a given dataset and CFTC market
+// name, newest-first. The 52-week chart uses the first slice; the full window feeds
+// the 3-year COT index. Returns [] on any failure.
 async function fetchRecords(
   dataset: string,
   cftcName: string,
@@ -202,7 +225,7 @@ async function fetchRecords(
   const params = new URLSearchParams({
     $where: `market_and_exchange_names='${cftcName}'`,
     $order: "report_date_as_yyyy_mm_dd DESC",
-    $limit: String(HISTORY_WEEKS + 1),
+    $limit: String(INDEX_WEEKS),
   });
   const url = `${CFTC_BASE}/${dataset}.json?${params}`;
 
@@ -222,10 +245,8 @@ function buildGroupSet(
   records: Record<string, unknown>[],
   categoryDefs: { name: string; cols: ColPair }[]
 ): CotGroupSet {
-  const latest = records[0];
-  const prev = records[1] ?? null;
   return {
-    categories: buildCategories(latest, prev, categoryDefs),
+    categories: buildCategories(records, categoryDefs),
     history: buildHistory(records, categoryDefs),
   };
 }
@@ -265,7 +286,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v4";
+  const CACHE_KEY = "cot-all-v5";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

@@ -5,6 +5,7 @@ import { useCotData } from "@/hooks/useCotData";
 import { CotInstrumentTabs } from "@/components/cot/CotInstrumentTabs";
 import { CotPositionChart } from "@/components/cot/CotPositionChart";
 import { CotNetChart } from "@/components/cot/CotNetChart";
+import { CotIndexGauge } from "@/components/cot/CotIndexGauge";
 import { CotHistoryChart } from "@/components/cot/CotHistoryChart";
 import { CotLoadingSkeleton } from "@/components/cot/CotLoadingSkeleton";
 import { formatDate } from "@/utils/formatters";
@@ -108,6 +109,12 @@ export default function CotPage() {
 
           {/* Net position chart */}
           <CotNetChart categories={groups.categories} />
+
+          {/* 3-year net-positioning index (bullishness / bearishness) */}
+          <CotIndexGauge
+            categories={groups.categories}
+            title={`${report.instrument} — 3-Year Net Positioning Index (${viewLabel})`}
+          />
 
           {/* Historical positioning (selectable look-back window) */}
           <CotHistoryChart

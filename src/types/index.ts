@@ -356,6 +356,9 @@ export interface CotCategory {
   shorts: number;
   net: number;
   netChange: number;
+  // 3-year net-positioning index (COT Index), 0–100. ≥80 bullish, ≤20 bearish.
+  // null when there isn't enough history or the 3yr range is flat.
+  index: number | null;
 }
 
 export interface CotWeekCategory {

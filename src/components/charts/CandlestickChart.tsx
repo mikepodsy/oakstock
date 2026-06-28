@@ -15,6 +15,7 @@ import {
   type IPriceLine,
   type UTCTimestamp,
   type AutoscaleInfo,
+  type Time,
 } from "lightweight-charts";
 import {
   ChevronsRight,
@@ -24,6 +25,8 @@ import {
   Minus,
   PanelRightClose,
   PanelRightOpen,
+  PenLine,
+  TrendingUp,
   X,
 } from "lucide-react";
 import {
@@ -32,6 +35,8 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
@@ -46,7 +51,13 @@ import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
 import { useChartStyleStore, withAlpha } from "@/stores/chartStyleStore";
 import { useIndicatorStore } from "@/stores/indicatorStore";
-import { useDrawingStore } from "@/stores/drawingStore";
+import {
+  useDrawingStore,
+  type TrendPoint,
+  type Trendline,
+} from "@/stores/drawingStore";
+import { TrendlinePrimitive } from "./trendlinePrimitive";
+import { distanceToSegment, midpoint } from "@/utils/geometry";
 import {
   sma as smaCalc,
   ema as emaCalc,
@@ -95,8 +106,17 @@ const VOLUME_DOWN = "#EF4444";
 // Stable empty reference so the store selector doesn't churn when a ticker has
 // no lines yet (avoids re-render loops).
 const EMPTY_LINES: { id: string; price: number }[] = [];
+// Stable empty reference for trendlines (same churn-avoidance reason as above).
+const EMPTY_TRENDLINES: Trendline[] = [];
 // How close (px) the cursor must be to a line to grab it.
 const LINE_HIT_PX = 6;
+// How close (px) the cursor must be to a trendline endpoint / segment to grab it.
+const TREND_ENDPOINT_PX = 8;
+const TREND_SEGMENT_PX = 6;
+
+// The active drawing tool armed from the Lines dropdown. "none" = normal
+// pan/edit; "hline"/"trendline" arm a placement gesture for the next clicks.
+type DrawTool = "none" | "hline" | "trendline";
 
 // Expiry windows for the options strike-breakdown panel.
 const EXPIRY_WINDOW_OPTIONS: { value: ExpiryWindow; label: string }[] = [
@@ -166,13 +186,38 @@ export function CandlestickChart({
   const addLine = useDrawingStore((s) => s.addLine);
   const moveLine = useDrawingStore((s) => s.moveLine);
   const removeLine = useDrawingStore((s) => s.removeLine);
-  const clearLines = useDrawingStore((s) => s.clearLines);
 
-  // Draw-line tool state: hover tracks the line under the cursor (for the drag
-  // handle + ✕ delete affordance). New lines are added by double-clicking.
+  // User-drawn diagonal trendlines for this ticker (persisted, per-symbol).
+  const trendlinesRaw = useDrawingStore((s) => s.trendlines[ticker]);
+  const trendlines = trendlinesRaw ?? EMPTY_TRENDLINES;
+  const addTrendline = useDrawingStore((s) => s.addTrendline);
+  const moveTrendline = useDrawingStore((s) => s.moveTrendline);
+  const removeTrendline = useDrawingStore((s) => s.removeTrendline);
+  const clearAll = useDrawingStore((s) => s.clearAll);
+
+  // Draw-line tool state: hover tracks the horizontal line under the cursor (for
+  // the drag handle + ✕ delete affordance). New lines are added by double-click
+  // or by arming a tool from the Lines dropdown.
   const [hover, setHover] = useState<{ id: string; y: number } | null>(null);
   const priceLineRefs = useRef<Map<string, IPriceLine>>(new Map());
   const dragRef = useRef<string | null>(null);
+
+  // Trendline tool: the armed tool, the in-progress first point, the hovered
+  // trendline (for highlight + ✕), and the active endpoint drag. The primitive
+  // does the actual rendering.
+  const [activeTool, setActiveTool] = useState<DrawTool>("none");
+  const [pendingP1, setPendingP1] = useState<TrendPoint | null>(null);
+  const [trendHover, setTrendHover] = useState<{
+    id: string;
+    mid: { x: number; y: number };
+  } | null>(null);
+  const trendlinePrimitiveRef = useRef<TrendlinePrimitive | null>(null);
+  const trendDragRef = useRef<{ id: string; endpoint: "p1" | "p2" } | null>(
+    null
+  );
+  // Briefly swallow the dblclick that trails a tool placement so it doesn't drop
+  // a stray horizontal line at the same spot.
+  const suppressDblClickRef = useRef(false);
   // Vertical price-pan offset (price units) added to the autoscaled range so the
   // user can drag the candles up/down into empty space. 0 = normal autoscale.
   const priceOffsetRef = useRef(0);
@@ -675,6 +720,51 @@ export function CandlestickChart({
     }
   }, [lines, theme, chartType, data]);
 
+  // Attach the trendline primitive to the (re)created candle series. chartEpoch
+  // bumps whenever the chart is rebuilt, so this re-binds to the fresh series.
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+    const primitive = new TrendlinePrimitive();
+    series.attachPrimitive(primitive);
+    trendlinePrimitiveRef.current = primitive;
+    primitive.setTrendlines(trendlines);
+    return () => {
+      try {
+        series.detachPrimitive(primitive);
+      } catch {
+        /* series already removed */
+      }
+      trendlinePrimitiveRef.current = null;
+    };
+    // trendlines intentionally omitted — kept in sync by the effect below so we
+    // don't re-attach (and lose the canvas) on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartEpoch]);
+
+  // Keep the primitive's data in sync without re-attaching.
+  useEffect(() => {
+    trendlinePrimitiveRef.current?.setTrendlines(trendlines);
+  }, [trendlines]);
+
+  useEffect(() => {
+    trendlinePrimitiveRef.current?.setHovered(trendHover?.id ?? null);
+  }, [trendHover]);
+
+  // Cancel an in-progress trendline (and disarm the tool) on Escape.
+  useEffect(() => {
+    if (activeTool === "none" && !pendingP1) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActiveTool("none");
+        setPendingP1(null);
+        trendlinePrimitiveRef.current?.setDraft(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeTool, pendingP1]);
+
   // Cursor y relative to the chart container's top, matching the coordinate
   // space lightweight-charts uses for priceToCoordinate / coordinateToPrice.
   const relativeY = useCallback((clientY: number): number | null => {
@@ -682,22 +772,75 @@ export function CandlestickChart({
     return rect ? clientY - rect.top : null;
   }, []);
 
+  // Cursor x/y relative to the chart container's top-left.
+  const relativeXY = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      return rect ? { x: clientX - rect.left, y: clientY - rect.top } : null;
+    },
+    []
+  );
+
+  // Map a cursor position to a trendline point. Price is free; time snaps to the
+  // nearest candle column (lightweight-charts maps x-coords to data slots).
+  const eventToTrendPoint = useCallback(
+    (clientX: number, clientY: number): TrendPoint | null => {
+      const series = candleSeriesRef.current;
+      const chart = chartRef.current;
+      const rel = relativeXY(clientX, clientY);
+      if (!series || !chart || !rel) return null;
+      const price = series.coordinateToPrice(rel.y);
+      const time = chart.timeScale().coordinateToTime(rel.x);
+      if (price == null || time == null) return null;
+      return { time: time as number, price: roundPrice(price) };
+    },
+    [relativeXY]
+  );
+
+  // Pixel coordinates of a trendline endpoint, or null if it's off-scale.
+  const trendPointToXY = useCallback(
+    (pt: TrendPoint): { x: number; y: number } | null => {
+      const series = candleSeriesRef.current;
+      const chart = chartRef.current;
+      if (!series || !chart) return null;
+      const x = chart.timeScale().timeToCoordinate(pt.time as Time);
+      const y = series.priceToCoordinate(pt.price);
+      if (x == null || y == null) return null;
+      return { x, y };
+    },
+    []
+  );
+
   // Hover detection: highlight the nearest line within the grab threshold.
   const onChartMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (dragRef.current) return; // drag has its own window listener
-      const series = candleSeriesRef.current;
-      const yc = relativeY(e.clientY);
-      if (yc == null || !series) {
-        setHover((prev) => (prev ? null : prev));
+      if (dragRef.current || trendDragRef.current) return; // drag owns the move
+
+      // Placing a trendline: rubber-band the preview from p1 to the cursor.
+      if (activeTool === "trendline" && pendingP1) {
+        const cursor = eventToTrendPoint(e.clientX, e.clientY);
+        if (cursor)
+          trendlinePrimitiveRef.current?.setDraft({ p1: pendingP1, cursor });
         return;
       }
+      // A tool is armed but no first point yet — nothing to hover.
+      if (activeTool !== "none") return;
+
+      const series = candleSeriesRef.current;
+      const rel = relativeXY(e.clientX, e.clientY);
+      if (!rel || !series) {
+        setHover((prev) => (prev ? null : prev));
+        setTrendHover((prev) => (prev ? null : prev));
+        return;
+      }
+
+      // Horizontal-line hover (drag handle + ✕).
       let best: { id: string; y: number } | null = null;
       let bestDist = LINE_HIT_PX;
       for (const line of lines) {
         const coord = series.priceToCoordinate(line.price);
         if (coord == null) continue;
-        const d = Math.abs(coord - yc);
+        const d = Math.abs(coord - rel.y);
         if (d < bestDist) {
           bestDist = d;
           best = { id: line.id, y: coord };
@@ -708,8 +851,50 @@ export function CandlestickChart({
         if (best && prev && best.id === prev.id && best.y === prev.y) return prev;
         return best;
       });
+
+      // Trendline hover: nearest by endpoint, else by segment body.
+      let tBest: { id: string; mid: { x: number; y: number } } | null = null;
+      let tBestDist = TREND_SEGMENT_PX;
+      for (const t of trendlines) {
+        const a = trendPointToXY(t.p1);
+        const b = trendPointToXY(t.p2);
+        if (!a || !b) continue;
+        const endpointDist = Math.min(
+          Math.hypot(rel.x - a.x, rel.y - a.y),
+          Math.hypot(rel.x - b.x, rel.y - b.y)
+        );
+        const segDist = distanceToSegment(rel, a, b);
+        const d = Math.min(
+          endpointDist <= TREND_ENDPOINT_PX ? 0 : Infinity,
+          segDist
+        );
+        if (d < tBestDist) {
+          tBestDist = d;
+          tBest = { id: t.id, mid: midpoint(a, b) };
+        }
+      }
+      setTrendHover((prev) => {
+        if (!tBest && !prev) return prev;
+        if (
+          tBest &&
+          prev &&
+          tBest.id === prev.id &&
+          tBest.mid.x === prev.mid.x &&
+          tBest.mid.y === prev.mid.y
+        )
+          return prev;
+        return tBest;
+      });
     },
-    [lines, relativeY]
+    [
+      activeTool,
+      pendingP1,
+      eventToTrendPoint,
+      lines,
+      trendlines,
+      relativeXY,
+      trendPointToXY,
+    ]
   );
 
   // Press on a hovered line to start dragging it vertically. Live-updates the
@@ -720,6 +905,54 @@ export function CandlestickChart({
       const series = candleSeriesRef.current;
       const chart = chartRef.current;
       if (!series || !chart) return;
+
+      // A drawing tool is armed → clicks place points (handled in onClick); don't
+      // start a pan/drag here.
+      if (activeTool !== "none") return;
+
+      // On a trendline endpoint → drag just that endpoint.
+      const rel = relativeXY(e.clientX, e.clientY);
+      if (rel) {
+        for (const t of trendlines) {
+          const a = trendPointToXY(t.p1);
+          const b = trendPointToXY(t.p2);
+          if (!a || !b) continue;
+          const onP1 = Math.hypot(rel.x - a.x, rel.y - a.y) <= TREND_ENDPOINT_PX;
+          const onP2 = Math.hypot(rel.x - b.x, rel.y - b.y) <= TREND_ENDPOINT_PX;
+          if (!onP1 && !onP2) continue;
+
+          e.preventDefault();
+          const endpoint: "p1" | "p2" = onP1 ? "p1" : "p2";
+          trendDragRef.current = { id: t.id, endpoint };
+          chart.applyOptions({ handleScroll: false, handleScale: false });
+          let last = endpoint === "p1" ? t.p1 : t.p2;
+
+          const move = (ev: MouseEvent) => {
+            const pt = eventToTrendPoint(ev.clientX, ev.clientY);
+            if (!pt) return;
+            last = pt;
+            const next = trendlines.map((tl) =>
+              tl.id === t.id ? { ...tl, [endpoint]: pt } : tl
+            );
+            trendlinePrimitiveRef.current?.setTrendlines(next);
+          };
+          const up = () => {
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+            trendDragRef.current = null;
+            chartRef.current?.applyOptions({
+              handleScroll: true,
+              handleScale: true,
+            });
+            const p1 = endpoint === "p1" ? last : t.p1;
+            const p2 = endpoint === "p2" ? last : t.p2;
+            moveTrendline(ticker, t.id, p1, p2);
+          };
+          window.addEventListener("mousemove", move);
+          window.addEventListener("mouseup", up);
+          return;
+        }
+      }
 
       // On a line → drag the line vertically (existing behavior).
       if (hover) {
@@ -781,13 +1014,75 @@ export function CandlestickChart({
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
     },
-    [hover, lines, moveLine, relativeY, ticker, forceRefit]
+    [
+      activeTool,
+      hover,
+      lines,
+      moveLine,
+      relativeY,
+      relativeXY,
+      trendlines,
+      trendPointToXY,
+      eventToTrendPoint,
+      moveTrendline,
+      ticker,
+      forceRefit,
+    ]
+  );
+
+  // Single click with a tool armed places points: one click for a horizontal
+  // line, two clicks for a trendline. The tool disarms after placing.
+  const onChartClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (activeTool === "none") return;
+      const pt = eventToTrendPoint(e.clientX, e.clientY);
+      if (!pt) return;
+
+      // Don't place when clicking the price axis.
+      const rect = containerRef.current?.getBoundingClientRect();
+      const axisW = chartRef.current?.priceScale("right").width() ?? 0;
+      if (rect && e.clientX - rect.left > rect.width - axisW) return;
+
+      const finish = () => {
+        setActiveTool("none");
+        suppressDblClickRef.current = true;
+        window.setTimeout(() => {
+          suppressDblClickRef.current = false;
+        }, 400);
+      };
+
+      if (activeTool === "hline") {
+        addLine(ticker, pt.price);
+        finish();
+        return;
+      }
+
+      // trendline
+      if (!pendingP1) {
+        setPendingP1(pt);
+        trendlinePrimitiveRef.current?.setDraft({ p1: pt, cursor: pt });
+      } else {
+        addTrendline(ticker, pendingP1, pt);
+        setPendingP1(null);
+        trendlinePrimitiveRef.current?.setDraft(null);
+        finish();
+      }
+    },
+    [activeTool, pendingP1, eventToTrendPoint, addLine, addTrendline, ticker]
   );
 
   // Double-click the price axis to reset the vertical pan back to autoscale;
   // double-click anywhere else to drop a new horizontal line.
   const onChartDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      // Swallow the dblclick that trails a tool placement; ignore while a tool
+      // is armed (clicks are handled by onChartClick).
+      if (suppressDblClickRef.current) {
+        suppressDblClickRef.current = false;
+        return;
+      }
+      if (activeTool !== "none") return;
+
       const series = candleSeriesRef.current;
       const yc = relativeY(e.clientY);
       if (yc == null || !series) return;
@@ -804,13 +1099,16 @@ export function CandlestickChart({
       if (price == null) return;
       addLine(ticker, roundPrice(price));
     },
-    [addLine, relativeY, ticker, forceRefit]
+    [activeTool, addLine, relativeY, ticker, forceRefit]
   );
 
   // A fresh symbol or timeframe should start from a clean autoscale.
   useEffect(() => {
     priceOffsetRef.current = 0;
   }, [ticker, interval]);
+
+  // Total drawings for this ticker — shown as the Draw button's badge.
+  const drawingCount = lines.length + trendlines.length;
 
   const isUp =
     data.length >= 2 ? data[data.length - 1].close >= data[0].close : true;
@@ -963,27 +1261,62 @@ export function CandlestickChart({
         {/* Candle/background colors + opacity (persisted globally). */}
         <ChartStyleMenu chartType={chartType} />
 
-        {/* Horizontal lines: double-click the chart to add one. This button
-            shows the count and clears them all. */}
-        <button
-          type="button"
-          onClick={() => lines.length > 0 && clearLines(ticker)}
-          disabled={lines.length === 0}
-          title={
-            lines.length > 0
-              ? "Clear all lines (double-click the chart to add one)"
-              : "Double-click the chart to add a horizontal line"
-          }
-          className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border border-border-primary bg-transparent text-text-secondary transition-colors enabled:hover:text-text-primary enabled:cursor-pointer disabled:opacity-60"
-        >
-          <Minus className="h-3 w-3" />
-          Lines
-          {lines.length > 0 && (
-            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-green-primary px-1 text-[10px] text-white">
-              {lines.length}
-            </span>
-          )}
-        </button>
+        {/* Drawing tools: arm a horizontal line (one click) or a trendline (two
+            clicks), or clear everything. The badge counts both drawing types. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border bg-transparent transition-colors cursor-pointer ${
+              activeTool !== "none"
+                ? "border-[#22d3ee] text-[#22d3ee]"
+                : "border-border-primary text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <PenLine className="h-3 w-3" />
+            {activeTool === "trendline"
+              ? pendingP1
+                ? "Click end point…"
+                : "Click start point…"
+              : activeTool === "hline"
+                ? "Click to place…"
+                : "Draw"}
+            {drawingCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-green-primary px-1 text-[10px] text-white">
+                {drawingCount}
+              </span>
+            )}
+            <ChevronDown className="h-3 w-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onClick={() => {
+                setPendingP1(null);
+                trendlinePrimitiveRef.current?.setDraft(null);
+                setActiveTool("hline");
+              }}
+            >
+              <Minus className="h-4 w-4" />
+              Horizontal line
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setPendingP1(null);
+                trendlinePrimitiveRef.current?.setDraft(null);
+                setActiveTool("trendline");
+              }}
+            >
+              <TrendingUp className="h-4 w-4" />
+              Trendline
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={drawingCount === 0}
+              onClick={() => clearAll(ticker)}
+            >
+              <X className="h-4 w-4" />
+              Clear all
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Options strike-breakdown controls (fullscreen only): OI⇄Volume toggle,
             expiry window, and a calls/puts color legend. */}
@@ -1065,11 +1398,22 @@ export function CandlestickChart({
         <div
           ref={containerRef}
           className="h-full w-full"
-          style={{ cursor: hover ? "ns-resize" : undefined }}
+          style={{
+            cursor:
+              activeTool !== "none"
+                ? "crosshair"
+                : hover
+                  ? "ns-resize"
+                  : trendHover
+                    ? "pointer"
+                    : undefined,
+          }}
           onMouseMove={onChartMouseMove}
           onMouseDown={onChartMouseDown}
+          onClick={onChartClick}
           onMouseLeave={() => {
             if (!dragRef.current) setHover(null);
+            if (!trendDragRef.current) setTrendHover(null);
           }}
           onDoubleClick={onChartDoubleClick}
         />
@@ -1092,6 +1436,26 @@ export function CandlestickChart({
             }}
             title="Remove line"
             aria-label="Remove line"
+            className="absolute z-20 flex h-5 w-5 items-center justify-center rounded border border-border-primary bg-bg-elevated/90 text-text-secondary backdrop-blur transition-colors hover:text-red-primary"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+
+        {/* ✕ delete affordance for the trendline under the cursor, at its
+            midpoint. */}
+        {trendHover && activeTool === "none" && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              removeTrendline(ticker, trendHover.id);
+              setTrendHover(null);
+            }}
+            style={{ top: trendHover.mid.y - 10, left: trendHover.mid.x - 10 }}
+            title="Remove trendline"
+            aria-label="Remove trendline"
             className="absolute z-20 flex h-5 w-5 items-center justify-center rounded border border-border-primary bg-bg-elevated/90 text-text-secondary backdrop-blur transition-colors hover:text-red-primary"
           >
             <X className="h-3 w-3" />

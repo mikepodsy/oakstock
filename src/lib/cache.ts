@@ -65,3 +65,9 @@ export const questradeCandlesCache = getOrCreateCache<unknown[]>("questrade-cand
 // Options strike breakdown. Short TTL so intraday volume stays fresh; open
 // interest only changes once a day so the rest of the payload is stable.
 export const questradeOptionsCache = getOrCreateCache<unknown>("questrade-options", 60);
+// Per-expiry option chain with per-contract quotes/greeks for the position
+// builder. Keyed TICKER:EXPIRY; short TTL so bid/ask/IV stay live.
+export const optionChainCache = getOrCreateCache<unknown>("option-chain", 60);
+// Assembled volatility dashboard (IV/HV history + term structure + skew).
+// Keyed TICKER; 30-min TTL — history is daily, term/skew tolerate slight lag.
+export const volatilityCache = getOrCreateCache<unknown>("volatility", 1800);

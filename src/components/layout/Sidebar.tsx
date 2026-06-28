@@ -18,6 +18,7 @@ import {
   PanelLeftOpen,
   Users,
   BarChart2,
+  LineChart,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
@@ -35,6 +36,7 @@ const NAV_LINKS = [
   { href: "/watchlist", label: "Watchlist", icon: Eye },
   { href: "/radar", label: "Radar", icon: Radar },
   { href: "/market-data", label: "Market Data", icon: Globe },
+  { href: "/options", label: "Options", icon: LineChart },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/economic", label: "Economic", icon: TrendingUp },
   { href: "/cot", label: "COT Report", icon: BarChart2 },

@@ -34,6 +34,18 @@ export const BENCHMARK_GROUPS = [
   },
 ] as const;
 
+// The "Magnificent 7" mega-cap tech names tracked on the momentum Alerts page.
+// Defined as a constant so adding/removing tickers is a one-line edit.
+export const MAG7 = [
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "AMZN",
+  "GOOGL",
+  "META",
+  "TSLA",
+] as const;
+
 export const MARKET_INDICES = [
   { ticker: "^GSPC", name: "S&P 500" },
   { ticker: "^GSPTSE", name: "TSX" },

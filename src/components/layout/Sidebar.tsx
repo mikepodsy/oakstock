@@ -20,6 +20,7 @@ import {
   Users,
   BarChart2,
   LineChart,
+  Bell,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
@@ -35,6 +36,7 @@ const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
+  { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/radar", label: "Radar", icon: Radar },
   { href: "/market-data", label: "Market Data", icon: Globe },
   { href: "/news", label: "News", icon: Newspaper },

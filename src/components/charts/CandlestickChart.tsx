@@ -1329,9 +1329,6 @@ export function CandlestickChart({
         {/* Indicators (multi-select, configurable, persisted). */}
         <IndicatorsMenu isIntraday={isIntraday} />
 
-        {/* Candle/background colors + opacity (persisted globally). */}
-        <ChartStyleMenu chartType={chartType} />
-
         {/* Drawing tools: arm a horizontal line (one click) or a trendline (two
             clicks), or clear everything. The badge counts both drawing types. */}
         <DropdownMenu>
@@ -1388,6 +1385,9 @@ export function CandlestickChart({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Candle/background colors + opacity (persisted globally). */}
+        <ChartStyleMenu chartType={chartType} />
 
         {/* Options strike-breakdown controls (fullscreen only): OI⇄Volume toggle,
             expiry window, and a calls/puts color legend. */}

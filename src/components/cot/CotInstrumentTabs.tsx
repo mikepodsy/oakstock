@@ -17,7 +17,7 @@ interface CotInstrumentTabsProps {
 }
 
 // Fixed display order for the group dropdowns, independent of report arrival order.
-const GROUP_ORDER: CotGroup[] = ["Indices", "Metals", "FX", "Energy"];
+const GROUP_ORDER: CotGroup[] = ["Indices", "Bonds", "Metals", "FX", "Energy"];
 
 export function CotInstrumentTabs({ reports, selected, onSelect }: CotInstrumentTabsProps) {
   // Bucket reports by group, preserving config order within each group.

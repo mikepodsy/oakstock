@@ -8,8 +8,15 @@ import { CotNetChart } from "@/components/cot/CotNetChart";
 import { CotIndexGauge } from "@/components/cot/CotIndexGauge";
 import { CotHistoryChart } from "@/components/cot/CotHistoryChart";
 import { CotLoadingSkeleton } from "@/components/cot/CotLoadingSkeleton";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 import { formatDate } from "@/utils/formatters";
-import { RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 
 type CotView = "detailed" | "legacy";
 
@@ -17,6 +24,8 @@ export default function CotPage() {
   const { data, loading, error, refetch } = useCotData();
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<CotView>("detailed");
+  // Which historical week (report date) to display; null = latest.
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const report = data?.length
     ? (data.find((r) => r.instrument === selected) ?? data[0])
@@ -34,6 +43,17 @@ export default function CotPage() {
         : null;
   const viewLabel = activeView === "legacy" ? "Legacy" : "Detailed";
 
+  // History is oldest → newest. Build a newest-first date list for the dropdown and
+  // resolve the week to display (falling back to the latest when no/stale selection).
+  const weeks = groups?.history ?? [];
+  const datesNewestFirst = [...weeks].reverse();
+  const selectedWeek =
+    (selectedDate ? weeks.find((w) => w.reportDate === selectedDate) : null) ??
+    weeks[weeks.length - 1] ??
+    null;
+  const displayCategories = selectedWeek?.categories ?? groups?.categories ?? [];
+  const isLatest = !selectedWeek || selectedWeek.reportDate === report?.reportDate;
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -44,10 +64,29 @@ export default function CotPage() {
             CFTC Commitment of Traders — positioning by trader category
           </p>
         </div>
-        {report && (
+        {report && selectedWeek && (
           <div className="text-right">
-            <span className="text-xs text-text-tertiary">Report date</span>
-            <p className="text-sm font-mono text-text-secondary">{formatDate(report.reportDate)}</p>
+            <span className="block text-xs text-text-tertiary mb-1">Report date</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-tertiary text-sm font-mono text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors cursor-pointer">
+                {formatDate(selectedWeek.reportDate)}
+                {!isLatest && <span className="text-xs text-text-tertiary">(past)</span>}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
+                <DropdownMenuRadioGroup
+                  value={selectedWeek.reportDate}
+                  onValueChange={(v) => setSelectedDate(v)}
+                >
+                  {datesNewestFirst.map((w, i) => (
+                    <DropdownMenuRadioItem key={w.reportDate} value={w.reportDate}>
+                      {formatDate(w.reportDate)}
+                      {i === 0 && <span className="ml-1.5 text-xs text-text-tertiary">latest</span>}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
@@ -101,18 +140,18 @@ export default function CotPage() {
             </div>
           )}
 
-          {/* Long / Short chart */}
+          {/* Long / Short chart (for the selected report week) */}
           <CotPositionChart
-            categories={groups.categories}
+            categories={displayCategories}
             title={`${report.instrument} — Long / Short Positioning (${viewLabel})`}
           />
 
           {/* Net position chart */}
-          <CotNetChart categories={groups.categories} />
+          <CotNetChart categories={displayCategories} />
 
           {/* 3-year net-positioning index (bullishness / bearishness) */}
           <CotIndexGauge
-            categories={groups.categories}
+            categories={displayCategories}
             title={`${report.instrument} — 3-Year Net Positioning Index (${viewLabel})`}
           />
 

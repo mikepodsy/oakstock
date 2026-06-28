@@ -17,6 +17,10 @@ const HISTORY_WEEKS = 52;
 // derived from this window — the 52-week chart payload is unaffected.
 const INDEX_WEEKS = 156;
 
+// Records pulled from CFTC: enough to compute a rolling 3-year index for every one
+// of the 52 historical weeks (so past reports show their own index), i.e. 52 + 156.
+const FETCH_WEEKS = HISTORY_WEEKS + INDEX_WEEKS;
+
 // ─── Instrument Config (add more here to extend) ──────────────────────────────
 const INSTRUMENTS: CotInstrument[] = [
   // ── Indices ──
@@ -41,6 +45,22 @@ const INSTRUMENTS: CotInstrument[] = [
   {
     label: "VIX",
     cftcName: "VIX FUTURES - CBOE FUTURES EXCHANGE",
+    reportType: "tff",
+    group: "Indices",
+  },
+  {
+    // CBOT renamed the consolidated E-mini Dow series; "DJIA Consolidated" is the
+    // current one (the older "DOW JONES INDUSTRIAL AVG- x $5" stopped in 2022).
+    label: "Dow Jones",
+    cftcName: "DJIA Consolidated - CHICAGO BOARD OF TRADE",
+    reportType: "tff",
+    group: "Indices",
+  },
+  {
+    // Yen-denominated Nikkei is the actively-updating, more liquid CME series;
+    // the USD-denominated "NIKKEI STOCK AVERAGE" went stale in early 2026.
+    label: "Nikkei 225",
+    cftcName: "NIKKEI STOCK AVERAGE YEN DENOM - CHICAGO MERCANTILE EXCHANGE",
     reportType: "tff",
     group: "Indices",
   },
@@ -109,6 +129,37 @@ const INSTRUMENTS: CotInstrument[] = [
     reportType: "disagg",
     group: "Energy",
   },
+  {
+    label: "Natural Gas",
+    cftcName: "NAT GAS NYME - NEW YORK MERCANTILE EXCHANGE",
+    reportType: "disagg",
+    group: "Energy",
+  },
+  // ── Bonds (US Treasuries — CBOT renamed these to the short "UST …" form) ──
+  {
+    label: "30-Year T-Bond",
+    cftcName: "UST BOND - CHICAGO BOARD OF TRADE",
+    reportType: "tff",
+    group: "Bonds",
+  },
+  {
+    label: "10-Year T-Note",
+    cftcName: "UST 10Y NOTE - CHICAGO BOARD OF TRADE",
+    reportType: "tff",
+    group: "Bonds",
+  },
+  {
+    label: "5-Year T-Note",
+    cftcName: "UST 5Y NOTE - CHICAGO BOARD OF TRADE",
+    reportType: "tff",
+    group: "Bonds",
+  },
+  {
+    label: "2-Year T-Note",
+    cftcName: "UST 2Y NOTE - CHICAGO BOARD OF TRADE",
+    reportType: "tff",
+    group: "Bonds",
+  },
 ];
 
 // ─── CFTC Column Maps ─────────────────────────────────────────────────────────
@@ -176,18 +227,23 @@ function cotIndex(records: Record<string, unknown>[], cols: ColPair): number | n
   return Math.min(Math.max(idx, 0), 100);
 }
 
-function buildCategories(
+// Build the full category set for the week at index `i` (0 = newest). netChange is
+// vs the prior week (records[i+1]); the index uses the trailing 3-year window from
+// that week (records.slice(i)). Lets any historical week render like the latest one.
+function buildCategoriesAt(
   records: Record<string, unknown>[],
+  i: number,
   categoryDefs: { name: string; cols: ColPair }[]
 ): CotCategory[] {
-  const latest = records[0];
-  const prev = records[1] ?? null;
+  const latest = records[i];
+  const prev = records[i + 1] ?? null;
+  const window = records.slice(i);
   return categoryDefs.map(({ name, cols }) => {
     const longs  = num(latest, cols.long);
     const shorts = num(latest, cols.short);
     const net    = longs - shorts;
     const prevNet = prev ? num(prev, cols.long) - num(prev, cols.short) : 0;
-    return { name, longs, shorts, net, netChange: net - prevNet, index: cotIndex(records, cols) };
+    return { name, longs, shorts, net, netChange: net - prevNet, index: cotIndex(window, cols) };
   });
 }
 
@@ -203,20 +259,16 @@ function buildHistory(
   // records arrive newest-first; reverse so the chart plots oldest → newest left to right
   return records
     .slice(0, HISTORY_WEEKS)
-    .map((rec) => ({
-      reportDate: reportDateOf(rec),
-      categories: categoryDefs.map(({ name, cols }) => {
-        const longs = num(rec, cols.long);
-        const shorts = num(rec, cols.short);
-        return { name, longs, shorts, net: longs - shorts };
-      }),
+    .map((_, i) => ({
+      reportDate: reportDateOf(records[i]),
+      categories: buildCategoriesAt(records, i, categoryDefs),
     }))
     .reverse();
 }
 
-// Pull up to INDEX_WEEKS (≈3 years) of records for a given dataset and CFTC market
-// name, newest-first. The 52-week chart uses the first slice; the full window feeds
-// the 3-year COT index. Returns [] on any failure.
+// Pull up to FETCH_WEEKS (~4 years) of records for a given dataset and CFTC market
+// name, newest-first. The 52-week chart uses the first slice; the deeper tail feeds
+// the rolling 3-year COT index for each of those weeks. Returns [] on any failure.
 async function fetchRecords(
   dataset: string,
   cftcName: string,
@@ -225,7 +277,7 @@ async function fetchRecords(
   const params = new URLSearchParams({
     $where: `market_and_exchange_names='${cftcName}'`,
     $order: "report_date_as_yyyy_mm_dd DESC",
-    $limit: String(INDEX_WEEKS),
+    $limit: String(FETCH_WEEKS),
   });
   const url = `${CFTC_BASE}/${dataset}.json?${params}`;
 
@@ -246,7 +298,7 @@ function buildGroupSet(
   categoryDefs: { name: string; cols: ColPair }[]
 ): CotGroupSet {
   return {
-    categories: buildCategories(records, categoryDefs),
+    categories: buildCategoriesAt(records, 0, categoryDefs),
     history: buildHistory(records, categoryDefs),
   };
 }
@@ -286,7 +338,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v5";
+  const CACHE_KEY = "cot-all-v6";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

@@ -341,7 +341,7 @@ export interface TreasuryBundleData {
 export type CotReportType = "tff" | "disagg";
 
 // Instruments are bucketed into these groups for the grouped selector dropdowns.
-export type CotGroup = "Indices" | "Metals" | "FX" | "Energy";
+export type CotGroup = "Indices" | "Metals" | "FX" | "Energy" | "Bonds";
 
 export interface CotInstrument {
   label: string;
@@ -361,12 +361,9 @@ export interface CotCategory {
   index: number | null;
 }
 
-export interface CotWeekCategory {
-  name: string;
-  longs: number;
-  shorts: number;
-  net: number;
-}
+// Each history week carries full category data (net change vs the prior week and
+// the rolling 3-year index) so any past report renders identically to the latest.
+export type CotWeekCategory = CotCategory;
 
 export interface CotWeek {
   reportDate: string;

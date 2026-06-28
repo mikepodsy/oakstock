@@ -1,10 +1,13 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useEffect } from "react";
 import { LineChart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TickerSearch } from "@/components/search/TickerSearch";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
+import { OptionsTabs } from "@/components/options/OptionsTabs";
+import { useOptionsTickerStore } from "@/stores/optionsTickerStore";
 import { useVolatility } from "@/hooks/useVolatility";
 import { IvVrpSection } from "@/components/options/volatility/IvVrpSection";
 import { TermStructureSection } from "@/components/options/volatility/TermStructureSection";
@@ -17,24 +20,27 @@ export default function VolatilityPage() {
   const ticker = (params.ticker as string)?.toUpperCase() ?? "";
   const { data, loading, error } = useVolatility(ticker);
 
+  // Remember this ticker so the Options tab returns here next time.
+  const setLastTicker = useOptionsTickerStore((s) => s.setLastTicker);
+  useEffect(() => {
+    if (ticker) setLastTicker(ticker);
+  }, [ticker, setLastTicker]);
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          <CompanyLogo ticker={ticker} className="w-10 h-10 rounded-lg" textClassName="text-sm" />
           <h1 className="text-2xl font-display text-text-primary">{ticker}</h1>
-          <span className="text-sm text-text-secondary">Volatility</span>
           {data?.spot != null && (
             <span className="text-sm font-financial text-text-tertiary">${data.spot.toFixed(2)}</span>
           )}
-          <Link
-            href={`/options/${ticker}`}
-            className="text-xs text-green-primary hover:underline"
-          >
-            ← Builder
-          </Link>
         </div>
-        <div className="w-64">
-          <TickerSearch onSelect={(r) => router.push(`/options/${r.ticker}/volatility`)} />
+        <div className="flex items-center gap-3">
+          <OptionsTabs ticker={ticker} />
+          <div className="w-56">
+            <TickerSearch onSelect={(r) => router.push(`/options/${r.ticker}/volatility`)} />
+          </div>
         </div>
       </div>
 

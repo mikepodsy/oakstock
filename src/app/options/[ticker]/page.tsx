@@ -1,9 +1,11 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
+import { OptionsTabs } from "@/components/options/OptionsTabs";
+import { useOptionsTickerStore } from "@/stores/optionsTickerStore";
 import { StrategySelector } from "@/components/options/StrategySelector";
 import { LegBuilder } from "@/components/options/LegBuilder";
 import { PayoffChart } from "@/components/options/PayoffChart";
@@ -33,6 +35,12 @@ export default function OptionsBuilderPage() {
 
   const { chains, expiries, spot, defaultExpiry, loading, error, ensureExpiry } =
     useOptionChain(ticker);
+
+  // Remember this ticker so the Options tab returns here next time.
+  const setLastTicker = useOptionsTickerStore((s) => s.setLastTicker);
+  useEffect(() => {
+    if (ticker) setLastTicker(ticker);
+  }, [ticker, setLastTicker]);
 
   const [strategy, setStrategy] = useState<StrategyType>("long_call");
   const [legs, setLegs] = useState<OptionLeg[]>([]);
@@ -180,6 +188,7 @@ export default function OptionsBuilderPage() {
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          <CompanyLogo ticker={ticker} className="w-10 h-10 rounded-lg" textClassName="text-sm" />
           <h1 className="text-2xl font-display text-text-primary">{ticker}</h1>
           <div className="flex items-center gap-1 text-sm text-text-secondary">
             <span className="text-text-tertiary">Underlying</span>
@@ -196,12 +205,7 @@ export default function OptionsBuilderPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href={`/options/${ticker}/volatility`}
-            className="text-xs text-text-secondary hover:text-text-primary transition-colors"
-          >
-            Volatility →
-          </Link>
+          <OptionsTabs ticker={ticker} />
           <StrategySelector value={strategy} onChange={handleStrategyChange} />
         </div>
       </div>

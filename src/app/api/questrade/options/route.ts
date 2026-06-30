@@ -8,12 +8,20 @@ import type {
   OptionsExpiry,
 } from "@/types";
 
+// A wide multi-expiry selection on a high-strike-count underlier (QQQ, SPY)
+// produces dozens of quote batches; give the function headroom beyond Vercel's
+// default so it never times out mid-aggregation and returns "no data".
+export const maxDuration = 60;
+
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=60, stale-while-revalidate=60",
 };
 
 // Questrade caps option-quote requests; stay well under it per batch.
 const QUOTE_BATCH_SIZE = 100;
+// How many quote batches to fetch at once. High enough to keep multi-expiry
+// requests fast, low enough to stay under Questrade's market-data rate limit.
+const QUOTE_CONCURRENCY = 6;
 // Only aggregate strikes within this band around spot. Far-OTM strikes never
 // show on the price-aligned histogram and only inflate the API call count.
 const STRIKE_BAND = 0.4; // ±40% of spot
@@ -66,6 +74,34 @@ function computeFlip(rows: OptionStrikeRow[]): number | null {
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+// Fetch all option-quote batches with bounded concurrency. Running them in
+// parallel (instead of one sequential round-trip each) is what keeps a wide
+// multi-expiry selection inside the function budget. A batch that fails is
+// skipped rather than failing the whole request, so the panel shows the strikes
+// it did get instead of nothing.
+async function fetchQuotesPooled(batches: number[][]): Promise<OptionQuote[]> {
+  const out: OptionQuote[] = [];
+  let next = 0;
+  async function run() {
+    while (next < batches.length) {
+      const i = next++;
+      try {
+        const { optionQuotes } = await questradePost<OptionQuotesResponse>(
+          "/v1/markets/quotes/options",
+          { optionIds: batches[i] }
+        );
+        out.push(...optionQuotes);
+      } catch {
+        /* skip this batch; partial data beats a total failure */
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(QUOTE_CONCURRENCY, batches.length) }, run)
+  );
   return out;
 }
 
@@ -230,47 +266,42 @@ export async function GET(request: NextRequest) {
     const gammaAcc = new Map<number, { call: number; put: number }>();
     let hasGreeks = false;
 
-    for (const batch of chunk(ids, QUOTE_BATCH_SIZE)) {
-      const { optionQuotes } = await questradePost<OptionQuotesResponse>(
-        "/v1/markets/quotes/options",
-        { optionIds: batch }
-      );
-      for (const q of optionQuotes) {
-        const strike = strikeOf.get(q.symbolId);
-        const side = sideOf.get(q.symbolId);
-        if (strike === undefined || side === undefined) continue;
+    const optionQuotes = await fetchQuotesPooled(chunk(ids, QUOTE_BATCH_SIZE));
+    for (const q of optionQuotes) {
+      const strike = strikeOf.get(q.symbolId);
+      const side = sideOf.get(q.symbolId);
+      if (strike === undefined || side === undefined) continue;
 
-        let row = byStrike.get(strike);
-        if (!row) {
-          row = {
-            strike,
-            callOI: 0,
-            putOI: 0,
-            callVol: 0,
-            putVol: 0,
-            callGex: 0,
-            putGex: 0,
-            gex: 0,
-          };
-          byStrike.set(strike, row);
-        }
-        const oi = q.openInterest ?? 0;
-        const vol = q.volume ?? 0;
-        if (side === "call") {
-          row.callOI += oi;
-          row.callVol += vol;
-        } else {
-          row.putOI += oi;
-          row.putVol += vol;
-        }
+      let row = byStrike.get(strike);
+      if (!row) {
+        row = {
+          strike,
+          callOI: 0,
+          putOI: 0,
+          callVol: 0,
+          putVol: 0,
+          callGex: 0,
+          putGex: 0,
+          gex: 0,
+        };
+        byStrike.set(strike, row);
+      }
+      const oi = q.openInterest ?? 0;
+      const vol = q.volume ?? 0;
+      if (side === "call") {
+        row.callOI += oi;
+        row.callVol += vol;
+      } else {
+        row.putOI += oi;
+        row.putVol += vol;
+      }
 
-        if (q.gamma != null) {
-          hasGreeks = true;
-          const g = gammaAcc.get(strike) ?? { call: 0, put: 0 };
-          if (side === "call") g.call += q.gamma * oi;
-          else g.put += q.gamma * oi;
-          gammaAcc.set(strike, g);
-        }
+      if (q.gamma != null) {
+        hasGreeks = true;
+        const g = gammaAcc.get(strike) ?? { call: 0, put: 0 };
+        if (side === "call") g.call += q.gamma * oi;
+        else g.put += q.gamma * oi;
+        gammaAcc.set(strike, g);
       }
     }
 

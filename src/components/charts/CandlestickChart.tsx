@@ -37,7 +37,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1467,7 +1466,7 @@ export function CandlestickChart({
                 <ChevronDown className="h-3 w-3" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-                <DropdownMenuLabel className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4 px-1.5 py-1 text-xs font-medium text-text-secondary">
                   <span>Expiries</span>
                   <span className="flex gap-2 text-[11px] font-normal">
                     <button
@@ -1495,7 +1494,7 @@ export function CandlestickChart({
                       Clear
                     </button>
                   </span>
-                </DropdownMenuLabel>
+                </div>
                 <DropdownMenuSeparator />
                 {(optionsData?.expiries ?? []).map((ex) => (
                   <DropdownMenuCheckboxItem

@@ -29,7 +29,8 @@ SUPABASE_KEY = os.environ.get(
     ""
 )
 
-EDGAR_BASE      = "https://data.sec.gov"
+EDGAR_BASE      = "https://data.sec.gov"      # submissions/company-facts JSON API
+ARCHIVES_BASE   = "https://www.sec.gov"       # filing Archives (index.json + documents)
 EDGAR_HEADERS   = {
     "User-Agent": "Oakstock research@oakstock.app",  # SEC requires this
     "Accept-Encoding": "gzip, deflate",
@@ -90,9 +91,9 @@ def get_filings_list(cik: str, form_type: str = "13F-HR", max_count: int = 8):
 
 def get_13f_xml_url(cik: str, accession: str) -> str | None:
     """Find the primary XML infotable file in a 13F filing."""
-    padded = cik.lstrip("0").zfill(10)
-    acc_fmt = f"{accession[:10]}-{accession[10:12]}-{accession[12:]}"
-    index_url = f"{EDGAR_BASE}/Archives/edgar/data/{padded.lstrip('0')}/{accession}/{acc_fmt}-index.json"
+    cik_num = cik.lstrip("0")
+    dir_url = f"{ARCHIVES_BASE}/Archives/edgar/data/{cik_num}/{accession}"
+    index_url = f"{dir_url}/index.json"
 
     try:
         index = edgar_get(index_url).json()
@@ -103,12 +104,12 @@ def get_13f_xml_url(cik: str, accession: str) -> str | None:
     for item in index.get("directory", {}).get("item", []):
         name = item.get("name", "")
         if "infotable" in name.lower() and name.endswith(".xml"):
-            return f"{EDGAR_BASE}/Archives/edgar/data/{padded.lstrip('0')}/{accession}/{name}"
-    # Broader search
+            return f"{dir_url}/{name}"
+    # Broader search — the infotable doc is the only .xml besides primary_doc.xml
     for item in index.get("directory", {}).get("item", []):
         name = item.get("name", "")
         if name.endswith(".xml") and name not in ("primary_doc.xml",):
-            return f"{EDGAR_BASE}/Archives/edgar/data/{padded.lstrip('0')}/{accession}/{name}"
+            return f"{dir_url}/{name}"
     return None
 
 
@@ -120,9 +121,13 @@ NS_MAP = {
 
 def parse_13f_xml(xml_text: str) -> list[dict]:
     """Parse 13F infotable XML and return list of holding dicts."""
-    # Strip namespace for simpler parsing
-    xml_clean = re.sub(r' xmlns[^"]*"[^"]*"', "", xml_text)
-    xml_clean = re.sub(r'<\?xml[^?]*\?>', "", xml_clean)
+    # Strip namespaces for simpler parsing. The root carries xmlns declarations
+    # plus a prefixed xsi:schemaLocation attribute; both the declarations and any
+    # prefixed tags/attributes must go, or ElementTree raises "unbound prefix".
+    xml_clean = re.sub(r'<\?xml[^?]*\?>', "", xml_text)
+    xml_clean = re.sub(r'\sxmlns(:\w+)?="[^"]*"', "", xml_clean)  # drop xmlns decls
+    xml_clean = re.sub(r'\s\w+:(\w+=)', r' \1', xml_clean)        # xsi:schemaLocation -> schemaLocation
+    xml_clean = re.sub(r'<(/?)\w+:', r'<\1', xml_clean)           # strip tag prefixes
 
     try:
         root = ET.fromstring(xml_clean)
@@ -133,7 +138,9 @@ def parse_13f_xml(xml_text: str) -> list[dict]:
     holdings = []
     for entry in root.findall(".//infoTable"):
         def txt(tag):
-            el = entry.find(tag)
+            # Use a descendant search: sshPrnamt / sshPrnamtType are nested inside
+            # <shrsOrPrnAmt>, so a direct-child find() would miss them (shares=0).
+            el = entry.find(f".//{tag}")
             return el.text.strip() if el is not None and el.text else ""
 
         value_raw = txt("value")
@@ -168,7 +175,7 @@ def resolve_tickers(cusips: list[str]) -> dict[str, str]:
         return {}
 
     ticker_map = {}
-    batch_size = 100  # OpenFIGI max
+    batch_size = 10  # OpenFIGI unauthenticated cap is 10 mapping jobs per request (HTTP 413 above that)
 
     for i in range(0, len(cusips), batch_size):
         batch = cusips[i:i + batch_size]
@@ -279,7 +286,10 @@ def fetch_manager(manager: dict, supabase, num_quarters: int = 2):
     # Parse each quarter
     all_parsed = {}  # quarter → list[dict]
 
-    for filing in filings[:num_quarters + 1]:
+    # Process oldest→newest so each quarter's previous quarter is already loaded
+    # when we compute change_type (otherwise the newest, displayed quarter would
+    # have no prior to diff against and every position would look "new").
+    for filing in reversed(filings[:num_quarters + 1]):
         quarter = period_to_quarter(filing["period"])
         print(f"\n  Quarter: {quarter} (filed {filing['filed_date']})")
 
@@ -330,7 +340,11 @@ def fetch_manager(manager: dict, supabase, num_quarters: int = 2):
         # 6. Build DB rows
         rows = []
         for h in enriched:
-            ticker = ticker_map.get(h["cusip"], "") or None
+            # Option rows (Call/Put) share the underlying's ticker, which would
+            # collide on the unique (manager_id, quarter, ticker) index. NULLs are
+            # distinct, so leave option rows ticker-less — they still carry
+            # company_name + option_type for display.
+            ticker = None if h.get("option_type") else (ticker_map.get(h["cusip"], "") or None)
             pct = round(h["value_usd"] / total_value * 100, 3) if total_value > 0 else 0
             rows.append({
                 "manager_id":     mid,

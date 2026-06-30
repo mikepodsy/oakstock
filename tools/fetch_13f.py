@@ -143,27 +143,37 @@ def parse_13f_xml(xml_text: str) -> list[dict]:
             el = entry.find(f".//{tag}")
             return el.text.strip() if el is not None and el.text else ""
 
-        value_raw = txt("value")
-        shares_raw = txt("sshPrnamt")
-
         try:
-            value_usd = int(value_raw.replace(",", "")) * 1000  # values are in thousands
+            value_raw_num = int(txt("value").replace(",", ""))
         except (ValueError, AttributeError):
-            value_usd = 0
+            value_raw_num = 0
 
         try:
-            shares = int(shares_raw.replace(",", ""))
+            shares = int(txt("sshPrnamt").replace(",", ""))
         except (ValueError, AttributeError):
             shares = 0
 
         holdings.append({
             "cusip":        txt("cusip"),
             "company_name": txt("nameOfIssuer"),
-            "value_usd":    value_usd,
+            "value_raw":    value_raw_num,   # scaled to dollars below once unit is known
             "shares":       shares,
             "share_class":  txt("sshPrnamtType"),
             "option_type":  txt("putCall") or None,
         })
+
+    # Detect the value unit for this filing. Pre-2023 form rules reported values in
+    # thousands; the 2023 amendment switched to whole dollars, but filers are
+    # inconsistent (e.g. Druckenmiller still files in thousands, Situational
+    # Awareness in whole dollars). The <value> tag carries no unit, so infer it from
+    # the share-weighted implied price (value / shares): a real per-share price is
+    # ~$1–$100k, so if the raw ratio is <$1 the values must be in thousands.
+    tot_val = sum(h["value_raw"] for h in holdings)
+    tot_sh  = sum(h["shares"] for h in holdings if h["shares"] > 0)
+    avg_price = (tot_val / tot_sh) if tot_sh else 0
+    multiplier = 1000 if (avg_price and avg_price < 1) else 1
+    for h in holdings:
+        h["value_usd"] = h.pop("value_raw") * multiplier
 
     return holdings
 

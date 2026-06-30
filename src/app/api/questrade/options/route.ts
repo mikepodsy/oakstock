@@ -22,9 +22,10 @@ const QUOTE_BATCH_SIZE = 100;
 // How many quote batches to fetch at once. High enough to keep multi-expiry
 // requests fast, low enough to stay under Questrade's market-data rate limit.
 const QUOTE_CONCURRENCY = 6;
-// Only aggregate strikes within this band around spot. Far-OTM strikes never
-// show on the price-aligned histogram and only inflate the API call count.
-const STRIKE_BAND = 0.4; // ±40% of spot
+// Aggregate strikes within this band around spot. Kept wide so the histogram
+// populates deep OTM/ITM strikes, but still bounded to keep the quote-batch
+// count sane on high-strike-count underliers (SPY/QQQ).
+const STRIKE_BAND = 1.0; // ±100% of spot
 
 const VALID_WINDOWS: ExpiryWindow[] = ["front", "2w", "monthly", "all"];
 

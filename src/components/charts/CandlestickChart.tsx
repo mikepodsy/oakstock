@@ -155,6 +155,8 @@ export function CandlestickChart({
   const [optionsLoading, setOptionsLoading] = useState(false);
   // Collapse the options panels out of the way so the price chart goes full width.
   const [panelsCollapsed, setPanelsCollapsed] = useState(false);
+  // Which side panel is shown: GEX histogram or the Options OI/Volume breakdown.
+  const [panelView, setPanelView] = useState<"gex" | "oi">("gex");
   // Bumped whenever the chart is recreated, so the histogram re-binds to the new
   // series instance (refs alone don't trigger a re-render).
   const [chartEpoch, setChartEpoch] = useState(0);
@@ -1416,6 +1418,25 @@ export function CandlestickChart({
               </span>
             </span>
 
+            {/* Switch the single side panel between the GEX histogram and the
+                Options OI/Volume breakdown. */}
+            <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
+              {(["gex", "oi"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setPanelView(v)}
+                  className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
+                    panelView === v
+                      ? "bg-bg-elevated text-text-primary"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  {v === "gex" ? "GEX" : "Options"}
+                </button>
+              ))}
+            </span>
+
             {/* Net (signed diverging) vs call/put Split view, for both panels. */}
             <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
               {(["net", "split"] as const).map((v) => (
@@ -1434,22 +1455,25 @@ export function CandlestickChart({
               ))}
             </span>
 
-            <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
-              {(["oi", "volume"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setOptionsMetric(m)}
-                  className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
-                    optionsMetric === m
-                      ? "bg-bg-elevated text-text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {m === "oi" ? "OI" : "Volume"}
-                </button>
-              ))}
-            </span>
+            {/* OI vs Volume only applies to the Options panel. */}
+            {panelView === "oi" && (
+              <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
+                {(["oi", "volume"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setOptionsMetric(m)}
+                    className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
+                      optionsMetric === m
+                        ? "bg-bg-elevated text-text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {m === "oi" ? "OI" : "Volume"}
+                  </button>
+                ))}
+              </span>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
@@ -1674,8 +1698,8 @@ export function CandlestickChart({
       {/* Gamma exposure by strike, diverging from a center zero line, with the
           zero-gamma flip level (fullscreen only). Sits between the chart and the
           OI/volume panel, matching the reference layout. */}
-      {fullscreen && !panelsCollapsed && (
-        <div className="flex-[0.6] min-w-[150px] border-l border-border-primary">
+      {fullscreen && !panelsCollapsed && panelView === "gex" && (
+        <div className="flex-[1] min-w-[220px] border-l border-border-primary">
           {optionsData && optionsData.hasGreeks ? (
             <GexHistogram
               series={candleSeriesRef.current}
@@ -1698,8 +1722,8 @@ export function CandlestickChart({
       )}
 
       {/* Options strike breakdown, aligned to the price axis (fullscreen only). */}
-      {fullscreen && !panelsCollapsed && (
-        <div className="relative flex-[0.6] min-w-[160px] border-l border-border-primary pl-1">
+      {fullscreen && !panelsCollapsed && panelView === "oi" && (
+        <div className="relative flex-[1] min-w-[220px] border-l border-border-primary pl-1">
           <StrikeHistogram
             series={candleSeriesRef.current}
             rows={optionsData?.rows ?? []}

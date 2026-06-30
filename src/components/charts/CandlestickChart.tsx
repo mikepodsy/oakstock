@@ -35,7 +35,9 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,8 +74,8 @@ import {
 import { maColorFor, INDICATOR_COLORS } from "@/utils/indicatorConfig";
 import type {
   QuestradeCandle,
-  ExpiryWindow,
   OptionsChainResponse,
+  StrikeView,
 } from "@/types";
 
 interface CandlestickChartProps {
@@ -120,14 +122,6 @@ const TREND_SEGMENT_PX = 6;
 // pan/edit; "hline"/"trendline" arm a placement gesture for the next clicks.
 type DrawTool = "none" | "hline" | "trendline";
 
-// Expiry windows for the options strike-breakdown panel.
-const EXPIRY_WINDOW_OPTIONS: { value: ExpiryWindow; label: string }[] = [
-  { value: "front", label: "Front expiry" },
-  { value: "2w", label: "Next 2 weeks" },
-  { value: "monthly", label: "Next month" },
-  { value: "all", label: "All expiries" },
-];
-
 // Round a clicked/dragged price to a sensible precision for its magnitude.
 function roundPrice(p: number): number {
   const decimals = Math.abs(p) >= 1 ? 2 : 4;
@@ -151,7 +145,11 @@ export function CandlestickChart({
   // Options strike-breakdown panel (fullscreen only). Lazily fetched so the
   // embedded chart never pays the options API cost.
   const [optionsMetric, setOptionsMetric] = useState<"oi" | "volume">("oi");
-  const [optionsWindow, setOptionsWindow] = useState<ExpiryWindow>("2w");
+  // How the GEX / strike histograms render: net diverging vs call/put split.
+  const [strikeView, setStrikeView] = useState<StrikeView>("net");
+  // Explicitly selected expiry dates (YYYY-MM-DD) to aggregate. Empty until the
+  // first response arrives, then seeded to the nearest expiry.
+  const [selectedExpiries, setSelectedExpiries] = useState<string[]>([]);
   const [optionsData, setOptionsData] = useState<OptionsChainResponse | null>(
     null
   );
@@ -317,14 +315,21 @@ export function CandlestickChart({
   // Lazily fetch the options strike breakdown — only while fullscreen, and
   // re-fetch on ticker/window change. Keeps the embedded chart off the options
   // API entirely.
+  const expiryKey = selectedExpiries.join(",");
   useEffect(() => {
     if (!fullscreen) return;
 
     let cancelled = false;
     setOptionsLoading(true);
-    fetchOptionStrikes(ticker, optionsWindow)
+    fetchOptionStrikes(ticker, selectedExpiries)
       .then((res) => {
-        if (!cancelled) setOptionsData(res);
+        if (cancelled) return;
+        setOptionsData(res);
+        // Seed the selection to the nearest expiry (0DTE if today is one) the
+        // first time we learn the available expiries for this ticker.
+        if (selectedExpiries.length === 0 && res.expiries.length > 0) {
+          setSelectedExpiries([res.expiries[0].date]);
+        }
       })
       .catch(() => {
         if (!cancelled) setOptionsData(null);
@@ -336,7 +341,13 @@ export function CandlestickChart({
     return () => {
       cancelled = true;
     };
-  }, [fullscreen, ticker, optionsWindow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen, ticker, expiryKey]);
+
+  // Reset the expiry selection when switching tickers so it re-seeds.
+  useEffect(() => {
+    setSelectedExpiries([]);
+  }, [ticker]);
 
   // While expanded: exit on Escape and lock background scroll. The chart uses
   // autoSize (ResizeObserver), so growing the wrapper resizes it automatically —
@@ -1406,6 +1417,24 @@ export function CandlestickChart({
               </span>
             </span>
 
+            {/* Net (signed diverging) vs call/put Split view, for both panels. */}
+            <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
+              {(["net", "split"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setStrikeView(v)}
+                  className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
+                    strikeView === v
+                      ? "bg-bg-elevated text-text-primary"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  {v === "net" ? "Net" : "Split"}
+                </button>
+              ))}
+            </span>
+
             <span className="flex items-center rounded-full border border-border-primary p-0.5 text-xs font-medium">
               {(["oi", "volume"] as const).map((m) => (
                 <button
@@ -1425,21 +1454,74 @@ export function CandlestickChart({
 
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-transparent border border-border-primary text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
-                {EXPIRY_WINDOW_OPTIONS.find((o) => o.value === optionsWindow)
-                  ?.label ?? "Expiry"}
+                {(() => {
+                  if (selectedExpiries.length === 0) return "Expiry";
+                  if (selectedExpiries.length > 1)
+                    return `${selectedExpiries.length} expiries`;
+                  const ex = optionsData?.expiries.find(
+                    (e) => e.date === selectedExpiries[0]
+                  );
+                  if (!ex) return selectedExpiries[0];
+                  return ex.isZeroDte ? "0DTE" : ex.label;
+                })()}
                 <ChevronDown className="h-3 w-3" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                  value={optionsWindow}
-                  onValueChange={(v) => setOptionsWindow(v as ExpiryWindow)}
-                >
-                  {EXPIRY_WINDOW_OPTIONS.map((opt) => (
-                    <DropdownMenuRadioItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
+              <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                <DropdownMenuLabel className="flex items-center justify-between gap-4">
+                  <span>Expiries</span>
+                  <span className="flex gap-2 text-[11px] font-normal">
+                    <button
+                      type="button"
+                      className="text-text-secondary hover:text-text-primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setSelectedExpiries(
+                          (optionsData?.expiries ?? []).map((x) => x.date)
+                        );
+                      }}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      className="text-text-secondary hover:text-text-primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        // Keep at least the nearest expiry so a panel always renders.
+                        const first = optionsData?.expiries[0]?.date;
+                        setSelectedExpiries(first ? [first] : []);
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(optionsData?.expiries ?? []).map((ex) => (
+                  <DropdownMenuCheckboxItem
+                    key={ex.date}
+                    checked={selectedExpiries.includes(ex.date)}
+                    onCheckedChange={(checked) => {
+                      setSelectedExpiries((prev) => {
+                        const next = checked
+                          ? [...prev, ex.date]
+                          : prev.filter((d) => d !== ex.date);
+                        // Never end up with an empty selection.
+                        return next.length > 0 ? next.sort() : prev;
+                      });
+                    }}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {ex.label}
+                      {ex.isZeroDte && (
+                        <span className="rounded-sm bg-oak-300/20 px-1 text-[9px] font-semibold text-oak-300">
+                          0DTE
+                        </span>
+                      )}
+                    </span>
+                  </DropdownMenuCheckboxItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
               </>
@@ -1602,6 +1684,7 @@ export function CandlestickChart({
               flip={optionsData.flip}
               netGex={optionsData.netGex}
               spot={optionsData.spot}
+              view={strikeView}
               epoch={chartEpoch}
               className="h-full w-full"
             />
@@ -1622,6 +1705,7 @@ export function CandlestickChart({
             series={candleSeriesRef.current}
             rows={optionsData?.rows ?? []}
             metric={optionsMetric}
+            view={strikeView}
             spot={optionsData?.spot ?? null}
             epoch={chartEpoch}
             className="h-full w-full"

@@ -157,9 +157,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/New_York",
+    });
     const expiries: OptionsExpiry[] = future.map((e) => {
       const day = expiryDay(e.expiryDate);
-      return { date: day, label: formatExpiryLabel(day) };
+      return { date: day, label: formatExpiryLabel(day), isZeroDte: day === today };
     });
 
     // Resolve the target expiry: requested (if listed) else nearest future.

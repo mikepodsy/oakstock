@@ -117,25 +117,34 @@ export interface QuestradeCandle {
 }
 
 // ─── Options Strike Breakdown ────────────────────────
-// Which expiries to aggregate for the strike-breakdown histogram.
+// Which expiries to aggregate for the strike-breakdown histogram. Kept as the
+// API's fallback when no explicit expiry list is supplied.
 export type ExpiryWindow = "front" | "2w" | "monthly" | "all";
 
+// How each strike histogram renders: "net" = signed diverging bars
+// (calls − puts), "split" = separate call and put bars.
+export type StrikeView = "net" | "split";
+
 // One row per strike, with call/put open-interest and volume summed across the
-// selected expiry window.
+// selected expiries.
 export interface OptionStrikeRow {
   strike: number;
   callOI: number;
   putOI: number;
   callVol: number;
   putVol: number;
-  // Net dealer gamma exposure at this strike (call GEX − put GEX), in dollars of
-  // hedging per 1% move in spot. 0 when greeks/spot are unavailable.
+  // Per-side dealer gamma exposure at this strike, in dollars of hedging per 1%
+  // move in spot. 0 when greeks/spot are unavailable.
+  callGex: number;
+  putGex: number;
+  // Net dealer gamma exposure (callGex − putGex).
   gex: number;
 }
 
 export interface OptionsExpiry {
-  date: string; // ISO expiry date
+  date: string; // ISO expiry date (YYYY-MM-DD)
   label: string; // e.g. "Jun 27"
+  isZeroDte: boolean; // true when this expiry is today's date (market TZ)
 }
 
 export interface OptionsChainResponse {

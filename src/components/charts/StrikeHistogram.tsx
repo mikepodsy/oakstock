@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
-import type { OptionStrikeRow } from "@/types";
+import type { OptionStrikeRow, StrikeView } from "@/types";
 import { formatCompactNumber } from "@/utils/formatters";
 import { niceTicks } from "@/utils/ticks";
 
@@ -10,6 +10,7 @@ import { niceTicks } from "@/utils/ticks";
 // volume bars elsewhere in the chart.
 const CALL_COLOR = "#22C55E";
 const PUT_COLOR = "#EF4444";
+const ZERO_LINE = "rgba(148,163,184,0.35)";
 const AXIS_COLOR = "rgba(148,163,184,0.7)";
 const SPOT_COLOR = "rgba(226,232,240,0.85)"; // current spot price line
 const AXIS_H = 16; // bottom strip reserved for the value axis labels
@@ -19,6 +20,8 @@ interface StrikeHistogramProps {
   series: ISeriesApi<SeriesType> | null;
   rows: OptionStrikeRow[];
   metric: "oi" | "volume";
+  /** "split" = call + put segments; "net" = signed call−put diverging bars. */
+  view: StrikeView;
   /** Current underlying price, drawn as a dashed line across the panel. */
   spot: number | null;
   /** Bumped by the parent when the chart is recreated, to re-bind the canvas. */
@@ -39,6 +42,7 @@ export function StrikeHistogram({
   series,
   rows,
   metric,
+  view,
   spot,
   epoch,
   className,
@@ -54,12 +58,16 @@ export function StrikeHistogram({
 
     let raf = 0;
     let lastSig = "";
+    const net = view === "net";
 
     const callOf = (r: OptionStrikeRow) => (metric === "oi" ? r.callOI : r.callVol);
     const putOf = (r: OptionStrikeRow) => (metric === "oi" ? r.putOI : r.putVol);
 
-    // Fixed scale across all strikes (not just visible) → stable axis.
-    const maxTotal = Math.max(1, ...rows.map((r) => callOf(r) + putOf(r)));
+    // Fixed scale across all strikes (not just visible) → stable axis. Net mode
+    // scales by the largest call−put imbalance; split mode by the largest total.
+    const maxTotal = net
+      ? Math.max(1, ...rows.map((r) => Math.abs(callOf(r) - putOf(r))))
+      : Math.max(1, ...rows.map((r) => callOf(r) + putOf(r)));
 
     const paint = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -80,7 +88,7 @@ export function StrikeHistogram({
       const spotY = spot != null ? series.priceToCoordinate(spot) : null;
 
       const sig =
-        `${cssW}x${cssH}x${dpr}|${metric}|${maxTotal}|${spotY}|` +
+        `${cssW}x${cssH}x${dpr}|${metric}|${view}|${maxTotal}|${spotY}|` +
         placed.map((p) => `${Math.round(p.y)}:${p.call}:${p.put}`).join(",");
       if (sig === lastSig) {
         raf = requestAnimationFrame(paint);
@@ -95,7 +103,19 @@ export function StrikeHistogram({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
 
-      const usableW = cssW - 4; // bars grow rightward from the left edge
+      const usableW = cssW - 4; // split: bars grow rightward from the left edge
+      const cx = Math.round(cssW / 2); // net: center zero line
+      const halfW = cx - 3;
+
+      // Net mode: center zero line (call-heavy left, put-heavy right).
+      if (net) {
+        ctx.strokeStyle = ZERO_LINE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx + 0.5, 0);
+        ctx.lineTo(cx + 0.5, plotH);
+        ctx.stroke();
+      }
 
       // Bars.
       if (placed.length > 0) {
@@ -105,16 +125,26 @@ export function StrikeHistogram({
         const barH = Math.max(1.5, Math.min(gap * 0.7, 10));
 
         for (const p of placed) {
-          const callW = (p.call / maxTotal) * usableW;
-          const putW = (p.put / maxTotal) * usableW;
           const top = p.y - barH / 2;
-          if (callW > 0) {
-            ctx.fillStyle = CALL_COLOR;
-            ctx.fillRect(0, top, callW, barH);
-          }
-          if (putW > 0) {
-            ctx.fillStyle = PUT_COLOR;
-            ctx.fillRect(callW, top, putW, barH);
+          if (net) {
+            // call-heavy grows left (green), put-heavy grows right (red).
+            const diff = p.call - p.put;
+            const len = (Math.abs(diff) / maxTotal) * halfW;
+            if (len > 0) {
+              ctx.fillStyle = diff >= 0 ? CALL_COLOR : PUT_COLOR;
+              ctx.fillRect(diff >= 0 ? cx - len : cx, top, len, barH);
+            }
+          } else {
+            const callW = (p.call / maxTotal) * usableW;
+            const putW = (p.put / maxTotal) * usableW;
+            if (callW > 0) {
+              ctx.fillStyle = CALL_COLOR;
+              ctx.fillRect(0, top, callW, barH);
+            }
+            if (putW > 0) {
+              ctx.fillStyle = PUT_COLOR;
+              ctx.fillRect(callW, top, putW, barH);
+            }
           }
         }
       }
@@ -131,15 +161,34 @@ export function StrikeHistogram({
         ctx.setLineDash([]);
       }
 
-      // Bottom value axis: 0 at the left edge, increasing to the right.
+      // Bottom value axis.
       ctx.fillStyle = AXIS_COLOR;
       ctx.font = "9px ui-sans-serif, system-ui, sans-serif";
       ctx.textBaseline = "bottom";
-      const ticks = niceTicks(maxTotal, 4);
-      for (const v of ticks) {
-        const x = (v / maxTotal) * usableW;
-        ctx.textAlign = v === 0 ? "left" : x > cssW - 14 ? "right" : "center";
-        ctx.fillText(formatCompactNumber(v), Math.min(x, cssW - 1), cssH - 2);
+      if (net) {
+        // 0 at center, magnitude growing left (calls) and right (puts).
+        ctx.textAlign = "center";
+        ctx.fillText("0", cx, cssH - 2);
+        for (const v of niceTicks(maxTotal, 2)) {
+          if (v === 0) continue;
+          const dx = (v / maxTotal) * halfW;
+          const label = formatCompactNumber(v);
+          if (cx - dx > 10) {
+            ctx.textAlign = cx - dx < 14 ? "left" : "center";
+            ctx.fillText(label, Math.max(cx - dx, 1), cssH - 2);
+          }
+          if (cx + dx < cssW - 10) {
+            ctx.textAlign = cx + dx > cssW - 14 ? "right" : "center";
+            ctx.fillText(label, Math.min(cx + dx, cssW - 1), cssH - 2);
+          }
+        }
+      } else {
+        // 0 at the left edge, increasing to the right.
+        for (const v of niceTicks(maxTotal, 4)) {
+          const x = (v / maxTotal) * usableW;
+          ctx.textAlign = v === 0 ? "left" : x > cssW - 14 ? "right" : "center";
+          ctx.fillText(formatCompactNumber(v), Math.min(x, cssW - 1), cssH - 2);
+        }
       }
 
       raf = requestAnimationFrame(paint);
@@ -147,7 +196,7 @@ export function StrikeHistogram({
 
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [series, rows, metric, spot, epoch]);
+  }, [series, rows, metric, view, spot, epoch]);
 
   const callTotal = rows.reduce(
     (s, r) => s + (metric === "oi" ? r.callOI : r.callVol),

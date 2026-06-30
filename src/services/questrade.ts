@@ -1,8 +1,4 @@
-import type {
-  QuestradeCandle,
-  ExpiryWindow,
-  OptionsChainResponse,
-} from "@/types";
+import type { QuestradeCandle, OptionsChainResponse } from "@/types";
 
 // Fetches OHLCV candles from Questrade at the given candle granularity
 // (Questrade HistoricalDataGranularity, e.g. "OneMinute", "OneDay"). The route
@@ -18,15 +14,16 @@ export async function fetchQuestradeCandles(
   return res.json();
 }
 
-// Fetches the options strike breakdown (open interest + volume per strike, split
-// call/put) aggregated over the given expiry window.
+// Fetches the options strike breakdown (open interest + volume + per-side GEX per
+// strike) aggregated over the given expiry dates (YYYY-MM-DD). When no expiries
+// are supplied the API falls back to the front expiry.
 export async function fetchOptionStrikes(
   ticker: string,
-  window: ExpiryWindow = "2w"
+  expiries: string[] = []
 ): Promise<OptionsChainResponse> {
-  const res = await fetch(
-    `/api/questrade/options?ticker=${encodeURIComponent(ticker)}&window=${window}`
-  );
+  const params = new URLSearchParams({ ticker });
+  if (expiries.length > 0) params.set("expiries", expiries.join(","));
+  const res = await fetch(`/api/questrade/options?${params.toString()}`);
   if (!res.ok) throw new Error(`Failed to fetch options for ${ticker}`);
   return res.json();
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
-import type { OptionStrikeRow } from "@/types";
+import type { OptionStrikeRow, StrikeView } from "@/types";
 import { formatCompactNumber } from "@/utils/formatters";
 import { niceTicks } from "@/utils/ticks";
 
@@ -33,6 +33,8 @@ interface GexHistogramProps {
   netGex: number;
   /** Current underlying price, drawn as a dashed line across the panel. */
   spot: number | null;
+  /** "net" = signed diverging bars; "split" = call left / put right. */
+  view: StrikeView;
   epoch: number;
   className?: string;
 }
@@ -49,6 +51,7 @@ export function GexHistogram({
   flip,
   netGex,
   spot,
+  view,
   epoch,
   className,
 }: GexHistogramProps) {
@@ -62,9 +65,13 @@ export function GexHistogram({
 
     let raf = 0;
     let lastSig = "";
+    const split = view === "split";
 
-    // Fixed scale across all strikes (not just visible) → stable axis.
-    const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(r.gex)));
+    // Fixed scale across all strikes (not just visible) → stable axis. In split
+    // mode each side is scaled independently of sign.
+    const maxAbs = split
+      ? Math.max(1, ...rows.map((r) => Math.max(r.callGex, r.putGex)))
+      : Math.max(1, ...rows.map((r) => Math.abs(r.gex)));
 
     const paint = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -76,19 +83,26 @@ export function GexHistogram({
       }
       const plotH = cssH - AXIS_H;
 
-      const placed: Array<{ y: number; gex: number }> = [];
+      const placed: Array<{ y: number; gex: number; call: number; put: number }> =
+        [];
       for (const r of rows) {
-        if (r.gex === 0) continue;
+        if (split ? r.callGex === 0 && r.putGex === 0 : r.gex === 0) continue;
         const y = series.priceToCoordinate(r.strike);
         if (y === null || y > plotH) continue;
-        placed.push({ y, gex: r.gex });
+        placed.push({ y, gex: r.gex, call: r.callGex, put: r.putGex });
       }
       const flipY = flip != null ? series.priceToCoordinate(flip) : null;
       const spotY = spot != null ? series.priceToCoordinate(spot) : null;
 
       const sig =
-        `${cssW}x${cssH}x${dpr}|${maxAbs}|${flipY}|${spotY}|` +
-        placed.map((p) => `${Math.round(p.y)}:${p.gex.toFixed(0)}`).join(",");
+        `${cssW}x${cssH}x${dpr}|${view}|${maxAbs}|${flipY}|${spotY}|` +
+        placed
+          .map((p) =>
+            split
+              ? `${Math.round(p.y)}:${p.call.toFixed(0)}:${p.put.toFixed(0)}`
+              : `${Math.round(p.y)}:${p.gex.toFixed(0)}`
+          )
+          .join(",");
       if (sig === lastSig) {
         raf = requestAnimationFrame(paint);
         return;
@@ -113,7 +127,8 @@ export function GexHistogram({
       ctx.lineTo(cx + 0.5, plotH);
       ctx.stroke();
 
-      // Bars: positive (long gamma) grow left, negative grow right.
+      // Bars. Net mode: positive (long gamma) grows left, negative grows right.
+      // Split mode: call GEX grows left (green), put GEX grows right (red).
       if (placed.length > 0) {
         const ys = placed.map((q) => q.y).sort((a, b) => a - b);
         let gap = plotH;
@@ -121,13 +136,26 @@ export function GexHistogram({
         const barH = Math.max(1.5, Math.min(gap * 0.7, 10));
 
         for (const p of placed) {
-          const len = (Math.abs(p.gex) / maxAbs) * halfW;
-          if (p.gex >= 0) {
-            ctx.fillStyle = POS_COLOR;
-            ctx.fillRect(cx - len, p.y - barH / 2, len, barH);
+          if (split) {
+            const callLen = (p.call / maxAbs) * halfW;
+            const putLen = (p.put / maxAbs) * halfW;
+            if (callLen > 0) {
+              ctx.fillStyle = POS_COLOR;
+              ctx.fillRect(cx - callLen, p.y - barH / 2, callLen, barH);
+            }
+            if (putLen > 0) {
+              ctx.fillStyle = NEG_COLOR;
+              ctx.fillRect(cx, p.y - barH / 2, putLen, barH);
+            }
           } else {
-            ctx.fillStyle = NEG_COLOR;
-            ctx.fillRect(cx, p.y - barH / 2, len, barH);
+            const len = (Math.abs(p.gex) / maxAbs) * halfW;
+            if (p.gex >= 0) {
+              ctx.fillStyle = POS_COLOR;
+              ctx.fillRect(cx - len, p.y - barH / 2, len, barH);
+            } else {
+              ctx.fillStyle = NEG_COLOR;
+              ctx.fillRect(cx, p.y - barH / 2, len, barH);
+            }
           }
         }
       }
@@ -186,22 +214,36 @@ export function GexHistogram({
 
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [series, rows, flip, spot, epoch]);
+  }, [series, rows, flip, spot, view, epoch]);
 
   const totalOI = rows.reduce((s, r) => s + r.callOI + r.putOI, 0);
+  const callGexTotal = rows.reduce((s, r) => s + r.callGex, 0);
+  const putGexTotal = rows.reduce((s, r) => s + r.putGex, 0);
 
   return (
     <div className={`relative ${className ?? ""}`}>
       <canvas ref={canvasRef} className="h-full w-full" />
-      {/* Title + net GEX + total OI contracts. */}
+      {/* Title + GEX readout + total OI contracts. */}
       <div className="absolute top-1 left-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
         <div className="text-[10px] font-semibold text-text-primary">GEX</div>
-        <div
-          className="text-[11px] font-semibold"
-          style={{ color: netGex >= 0 ? POS_COLOR : NEG_COLOR }}
-        >
-          {formatGexShort(netGex)}
-        </div>
+        {view === "split" ? (
+          <div className="text-[11px] font-semibold">
+            <span style={{ color: POS_COLOR }}>
+              {formatGexShort(callGexTotal)} C
+            </span>
+            <span className="text-text-tertiary"> · </span>
+            <span style={{ color: NEG_COLOR }}>
+              {formatGexShort(putGexTotal)} P
+            </span>
+          </div>
+        ) : (
+          <div
+            className="text-[11px] font-semibold"
+            style={{ color: netGex >= 0 ? POS_COLOR : NEG_COLOR }}
+          >
+            {formatGexShort(netGex)}
+          </div>
+        )}
         <div className="text-[9px] text-text-tertiary">
           OI {formatCompactNumber(totalOI)}
         </div>

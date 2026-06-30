@@ -82,6 +82,13 @@ function formatExpiryLabel(day: string): string {
   });
 }
 
+// Today's date as YYYY-MM-DD in the market's timezone, for 0DTE detection.
+function todayInET(): string {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+}
+
 // Pick which expiries fall inside the requested window. Always future-dated.
 function selectExpiries(
   expiries: ChainExpiry[],
@@ -103,6 +110,23 @@ function selectExpiries(
   return within.length > 0 ? within : [future[0]];
 }
 
+// Pick exactly the expiries whose day matches one of the requested dates. Falls
+// back to the nearest future expiry when none match (e.g. stale selection).
+function selectExpiriesByDate(
+  expiries: ChainExpiry[],
+  days: string[]
+): ChainExpiry[] {
+  const now = Date.now();
+  const future = expiries
+    .filter((e) => new Date(e.expiryDate).getTime() >= now - 86_400_000)
+    .sort((a, b) => +new Date(a.expiryDate) - +new Date(b.expiryDate));
+
+  if (future.length === 0) return [];
+  const want = new Set(days);
+  const matched = future.filter((e) => want.has(expiryDay(e.expiryDate)));
+  return matched.length > 0 ? matched : [future[0]];
+}
+
 async function fetchSpot(symbolId: number): Promise<number | null> {
   try {
     const data = await questradeGet<SymbolQuotesResponse>(
@@ -118,6 +142,14 @@ export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker");
   const windowParam = (request.nextUrl.searchParams.get("window") ??
     "2w") as ExpiryWindow;
+  // Explicit expiry selection (comma-separated YYYY-MM-DD). When present it
+  // takes precedence over `window`. Keep only well-formed dates.
+  const expiriesParam = request.nextUrl.searchParams.get("expiries");
+  const wantDays = expiriesParam
+    ? [...new Set(expiriesParam.split(",").map((d) => d.trim()))]
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .sort()
+    : [];
 
   if (!ticker) {
     return NextResponse.json(
@@ -125,14 +157,16 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!VALID_WINDOWS.includes(windowParam)) {
+  if (wantDays.length === 0 && !VALID_WINDOWS.includes(windowParam)) {
     return NextResponse.json(
       { error: `invalid window '${windowParam}'` },
       { status: 400 }
     );
   }
 
-  const cacheKey = `${ticker.toUpperCase()}:${windowParam}`;
+  const cacheKey = `${ticker.toUpperCase()}:${
+    wantDays.length > 0 ? wantDays.join(",") : windowParam
+  }`;
   const cached = questradeOptionsCache.get(cacheKey);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });
@@ -153,12 +187,20 @@ export async function GET(request: NextRequest) {
     ]);
 
     const allExpiries = chain.optionChain ?? [];
+    const today = todayInET();
     const expiries: OptionsExpiry[] = allExpiries
       .map((e) => expiryDay(e.expiryDate))
       .sort()
-      .map((day) => ({ date: day, label: formatExpiryLabel(day) }));
+      .map((day) => ({
+        date: day,
+        label: formatExpiryLabel(day),
+        isZeroDte: day === today,
+      }));
 
-    const selected = selectExpiries(allExpiries, windowParam);
+    const selected =
+      wantDays.length > 0
+        ? selectExpiriesByDate(allExpiries, wantDays)
+        : selectExpiries(allExpiries, windowParam);
 
     // Map each option contract id → the strike it belongs to and its side, so
     // we can fold the quote responses back into per-strike rows.
@@ -200,7 +242,16 @@ export async function GET(request: NextRequest) {
 
         let row = byStrike.get(strike);
         if (!row) {
-          row = { strike, callOI: 0, putOI: 0, callVol: 0, putVol: 0, gex: 0 };
+          row = {
+            strike,
+            callOI: 0,
+            putOI: 0,
+            callVol: 0,
+            putVol: 0,
+            callGex: 0,
+            putGex: 0,
+            gex: 0,
+          };
           byStrike.set(strike, row);
         }
         const oi = q.openInterest ?? 0;
@@ -230,7 +281,9 @@ export async function GET(request: NextRequest) {
     const gexScale = spot != null ? spot * spot * 0.01 * 100 : 0;
     for (const r of rows) {
       const g = gammaAcc.get(r.strike);
-      r.gex = g ? gexScale * (g.call - g.put) : 0;
+      r.callGex = g ? gexScale * g.call : 0;
+      r.putGex = g ? gexScale * g.put : 0;
+      r.gex = r.callGex - r.putGex;
     }
     const netGex = rows.reduce((sum, r) => sum + r.gex, 0);
     const flip = gexScale > 0 ? computeFlip(rows) : null;

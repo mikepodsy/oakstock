@@ -252,6 +252,37 @@ export function CandlestickChart({
     });
   }, [autoscaleProvider]);
 
+  // Scrolling the wheel over an options panel pans the shared price axis (and
+  // thus the price-aligned strike bars) up/down, reusing the same vertical
+  // offset as the chart's drag-to-pan. Scroll up reveals higher strikes.
+  // Attached via a callback ref as a non-passive native listener so
+  // preventDefault actually stops the page from scrolling — React's synthetic
+  // onWheel is passive and can't.
+  const panelWheelCleanup = useRef<(() => void) | null>(null);
+  const attachPanelWheel = useCallback(
+    (node: HTMLDivElement | null) => {
+      panelWheelCleanup.current?.();
+      panelWheelCleanup.current = null;
+      if (!node) return;
+      const onWheel = (e: WheelEvent) => {
+        const series = candleSeriesRef.current;
+        if (!series) return;
+        e.preventDefault();
+        // Price-per-pixel from two sample coordinates (independent of margins).
+        const pA = series.coordinateToPrice(100);
+        const pB = series.coordinateToPrice(200);
+        if (pA == null || pB == null) return;
+        const pricePerPixel = (pA - pB) / 100;
+        priceOffsetRef.current -= e.deltaY * pricePerPixel;
+        forceRefit();
+      };
+      node.addEventListener("wheel", onWheel, { passive: false });
+      panelWheelCleanup.current = () =>
+        node.removeEventListener("wheel", onWheel);
+    },
+    [forceRefit]
+  );
+
   const containerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<ISeriesApi<
     "Candlestick" | "Bar" | "Line"
@@ -1699,7 +1730,10 @@ export function CandlestickChart({
           zero-gamma flip level (fullscreen only). Sits between the chart and the
           OI/volume panel, matching the reference layout. */}
       {fullscreen && !panelsCollapsed && panelView === "gex" && (
-        <div className="flex-[1] min-w-[220px] border-l border-border-primary">
+        <div
+          ref={attachPanelWheel}
+          className="flex-[1] min-w-[220px] border-l border-border-primary"
+        >
           {optionsData && optionsData.hasGreeks ? (
             <GexHistogram
               series={candleSeriesRef.current}
@@ -1723,7 +1757,10 @@ export function CandlestickChart({
 
       {/* Options strike breakdown, aligned to the price axis (fullscreen only). */}
       {fullscreen && !panelsCollapsed && panelView === "oi" && (
-        <div className="relative flex-[1] min-w-[220px] border-l border-border-primary pl-1">
+        <div
+          ref={attachPanelWheel}
+          className="relative flex-[1] min-w-[220px] border-l border-border-primary pl-1"
+        >
           <StrikeHistogram
             series={candleSeriesRef.current}
             rows={optionsData?.rows ?? []}

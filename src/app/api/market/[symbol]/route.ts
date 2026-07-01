@@ -6,16 +6,69 @@ import type { MarketIndicator, EconomicIndicatorData, EconomicDataPoint } from "
 
 const yf = new YahooFinance();
 
-const SYMBOL_CONFIG: Record<
-  MarketIndicator,
-  { ticker: string; name: string; unit: string }
-> = {
+type DerivedConfig = {
+  a: string;
+  b: string;
+  op: "ratio" | "spread";
+  name: string;
+  unit: string;
+  // When set, the series is built from intraday bars over `lookbackDays` and
+  // the two tickers are aligned by hour bucket (used for indices such as
+  // ^VIXEQ that have no daily history on Yahoo, only recent intraday bars).
+  interval?: "1h";
+  lookbackDays?: number;
+};
+type SymbolConfig =
+  | { ticker: string; name: string; unit: string }
+  | DerivedConfig;
+
+const SYMBOL_CONFIG: Record<MarketIndicator, SymbolConfig> = {
   gold: { ticker: "GC=F", name: "Gold", unit: "USD/oz" },
   dxy: { ticker: "DX-Y.NYB", name: "US Dollar Index (DXY)", unit: "Index" },
   sp500: { ticker: "^GSPC", name: "S&P 500", unit: "Index" },
   dowjones: { ticker: "^DJI", name: "Dow Jones", unit: "Index" },
   vix: { ticker: "^VIX", name: "VIX", unit: "Index" },
+  es: { ticker: "ES=F", name: "S&P 500 Futures (ES)", unit: "Index" },
+  nq: { ticker: "NQ=F", name: "Nasdaq 100 Futures (NQ)", unit: "Index" },
+  rspSpy: { a: "RSP", b: "SPY", op: "ratio", name: "RSP / SPY (Breadth)", unit: "Ratio" },
+  vixeqVix: {
+    a: "^VIXEQ",
+    b: "^VIX",
+    op: "spread",
+    name: "VIXEQ − VIX (Dispersion)",
+    unit: "Index",
+    interval: "1h",
+    lookbackDays: 5,
+  },
 };
+
+function isDerived(config: SymbolConfig): config is DerivedConfig {
+  return "a" in config;
+}
+
+type Point = { key: string; date: string; value: number };
+
+/** Fetch a Yahoo close series. Daily keys by YYYY-MM-DD; intraday keys by hour bucket. */
+async function fetchSeries(
+  ticker: string,
+  period1: Date,
+  interval: "1d" | "1h" = "1d"
+): Promise<Point[]> {
+  const result = await yf.chart(ticker, { period1, interval });
+  const quotes = result.quotes || [];
+  return quotes
+    .filter((q: Record<string, unknown>) => q.close != null)
+    .map((q: Record<string, unknown>) => {
+      const d = new Date(q.date as string | number);
+      if (interval === "1h") {
+        const bucket = new Date(d);
+        bucket.setMinutes(0, 0, 0);
+        return { key: bucket.toISOString(), date: d.toISOString(), value: q.close as number };
+      }
+      const day = d.toISOString().split("T")[0];
+      return { key: day, date: day, value: q.close as number };
+    });
+}
 
 const VALID_SYMBOLS = Object.keys(SYMBOL_CONFIG) as MarketIndicator[];
 
@@ -68,24 +121,44 @@ export async function GET(
 
   try {
     const period1 = getRangeStart(range);
-    const result = await yf.chart(config.ticker, {
-      period1,
-      interval: "1d",
-    });
 
-    const quotes = result.quotes || [];
-    const data: EconomicDataPoint[] = quotes
-      .filter((q: Record<string, unknown>) => q.close != null)
-      .map((q: Record<string, unknown>) => ({
-        date: new Date(q.date as string | number).toISOString().split("T")[0],
-        value: parseFloat((q.close as number).toFixed(2)),
+    let data: EconomicDataPoint[];
+    if (isDerived(config)) {
+      // Derived two-ticker series: fetch both, align by shared key, combine.
+      // Intraday configs use recent hourly bars (aligned by hour bucket) for
+      // indices without daily history; daily configs align by calendar date.
+      const interval = config.interval ?? "1d";
+      const start = config.interval
+        ? new Date(Date.now() - (config.lookbackDays ?? 5) * 86_400_000)
+        : period1;
+      const [seriesA, seriesB] = await Promise.all([
+        fetchSeries(config.a, start, interval),
+        fetchSeries(config.b, start, interval),
+      ]);
+      const mapB = new Map(seriesB.map((d) => [d.key, d.value]));
+      const decimals = config.op === "ratio" ? 4 : 2;
+      data = seriesA.reduce<EconomicDataPoint[]>((acc, point) => {
+        const valB = mapB.get(point.key);
+        if (valB !== undefined && valB !== 0) {
+          const combined =
+            config.op === "ratio" ? point.value / valB : point.value - valB;
+          acc.push({ date: point.date, value: parseFloat(combined.toFixed(decimals)) });
+        }
+        return acc;
+      }, []);
+    } else {
+      data = (await fetchSeries(config.ticker, period1)).map((p) => ({
+        date: p.date,
+        value: parseFloat(p.value.toFixed(2)),
       }));
+    }
 
     const currentValue = data.length > 0 ? data[data.length - 1].value : null;
     const previousValue = data.length > 1 ? data[data.length - 2].value : null;
+    const changeDecimals = config.unit === "Ratio" ? 4 : 2;
     const change =
       currentValue !== null && previousValue !== null
-        ? parseFloat((currentValue - previousValue).toFixed(2))
+        ? parseFloat((currentValue - previousValue).toFixed(changeDecimals))
         : null;
 
     const response: EconomicIndicatorData = {

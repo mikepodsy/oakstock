@@ -40,6 +40,7 @@ function filterDataByRange(
 function formatDisplayValue(value: number, unit: string): string {
   if (unit === "%" || unit === "bps") return `${value.toFixed(2)}%`;
   if (unit === "Index") return value.toFixed(2);
+  if (unit === "Ratio") return value.toFixed(3);
   return `$${value.toFixed(2)}`;
 }
 
@@ -54,11 +55,13 @@ function CustomTooltip({
   payload,
   label,
   unit,
+  intraday,
 }: {
   active?: boolean;
   payload?: Array<{ value: number }>;
   label?: string;
   unit: string;
+  intraday?: boolean;
 }) {
   if (!active || !payload?.length || !label) return null;
 
@@ -68,7 +71,7 @@ function CustomTooltip({
   return (
     <div className="rounded-lg border border-border-primary bg-bg-elevated p-3 shadow-lg">
       <p className="text-xs text-text-secondary mb-1">
-        {format(new Date(label), "MMM d, yyyy")}
+        {format(new Date(label), intraday ? "MMM d, h:mm a" : "MMM d, yyyy")}
       </p>
       <p className="text-sm font-financial text-text-primary">{formatted}</p>
     </div>
@@ -79,15 +82,18 @@ function ChartContent({
   data,
   chartData,
   height,
+  intraday,
 }: {
   data: EconomicIndicatorData;
   chartData: EconomicDataPoint[];
   height: number;
+  intraday: boolean;
 }) {
   const formatYAxis = (value: number) => {
     if (data.unit === "%" || data.unit === "bps") return `${value.toFixed(1)}%`;
     if (data.unit === "Index")
       return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (data.unit === "Ratio") return value.toFixed(3);
     return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
 
@@ -104,7 +110,9 @@ function ChartContent({
         <XAxis
           dataKey="date"
           tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-          tickFormatter={(date: string) => format(new Date(date), "MMM yy")}
+          tickFormatter={(date: string) =>
+            format(new Date(date), intraday ? "MMM d" : "MMM yy")
+          }
           axisLine={false}
           tickLine={false}
         />
@@ -115,7 +123,7 @@ function ChartContent({
           tickLine={false}
           width={60}
         />
-        <Tooltip content={<CustomTooltip unit={data.unit} />} />
+        <Tooltip content={<CustomTooltip unit={data.unit} intraday={intraday} />} />
         <Line
           type="monotone"
           dataKey="value"
@@ -156,17 +164,27 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
       if (fullscreen) setModalRange(cardRange);
     }, [fullscreen, cardRange]);
 
+    // Intraday series (e.g. VIXEQ − VIX) carry full ISO timestamps in `date`;
+    // daily series use YYYY-MM-DD. Intraday spans are too short for the
+    // month-based range picker, so it's hidden and no filtering is applied.
+    const intraday = useMemo(
+      () => !!data?.data.some((d) => d.date.includes("T")),
+      [data]
+    );
+
     const cardData = useMemo(() => {
       if (!data) return [];
+      if (intraday) return data.data;
       const range = MODAL_RANGES.find((r) => r.label === cardRange);
       return filterDataByRange(data.data, range?.months ?? 0);
-    }, [data, cardRange]);
+    }, [data, cardRange, intraday]);
 
     const modalData = useMemo(() => {
       if (!data) return [];
+      if (intraday) return data.data;
       const range = MODAL_RANGES.find((r) => r.label === modalRange);
       return filterDataByRange(data.data, range?.months ?? 0);
-    }, [data, modalRange]);
+    }, [data, modalRange, intraday]);
 
     if (loading) {
       return (
@@ -197,21 +215,23 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-display text-text-primary">{title}</h3>
             <div className="flex items-center gap-2">
-              <div className="flex gap-0.5 rounded-lg bg-bg-tertiary p-0.5">
-                {MODAL_RANGES.map((r) => (
-                  <button
-                    key={r.label}
-                    onClick={() => setCardRange(r.label)}
-                    className={`px-2 py-0.5 text-[10px] rounded-md transition-colors ${
-                      cardRange === r.label
-                        ? "bg-bg-secondary text-text-primary shadow-sm"
-                        : "text-text-tertiary hover:text-text-secondary"
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+              {!intraday && (
+                <div className="flex gap-0.5 rounded-lg bg-bg-tertiary p-0.5">
+                  {MODAL_RANGES.map((r) => (
+                    <button
+                      key={r.label}
+                      onClick={() => setCardRange(r.label)}
+                      className={`px-2 py-0.5 text-[10px] rounded-md transition-colors ${
+                        cardRange === r.label
+                          ? "bg-bg-secondary text-text-primary shadow-sm"
+                          : "text-text-tertiary hover:text-text-secondary"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 onClick={() => setFullscreen(true)}
                 className="p-1 rounded-lg hover:bg-bg-tertiary transition-colors text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity"
@@ -220,7 +240,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
               </button>
             </div>
           </div>
-          <ChartContent data={data} chartData={cardData} height={300} />
+          <ChartContent data={data} chartData={cardData} height={300} intraday={intraday} />
         </div>
 
         {/* Fullscreen Modal */}
@@ -236,21 +256,23 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-display text-text-primary">{title}</h3>
                 <div className="flex items-center gap-3">
-                  <div className="flex gap-1 rounded-lg bg-bg-tertiary p-0.5">
-                    {MODAL_RANGES.map((r) => (
-                      <button
-                        key={r.label}
-                        onClick={() => setModalRange(r.label)}
-                        className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
-                          modalRange === r.label
-                            ? "bg-bg-secondary text-text-primary shadow-sm"
-                            : "text-text-tertiary hover:text-text-secondary"
-                        }`}
-                      >
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
+                  {!intraday && (
+                    <div className="flex gap-1 rounded-lg bg-bg-tertiary p-0.5">
+                      {MODAL_RANGES.map((r) => (
+                        <button
+                          key={r.label}
+                          onClick={() => setModalRange(r.label)}
+                          className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                            modalRange === r.label
+                              ? "bg-bg-secondary text-text-primary shadow-sm"
+                              : "text-text-tertiary hover:text-text-secondary"
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <button
                     onClick={() => setFullscreen(false)}
                     className="p-1.5 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
@@ -259,7 +281,7 @@ export const EconomicChart = forwardRef<HTMLDivElement, EconomicChartProps>(
                   </button>
                 </div>
               </div>
-              <ChartContent data={data} chartData={modalData} height={500} />
+              <ChartContent data={data} chartData={modalData} height={500} intraday={intraday} />
             </div>
           </div>
         )}

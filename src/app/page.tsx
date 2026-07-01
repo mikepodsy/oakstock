@@ -1,32 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { TreeDeciduous, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePortfolioStore } from "@/stores/portfolioStore";
 import { useQuotes } from "@/hooks/useQuotes";
-import { usePortfolioHistory } from "@/hooks/usePortfolioHistory";
-import {
-  mergeHoldingWithQuote,
-  portfolioTotals,
-  totalShares,
-  totalCost,
-} from "@/utils/calculations";
+import { mergeHoldingWithQuote, portfolioTotals } from "@/utils/calculations";
 import { CreatePortfolioDialog } from "@/components/dashboard/CreatePortfolioDialog";
 import { PortfolioSummaryCards } from "@/components/dashboard/PortfolioSummaryCards";
 import { DailyBrief } from "@/components/dashboard/DailyBrief";
-import { PerformanceChart } from "@/components/charts/PerformanceChart";
-import { DEFAULT_BENCHMARKS } from "@/utils/constants";
-
-const BENCHMARK_OPTIONS = DEFAULT_BENCHMARKS.map((b) => ({
-  label: b,
-  value: b,
-}));
+import { MarketOverview } from "@/components/dashboard/MarketOverview";
 
 export default function DashboardPage() {
   const portfolios = usePortfolioStore((s) => s.portfolios);
-  const [period, setPeriod] = useState("1y");
-  const [benchmark, setBenchmark] = useState("SPY");
 
   // Collect all unique tickers across all portfolios
   const allTickers = useMemo(() => {
@@ -49,36 +35,6 @@ export default function DashboardPage() {
     );
     return portfolioTotals(allHoldings);
   }, [portfolios, quotes, allTickers.length]);
-
-  // Combined chart data: all holdings from all portfolios
-  const combinedHistoryInputs = useMemo(
-    () =>
-      portfolios.flatMap((p) =>
-        p.holdings.map((h) => ({
-          ticker: h.ticker,
-          shares: totalShares(h.lots),
-        }))
-      ),
-    [portfolios]
-  );
-
-  const combinedCostBasis = useMemo(
-    () =>
-      portfolios.reduce(
-        (sum, p) =>
-          sum + p.holdings.reduce((s, h) => s + totalCost(h.lots), 0),
-        0
-      ),
-    [portfolios]
-  );
-
-  const { data: combinedChartData, loading: chartLoading } =
-    usePortfolioHistory(
-      combinedHistoryInputs,
-      benchmark,
-      period,
-      combinedCostBasis
-    );
 
   if (portfolios.length === 0) {
     return (
@@ -114,16 +70,7 @@ export default function DashboardPage() {
 
       <PortfolioSummaryCards data={summary} loading={loading} />
 
-      <PerformanceChart
-        data={combinedChartData}
-        benchmarkName={benchmark}
-        period={period}
-        onPeriodChange={setPeriod}
-        loading={chartLoading}
-        title="Oakstock Performance"
-        benchmarkOptions={BENCHMARK_OPTIONS}
-        onBenchmarkChange={setBenchmark}
-      />
+      <MarketOverview />
 
       <DailyBrief />
     </div>

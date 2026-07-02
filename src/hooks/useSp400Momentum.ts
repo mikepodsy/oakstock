@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Sp400Response, StoredMomentum } from "@/app/api/alerts/sp400/route";
+import { isSnapshotStale } from "@/utils/refreshSchedule";
 
 /**
  * Reads the precomputed large-cap momentum snapshot from /api/alerts/sp400.
@@ -15,6 +16,7 @@ export function useSp400Momentum() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fetchIdRef = useRef(0);
+  const autoHealedRef = useRef(false);
 
   const refetch = useCallback(async () => {
     const fetchId = ++fetchIdRef.current;
@@ -53,6 +55,16 @@ export function useSp400Momentum() {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  // Self-heal: if the snapshot predates the last expected daily refresh, kick off
+  // one recompute per mount. The Vercel cron only runs on the production
+  // deployment, so this keeps dev/preview current and backstops any missed run.
+  useEffect(() => {
+    if (autoHealedRef.current || loading || refreshing) return;
+    if (!isSnapshotStale(lastUpdated)) return;
+    autoHealedRef.current = true;
+    triggerRefresh();
+  }, [loading, refreshing, lastUpdated, triggerRefresh]);
 
   return { statuses, lastUpdated, loading, refreshing, error, refetch, triggerRefresh };
 }

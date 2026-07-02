@@ -83,18 +83,28 @@ export function PayoffChart({
   sigma1,
   sigma2,
 }: PayoffChartProps) {
-  const { points, breakevens } = result;
+  const { points, breakevens, maxLoss, netDebit } = result;
   const [pinned, setPinned] = useState<number | null>(null);
 
-  // Split gradient: green above zero, red below, with the stop at the y=0 line.
-  const gradientOffset = useMemo(() => {
+  // Frame the P&L axis to the strategy's own cost/risk scale so a small debit
+  // stays legible instead of collapsing onto the zero line. Runaway upside
+  // (e.g. a long call's unbounded profit) is capped to a few multiples of that
+  // scale; the profit line simply clips off the top. The gradient split is
+  // derived from the same frame so the green/red boundary tracks the zero line.
+  const { yDomain, gradientOffset } = useMemo(() => {
     const ys = points.map((p) => p.expiry);
-    const max = Math.max(...ys, 0);
-    const min = Math.min(...ys, 0);
-    if (max <= 0) return 0;
-    if (min >= 0) return 1;
-    return max / (max - min);
-  }, [points]);
+    const lossExtent = Math.max(0, -Math.min(0, ...ys)); // depth below zero
+    const rawProfit = Math.max(0, ...ys); // height above zero
+    // Reference magnitude: the position's cost or defined risk, floored at $1.
+    const ref = Math.max(lossExtent, Math.abs(maxLoss ?? 0), Math.abs(netDebit), 1);
+    const profitExtent = Math.min(rawProfit, ref * 5);
+    const span = Math.max(profitExtent + lossExtent, ref);
+    const pad = span * 0.1;
+    const domain: [number, number] = [-lossExtent - pad, profitExtent + pad];
+    const denom = profitExtent + lossExtent;
+    const offset = denom <= 0 ? 1 : profitExtent / denom;
+    return { yDomain: domain, gradientOffset: offset };
+  }, [points, maxLoss, netDebit]);
 
   return (
     <div className="h-[360px] md:h-[440px]">
@@ -127,6 +137,8 @@ export function PayoffChart({
             axisLine={false}
           />
           <YAxis
+            domain={yDomain}
+            allowDataOverflow
             tick={{ fill: "var(--text-tertiary)", fontSize: 12 }}
             tickFormatter={(v: number) => `$${v.toFixed(0)}`}
             tickLine={false}

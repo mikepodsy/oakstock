@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
+import { TickerHoverCard } from "@/components/shared/TickerHoverCard";
 import type { StoredMomentum } from "@/app/api/alerts/sp400/route";
 import type { CrossState } from "@/utils/momentum";
 import { recentCrossDirection, RECENT_CROSS_WINDOW } from "@/utils/momentum";
@@ -155,13 +156,15 @@ export function MaCrossingsList({ statuses }: { statuses: StoredMomentum[] }) {
               {rows.map(({ stock, crossings, freshest }) => (
                 <tr key={stock.ticker} className="border-b border-border-primary last:border-0">
                   <td className="px-3 py-1.5">
-                    <Link
-                      href={`/stock/${stock.ticker}`}
-                      className="flex items-center gap-2 font-display text-[13px] text-text-primary hover:text-green-primary transition-colors"
-                    >
-                      <CompanyLogo ticker={stock.ticker} className="w-5 h-5 rounded" textClassName="text-[8px]" />
-                      {stock.ticker}
-                    </Link>
+                    <TickerHoverCard ticker={stock.ticker} name={stock.name}>
+                      <Link
+                        href={`/stock/${stock.ticker}`}
+                        className="flex items-center gap-2 font-display text-[13px] text-text-primary hover:text-green-primary transition-colors"
+                      >
+                        <CompanyLogo ticker={stock.ticker} className="w-5 h-5 rounded" textClassName="text-[8px]" />
+                        {stock.ticker}
+                      </Link>
+                    </TickerHoverCard>
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     <span className="text-xs tabular-nums text-text-primary">{fmtPrice(stock.close)}</span>

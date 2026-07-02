@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
+import { TickerHoverCard } from "@/components/shared/TickerHoverCard";
 import type { CrossState, MomentumStatus } from "@/utils/momentum";
 import {
   fmtPrice,
@@ -98,13 +99,15 @@ export function MomentumTable({ statuses }: { statuses: MomentumStatus[] }) {
                 }`}
               >
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <Link
-                    href={`/stock/${s.ticker}`}
-                    className="group flex items-center gap-2 font-display text-sm text-text-primary hover:text-green-primary transition-colors"
-                  >
-                    <CompanyLogo ticker={s.ticker} className="w-6 h-6 rounded" textClassName="text-[9px]" />
-                    {s.ticker}
-                  </Link>
+                  <TickerHoverCard ticker={s.ticker}>
+                    <Link
+                      href={`/stock/${s.ticker}`}
+                      className="group flex items-center gap-2 font-display text-sm text-text-primary hover:text-green-primary transition-colors"
+                    >
+                      <CompanyLogo ticker={s.ticker} className="w-6 h-6 rounded" textClassName="text-[9px]" />
+                      {s.ticker}
+                    </Link>
+                  </TickerHoverCard>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className="text-sm tabular-nums text-text-primary">{fmtPrice(s.close)}</span>

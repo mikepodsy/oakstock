@@ -49,7 +49,12 @@ export default function OptionsBuilderPage() {
   const [legs, setLegs] = useState<OptionLeg[]>([]);
   const [valuationFraction, setValuationFraction] = useState(0);
   const [rangePct, setRangePct] = useState(0.15);
-  const [spotOverride, setSpotOverride] = useState<number | null>(null);
+  // Raw text of the Underlying box. Seeded once from the live Questrade spot so
+  // the box defaults to the current price, but tracks the user's keystrokes
+  // verbatim afterwards (including an empty string) so any digit — the last one
+  // included — can be deleted without snapping back.
+  const [spotText, setSpotText] = useState("");
+  const spotSeeded = useRef(false);
   const [overlays, setOverlays] = useState({
     today: true,
     intermediate: false,
@@ -124,7 +129,24 @@ export default function OptionsBuilderPage() {
     ]);
   }, [defaultExpiry]);
 
-  const effectiveSpot = spotOverride ?? spot;
+  // Default the Underlying box to the live spot as soon as it loads. Only seeds
+  // once per ticker so it never clobbers what the user is typing.
+  useEffect(() => {
+    if (spot != null && !spotSeeded.current) {
+      spotSeeded.current = true;
+      setSpotText(String(spot));
+    }
+  }, [spot]);
+  // Reset the seed guard when the ticker changes so the new symbol's spot seeds.
+  useEffect(() => {
+    spotSeeded.current = false;
+    setSpotText("");
+  }, [ticker]);
+
+  // Use the typed value when it parses to a real number; otherwise (empty or
+  // mid-edit) fall back to the live Questrade spot for all computations.
+  const typedSpot = spotText.trim() === "" ? NaN : Number(spotText);
+  const effectiveSpot = Number.isFinite(typedSpot) ? typedSpot : spot;
 
   // Hydrate legs against chains for the payoff (ensures latest mid/IV/greeks).
   const payoffLegs = useMemo(
@@ -202,10 +224,9 @@ export default function OptionsBuilderPage() {
               type="number"
               step="0.01"
               className="w-24 bg-bg-tertiary border border-border-primary rounded-md px-2 py-1 font-financial text-text-primary focus:outline-none focus:border-oak-300"
-              value={effectiveSpot ?? ""}
-              onChange={(e) =>
-                setSpotOverride(e.target.value === "" ? null : Number(e.target.value))
-              }
+              value={spotText}
+              placeholder={spot != null ? String(spot) : ""}
+              onChange={(e) => setSpotText(e.target.value)}
             />
           </div>
         </div>

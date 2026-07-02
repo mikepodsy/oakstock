@@ -11,7 +11,7 @@ import { StrategySelector } from "@/components/options/StrategySelector";
 import { LegBuilder } from "@/components/options/LegBuilder";
 import { PayoffChart } from "@/components/options/PayoffChart";
 import { TimeDecaySlider } from "@/components/options/TimeDecaySlider";
-import { ZoomSlider } from "@/components/options/ZoomSlider";
+import { ZoomSlider, ZOOM_MIN, ZOOM_MAX } from "@/components/options/ZoomSlider";
 import { PositionSummary } from "@/components/options/PositionSummary";
 import { useOptionChain } from "@/hooks/useOptionChain";
 import { computePayoff } from "@/lib/options/payoff";
@@ -49,6 +49,9 @@ export default function OptionsBuilderPage() {
   const [legs, setLegs] = useState<OptionLeg[]>([]);
   const [valuationFraction, setValuationFraction] = useState(0);
   const [rangePct, setRangePct] = useState(0.15);
+  // Once the user grabs the zoom slider we stop auto-fitting the price window
+  // until they switch strategy/ticker, so a manual zoom sticks.
+  const userZoomed = useRef(false);
   // Raw text of the Underlying box. Seeded once from the live Questrade spot so
   // the box defaults to the current price, but tracks the user's keystrokes
   // verbatim afterwards (including an empty string) so any digit — the last one
@@ -94,6 +97,8 @@ export default function OptionsBuilderPage() {
 
   const handleStrategyChange = useCallback(
     (s: StrategyType) => {
+      // A new strategy re-enables auto-fit so the window reframes to it.
+      userZoomed.current = false;
       setStrategy(s);
       const chain = defaultExpiry ? chains[defaultExpiry] : undefined;
       if (s === "custom") {
@@ -141,6 +146,7 @@ export default function OptionsBuilderPage() {
   useEffect(() => {
     spotSeeded.current = false;
     setSpotText("");
+    userZoomed.current = false;
   }, [ticker]);
 
   // Use the typed value when it parses to a real number; otherwise (empty or
@@ -183,6 +189,37 @@ export default function OptionsBuilderPage() {
       rangePct,
     });
   }, [payoffLegs, effectiveSpot, valuationFraction, atmIv, rangePct]);
+
+  // Price window (± fraction of spot) that frames the chosen strategy: wide
+  // enough to show every strike and breakeven plus a margin of the expected
+  // move, but no wider — so a small debit reads as a real distance below zero
+  // instead of collapsing onto the axis. `null` until we have a spot + legs.
+  const autoRangePct = useMemo(() => {
+    if (!effectiveSpot) return null;
+    const marks = [
+      ...legs.map((l) => l.strike).filter((s): s is number => s != null),
+      ...(result?.breakevens ?? []),
+    ];
+    // Farthest strike/breakeven from spot, as a fraction of spot.
+    const markDev = marks.reduce(
+      (m, p) => Math.max(m, Math.abs(p - effectiveSpot) / effectiveSpot),
+      0,
+    );
+    // One expected move, so single long options still show their slope.
+    const move = atmIv && maxDteYearsVal > 0 ? atmIv * Math.sqrt(maxDteYearsVal) : 0;
+    const raw = Math.max(markDev * 1.3, move * 1.5, 0.08);
+    return Math.min(Math.max(raw, ZOOM_MIN), ZOOM_MAX);
+  }, [effectiveSpot, legs, result, atmIv, maxDteYearsVal]);
+
+  // Apply the auto-fit until the user takes manual control of the zoom.
+  useEffect(() => {
+    if (autoRangePct != null && !userZoomed.current) setRangePct(autoRangePct);
+  }, [autoRangePct]);
+
+  const handleZoom = useCallback((pct: number) => {
+    userZoomed.current = true;
+    setRangePct(pct);
+  }, []);
 
   const handleShare = useCallback(() => {
     const qs = encodeLegs(legs);
@@ -277,7 +314,7 @@ export default function OptionsBuilderPage() {
                   sigma2={overlays.sigma2 ? sigmaBands.sigma2 : null}
                 />
               </div>
-              <ZoomSlider rangePct={rangePct} onChange={setRangePct} />
+              <ZoomSlider rangePct={rangePct} onChange={handleZoom} />
             </div>
             {maxDteDaysVal > 0 && (
               <div className="mt-3">

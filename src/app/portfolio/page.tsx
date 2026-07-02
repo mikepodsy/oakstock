@@ -282,15 +282,19 @@ export default function PortfolioPage() {
           />
 
           {/* Allocation & Sectors below holdings */}
-          <div className="space-y-6 mt-6 max-w-[660px] mx-auto">
-            <AllocationDonut
-              holdings={allocationData}
-              totalValue={summary?.totalValue ?? 0}
-            />
-            <SectorBreakdown
-              holdings={sectorData}
-              totalValue={summary?.totalValue ?? 0}
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
+              <AllocationDonut
+                holdings={allocationData}
+                totalValue={summary?.totalValue ?? 0}
+              />
+            </div>
+            <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
+              <SectorBreakdown
+                holdings={sectorData}
+                totalValue={summary?.totalValue ?? 0}
+              />
+            </div>
           </div>
         </>
       )}

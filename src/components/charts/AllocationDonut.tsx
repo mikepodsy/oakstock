@@ -93,8 +93,8 @@ export function AllocationDonut({
       <h3 className="font-display text-base text-text-primary mb-4">
         Allocation
       </h3>
-      <div className="flex items-center justify-center gap-10">
-        <div className="w-[320px] h-[320px] flex-shrink-0">
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-[300px] h-[300px] flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -123,7 +123,7 @@ export function AllocationDonut({
         </div>
 
         {/* Legend list with logos */}
-        <div className="w-[280px] flex-shrink-0 space-y-1 max-h-[340px] overflow-y-auto pr-2">
+        <div className="w-full space-y-1 max-h-[340px] overflow-y-auto pr-2">
           {chartData.map((item, index) => (
             <div key={item.ticker} className="flex items-center gap-2.5 py-1">
               <div className="flex-shrink-0 [&_img]:!w-7 [&_img]:!h-7 [&_img]:!rounded-md [&_div]:!w-7 [&_div]:!h-7 [&_div]:!rounded-md [&_div]:!text-xs">

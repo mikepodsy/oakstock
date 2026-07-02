@@ -153,7 +153,7 @@ export default function PortfolioDetailPage() {
         loading={chartLoading}
       />
 
-      <div className="space-y-6 mt-6 max-w-[660px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
           <AllocationDonut
             holdings={allocationData}

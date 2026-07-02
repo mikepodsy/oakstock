@@ -188,8 +188,8 @@ export function SectorBreakdown({
         ))}
       </div>
 
-      <div className="flex items-center justify-center gap-10">
-        <div className="w-[320px] h-[320px] flex-shrink-0">
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-[300px] h-[300px] flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -218,7 +218,7 @@ export function SectorBreakdown({
         </div>
 
         {/* Legend list with icons and percentage bars */}
-        <div className="w-[280px] flex-shrink-0 space-y-1 max-h-[340px] overflow-y-auto pr-2">
+        <div className="w-full space-y-1 max-h-[340px] overflow-y-auto pr-2">
           {chartData.map((item, index) => {
             const isExpanded = expandedGroups.has(item.label);
             const color = CHART_COLORS[index % CHART_COLORS.length];

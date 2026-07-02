@@ -190,24 +190,37 @@ export default function OptionsBuilderPage() {
     });
   }, [payoffLegs, effectiveSpot, valuationFraction, atmIv, rangePct]);
 
-  // Price window (± fraction of spot) that frames the chosen strategy: wide
-  // enough to show every strike and breakeven plus a margin of the expected
-  // move, but no wider — so a small debit reads as a real distance below zero
-  // instead of collapsing onto the axis. `null` until we have a spot + legs.
+  // Price window (± fraction of spot) that frames the chosen strategy so the
+  // P&L axis scales to the debit/credit at stake. Primary driver: the move that
+  // swings position P&L by ~a few multiples of the position's cost (using net
+  // delta = $ P&L per $1 of underlying), so the payoff shows a natural slope
+  // rather than shooting off the top. Floored so every strike/breakeven stays
+  // in view, and to the expected move when the position is ~delta-neutral.
+  // `null` until we have a spot + legs.
   const autoRangePct = useMemo(() => {
-    if (!effectiveSpot) return null;
+    if (!effectiveSpot || !result) return null;
+    // The position's cost / defined risk, in dollars (floored so it's positive).
+    const ref = Math.max(Math.abs(result.netDebit), Math.abs(result.maxLoss ?? 0), 1);
+    const netDelta = Math.abs(result.netGreeks.delta);
+    // Target: P&L reaches ~3x the cost at the window edge.
+    const costWindow =
+      netDelta > 5 ? (3 * ref) / (netDelta * effectiveSpot) : Infinity;
+
+    // Keep every strike and breakeven in view (with a little margin).
     const marks = [
       ...legs.map((l) => l.strike).filter((s): s is number => s != null),
-      ...(result?.breakevens ?? []),
+      ...result.breakevens,
     ];
-    // Farthest strike/breakeven from spot, as a fraction of spot.
     const markDev = marks.reduce(
       (m, p) => Math.max(m, Math.abs(p - effectiveSpot) / effectiveSpot),
       0,
     );
-    // One expected move, so single long options still show their slope.
+    // Expected move fallback for delta-neutral positions (straddles, etc.).
     const move = atmIv && maxDteYearsVal > 0 ? atmIv * Math.sqrt(maxDteYearsVal) : 0;
-    const raw = Math.max(markDev * 1.3, move * 1.5, 0.08);
+
+    const costTerm = Number.isFinite(costWindow) ? Math.min(costWindow, ZOOM_MAX) : 0;
+    const moveTerm = Number.isFinite(costWindow) ? 0 : move * 1.5;
+    const raw = Math.max(costTerm, markDev * 1.15, moveTerm, 0.05);
     return Math.min(Math.max(raw, ZOOM_MIN), ZOOM_MAX);
   }, [effectiveSpot, legs, result, atmIv, maxDteYearsVal]);
 

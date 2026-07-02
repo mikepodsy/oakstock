@@ -8,6 +8,46 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=30, stale-while-revalidate=30",
 };
 
+type ExtendedHours = {
+  session: "pre" | "post";
+  changePercent: number;
+  price: number;
+};
+
+// Build the contextual pre/post-market box from a Yahoo price-like object.
+// `scale` is 100 for quoteSummary (percents come as decimals) and 1 for
+// quote() (already in percent form).
+function buildExtendedHours(
+  src: Record<string, unknown>,
+  scale: number
+): ExtendedHours | undefined {
+  const num = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  const state = typeof src.marketState === "string" ? src.marketState : "";
+
+  if (state === "PRE" || state === "PREPRE") {
+    const pct = num(src.preMarketChangePercent);
+    if (pct !== undefined) {
+      return {
+        session: "pre",
+        changePercent: pct * scale,
+        price: num(src.preMarketPrice) ?? 0,
+      };
+    }
+  } else if (state === "POST" || state === "POSTPOST") {
+    const pct = num(src.postMarketChangePercent);
+    if (pct !== undefined) {
+      return {
+        session: "post",
+        changePercent: pct * scale,
+        price: num(src.postMarketPrice) ?? 0,
+      };
+    }
+  }
+
+  return undefined;
+}
+
 async function fetchSingleQuote(ticker: string) {
   const cached = quoteCache.get(ticker);
   if (cached) return cached;
@@ -36,6 +76,7 @@ async function fetchSingleQuote(ticker: string) {
       sector: profile?.sector ?? undefined,
       website: profile?.website ?? undefined,
       currency: price?.currency ?? "USD",
+      extendedHours: price ? buildExtendedHours(price, 100) : undefined,
     };
     quoteCache.set(ticker, data);
     return data;
@@ -55,6 +96,7 @@ async function fetchSingleQuote(ticker: string) {
       fiftyTwoWeekLow: result.fiftyTwoWeekLow ?? undefined,
       sector: undefined,
       currency: result.currency ?? "USD",
+      extendedHours: buildExtendedHours(result, 1),
     };
     quoteCache.set(ticker, data);
     return data;

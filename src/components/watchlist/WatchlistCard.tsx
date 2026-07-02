@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Trash2, Sun, Moon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WatchlistCardDetail } from "./WatchlistCardDetail";
@@ -91,6 +91,27 @@ export function WatchlistCard({
                   >
                     {formatPercent(quote.dayChangePercent)}
                   </Badge>
+                  {quote.extendedHours && (
+                    <div
+                      className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs ${
+                        quote.extendedHours.changePercent >= 0
+                          ? "bg-green-muted text-green-primary"
+                          : "bg-red-muted text-red-primary"
+                      }`}
+                      title={
+                        quote.extendedHours.session === "pre"
+                          ? "Pre-market"
+                          : "After-hours"
+                      }
+                    >
+                      {quote.extendedHours.session === "pre" ? (
+                        <Sun className="h-3 w-3" />
+                      ) : (
+                        <Moon className="h-3 w-3" />
+                      )}
+                      {formatPercent(quote.extendedHours.changePercent)}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

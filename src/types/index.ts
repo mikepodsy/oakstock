@@ -77,6 +77,11 @@ export interface QuoteData {
   sector?: string;
   website?: string;
   currency: string;
+  extendedHours?: {
+    session: "pre" | "post";
+    changePercent: number; // already scaled to a percent, e.g. +0.42
+    price: number;
+  };
 }
 
 export interface FinancialData {

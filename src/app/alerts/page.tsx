@@ -8,6 +8,7 @@ import { CompactMomentumTable } from "@/components/alerts/CompactMomentumTable";
 import { MaCrossingsList } from "@/components/alerts/MaCrossingsList";
 import { useMomentumAlerts } from "@/hooks/useMomentumAlerts";
 import { useSp400Momentum } from "@/hooks/useSp400Momentum";
+import { useEtfMomentum } from "@/hooks/useEtfMomentum";
 import type { StoredMomentum } from "@/app/api/alerts/sp400/route";
 
 function fmtUpdated(iso: string | null): string {
@@ -24,6 +25,7 @@ function fmtUpdated(iso: string | null): string {
 export default function AlertsPage() {
   const mag7 = useMomentumAlerts();
   const sp = useSp400Momentum();
+  const etf = useEtfMomentum();
 
   // Combined universe for the recent-crossings list (large caps already exclude
   // the Mag 7, but dedupe defensively; the precomputed sp row wins).
@@ -137,6 +139,45 @@ export default function AlertsPage() {
           ) : (
             <CompactMomentumTable statuses={sp.statuses} />
           )}
+
+          {/* Recent MA crossings across the ETF universe (precomputed snapshot) */}
+          <div className="mt-8">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-display text-sm uppercase tracking-wide text-text-secondary">
+                  ETF MA crossings
+                </h2>
+                <p className="text-xs text-text-tertiary mt-0.5">
+                  ETFs that rose above or fell below their 50d / 200d MA in the last 5 trading days.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-[11px] text-text-tertiary">
+                  Updated {fmtUpdated(etf.lastUpdated)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={etf.triggerRefresh}
+                  disabled={etf.refreshing}
+                  title="Recompute all ETFs (takes ~1m)"
+                  className="text-text-tertiary hover:text-text-primary"
+                >
+                  <RefreshCw className={`h-4 w-4 ${etf.refreshing ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
+            {etf.error && (
+              <div className="mb-3 rounded-lg border border-red-primary bg-red-muted px-3 py-2 text-sm text-red-primary">
+                {etf.error}
+              </div>
+            )}
+            {etf.loading && etf.statuses.length === 0 ? (
+              <div className="text-sm text-text-secondary">Loading ETF crossings…</div>
+            ) : (
+              <MaCrossingsList statuses={etf.statuses} />
+            )}
+          </div>
         </section>
       </div>
     </div>

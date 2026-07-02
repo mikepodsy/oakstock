@@ -318,3 +318,14 @@ export const RADAR_ETF_CATEGORIES: Record<string, { label: string; tickers: stri
 } as const;
 
 export const RADAR_ETF_CATEGORY_KEYS = Object.keys(RADAR_ETF_CATEGORIES);
+
+// Deduped ETF universe for the Alerts "ETF MA crossings" panel. Drawn from every
+// RADAR category except `leveraged_inverse` — those funds flip above/below their
+// moving averages constantly and would swamp the recent-crossings list with noise.
+export const ETF_UNIVERSE: string[] = Array.from(
+  new Set(
+    Object.entries(RADAR_ETF_CATEGORIES)
+      .filter(([key]) => key !== "leveraged_inverse")
+      .flatMap(([, cat]) => cat.tickers)
+  )
+);

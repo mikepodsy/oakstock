@@ -95,3 +95,60 @@ export function parseInsiderTrades(html: string): InsiderTrade[] {
 
   return trades;
 }
+
+/** A row from Finviz's market-wide insider feed — carries the ticker/company too. */
+export interface InsiderFeedTrade extends InsiderTrade {
+  /** Ticker of the traded company, e.g. "GF". */
+  ticker: string;
+  /** Company name, e.g. "New Germany Fund Inc" ("" when Finviz omits it). */
+  company: string;
+  /** SEC filing timestamp as shown, e.g. "Jul 02 09:13 PM". */
+  filingTime: string;
+}
+
+/**
+ * Parse Finviz's market-wide insider feed (insidertrading.ashx). Feed rows have
+ * a leading Ticker column the per-stock table lacks; the ticker <td> also carries
+ * data-boxover-{ticker,company} attributes we lift for the hover card. Injected
+ * ad rows are a single <td colspan="10"> and fall out via the cell-count guard.
+ */
+export function parseInsiderFeed(html: string): InsiderFeedTrade[] {
+  const trades: InsiderFeedTrade[] = [];
+
+  const rowRe = /<tr[^>]*class="[^"]*fv-insider-row[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch: RegExpExecArray | null;
+  while ((rowMatch = rowRe.exec(html)) !== null) {
+    const row = rowMatch[1];
+
+    // Cells in order: Ticker, Owner, Relationship, Date, Transaction, Cost,
+    // #Shares, Value ($), #Shares Total, SEC Form 4.
+    const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((c) =>
+      stripTags(c[1]),
+    );
+    if (cells.length < 9) continue;
+
+    const transaction = cells[4];
+    const ticker = /data-boxover-ticker="([^"]*)"/i.exec(row)?.[1] ?? cells[0];
+    const company = /data-boxover-company="([^"]*)"/i.exec(row)?.[1] ?? "";
+    const secFormUrl =
+      /href="(https?:\/\/[^"]*sec\.gov[^"]*)"/i.exec(row)?.[1] ?? null;
+
+    trades.push({
+      ticker,
+      company,
+      owner: cells[1],
+      relationship: cells[2],
+      date: cells[3],
+      transaction,
+      action: classifyTransaction(transaction),
+      cost: toNumber(cells[5]),
+      shares: Math.round(toNumber(cells[6])),
+      value: Math.round(toNumber(cells[7])),
+      sharesTotal: Math.round(toNumber(cells[8])),
+      secFormUrl,
+      filingTime: cells[9] ?? "",
+    });
+  }
+
+  return trades;
+}

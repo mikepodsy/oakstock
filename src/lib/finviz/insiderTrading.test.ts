@@ -1,11 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { classifyTransaction, parseInsiderTrades } from "./insiderTrading";
+import {
+  classifyTransaction,
+  parseInsiderFeed,
+  parseInsiderTrades,
+} from "./insiderTrading";
 
 // Real markup captured from Finviz quote pages (GF: Buy/Sale, SYRE:
 // Proposed Sale/Option Exercise), trimmed to one row per transaction type.
 const FIXTURE = readFileSync(
   new URL("./insiderTrading.fixture.html", import.meta.url),
+  "utf8",
+);
+
+// Real markup from the global buys feed (insidertrading.ashx?tc=1): three buy
+// rows (GF/SNES/BOLD) plus one injected ad/banner row that must be skipped.
+const FEED_FIXTURE = readFileSync(
+  new URL("./insiderFeed.fixture.html", import.meta.url),
   "utf8",
 );
 
@@ -76,5 +87,35 @@ describe("parseInsiderTrades", () => {
     expect(parseInsiderTrades("<html><body>no table here</body></html>")).toEqual(
       [],
     );
+  });
+});
+
+describe("parseInsiderFeed", () => {
+  const trades = parseInsiderFeed(FEED_FIXTURE);
+
+  it("skips ad/banner rows and parses only real trades", () => {
+    expect(trades).toHaveLength(3);
+  });
+
+  it("extracts ticker and company from the first row", () => {
+    expect(trades[0]).toMatchObject({
+      ticker: "GF",
+      company: "New Germany Fund Inc",
+      owner: "Saba Capital Management, L.P.",
+      relationship: "10% Owner",
+      transaction: "Buy",
+      action: "buy",
+      value: 1137,
+    });
+    expect(trades[0].secFormUrl).toMatch(/sec\.gov/);
+    expect(trades[0].filingTime).toBe("Jul 02 09:13 PM");
+  });
+
+  it("classifies every parsed row as a buy", () => {
+    expect(trades.every((t) => t.action === "buy")).toBe(true);
+  });
+
+  it("returns an empty array when there are no feed rows", () => {
+    expect(parseInsiderFeed("<html><body>nothing</body></html>")).toEqual([]);
   });
 });

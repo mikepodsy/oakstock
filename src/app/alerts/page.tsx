@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MomentumTable } from "@/components/alerts/MomentumTable";
 import { CompactMomentumTable } from "@/components/alerts/CompactMomentumTable";
 import { MaCrossingsList } from "@/components/alerts/MaCrossingsList";
+import { InsiderBuyingPanel } from "@/components/alerts/InsiderBuyingPanel";
 import { useMomentumAlerts } from "@/hooks/useMomentumAlerts";
 import { useSp400Momentum } from "@/hooks/useSp400Momentum";
 import { useEtfMomentum } from "@/hooks/useEtfMomentum";
@@ -180,6 +181,8 @@ export default function AlertsPage() {
           </div>
         </section>
       </div>
+
+      <InsiderBuyingPanel />
     </div>
   );
 }

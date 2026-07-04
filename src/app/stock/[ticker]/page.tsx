@@ -10,6 +10,7 @@ import { KeyStatsRow } from "@/components/stock/KeyStatsRow";
 import { FinancialChartsGrid } from "@/components/stock/FinancialChartsGrid";
 import { FinancialsSummaryTable } from "@/components/stock/FinancialsSummaryTable";
 import { CompanyDescription } from "@/components/stock/CompanyDescription";
+import { InsiderTradingSection } from "@/components/stock/InsiderTradingSection";
 import { SentimentSection } from "@/components/stock/SentimentSection";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -126,6 +127,8 @@ export default function StockDetailPage() {
           <FinancialChartsGrid data={fundamentals} />
         </>
       ) : null}
+
+      <InsiderTradingSection ticker={ticker} />
 
       <CompanyDescription description={financials?.description ?? null} />
     </div>

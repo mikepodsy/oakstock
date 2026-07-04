@@ -2,6 +2,7 @@
 // skew from the live Questrade options chain. Server-only (uses questradeGet/Post).
 import { questradeGet, questradePost, resolveSymbolId } from "@/lib/questrade";
 import { computeSkew } from "@/lib/options/volStats";
+import { chunk } from "@/lib/chunk";
 import type { ContractQuote, OptionStrikeQuotes } from "@/types/options";
 import type { TermStructurePoint, SkewData } from "@/types/volatility";
 
@@ -30,12 +31,6 @@ interface OptionQuotesResponse {
 }
 interface SymbolQuotesResponse {
   quotes: Array<{ lastTradePrice: number | null }>;
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
 }
 
 const day = (iso: string) => iso.slice(0, 10);

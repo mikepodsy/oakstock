@@ -10,8 +10,11 @@ import {
   readFreshFundamentals,
 } from "@/lib/edgar/store";
 import type { FinancialStatement, FundamentalsData } from "@/types";
+import { ApiError, apiHandler, withTimeout } from "@/lib/apiHandler";
 
 const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+
+const YAHOO_TIMEOUT_MS = 20_000;
 
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=3600",
@@ -54,20 +57,24 @@ async function fetchYahooFundamentals(
 ): Promise<FundamentalsData | null> {
   try {
     const today = new Date().toISOString().split("T")[0];
-    const [quarterlyRaw, annualRaw] = await Promise.all([
-      yf.fundamentalsTimeSeries(ticker, {
-        period1: "2001-01-01",
-        period2: today,
-        type: "quarterly",
-        module: "all",
-      }),
-      yf.fundamentalsTimeSeries(ticker, {
-        period1: "2001-01-01",
-        period2: today,
-        type: "annual",
-        module: "all",
-      }),
-    ]);
+    const [quarterlyRaw, annualRaw] = await withTimeout(
+      Promise.all([
+        yf.fundamentalsTimeSeries(ticker, {
+          period1: "2001-01-01",
+          period2: today,
+          type: "quarterly",
+          module: "all",
+        }),
+        yf.fundamentalsTimeSeries(ticker, {
+          period1: "2001-01-01",
+          period2: today,
+          type: "annual",
+          module: "all",
+        }),
+      ]),
+      YAHOO_TIMEOUT_MS,
+      `fundamentalsTimeSeries(${ticker})`
+    );
 
     const quarterly = (quarterlyRaw as Record<string, unknown>[])
       .map(mapStatement)
@@ -78,19 +85,20 @@ async function fetchYahooFundamentals(
 
     if (quarterly.length === 0 && annual.length === 0) return null;
     return { ticker, quarterly, annual };
-  } catch {
+  } catch (err) {
+    console.warn(
+      `[api/fundamentals] yahoo fetch failed for ${ticker}:`,
+      err instanceof Error ? err.message : err
+    );
     return null;
   }
 }
 
-export async function GET(request: NextRequest) {
+export const GET = apiHandler("fundamentals", async (request: NextRequest) => {
   const ticker = request.nextUrl.searchParams.get("ticker");
 
   if (!ticker) {
-    return NextResponse.json(
-      { error: "ticker parameter is required" },
-      { status: 400 }
-    );
+    throw new ApiError(400, "ticker parameter is required");
   }
 
   const cached = fundamentalsCache.get(ticker);
@@ -114,8 +122,12 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       );
     }
-  } catch {
+  } catch (err) {
     // DB unavailable — fall through to a live fetch.
+    console.warn(
+      `[api/fundamentals] supabase read failed for ${ticker}:`,
+      err instanceof Error ? err.message : err
+    );
   }
 
   // 2. Primary source: SEC EDGAR (~15+ years of history). Where EDGAR leaves
@@ -132,8 +144,12 @@ export async function GET(request: NextRequest) {
         return respond(data);
       }
     }
-  } catch {
+  } catch (err) {
     // fall through to Yahoo
+    console.warn(
+      `[api/fundamentals] edgar fetch failed for ${ticker}:`,
+      err instanceof Error ? err.message : err
+    );
   }
 
   // 3. Fallback: Yahoo (for tickers EDGAR doesn't cover). Persist on success.
@@ -145,8 +161,5 @@ export async function GET(request: NextRequest) {
 
   // 4. Nothing anywhere — record so we don't retry on every load.
   await markSync(ticker, null, "none");
-  return NextResponse.json(
-    { error: `Failed to fetch fundamentals for ${ticker}` },
-    { status: 500 }
-  );
-}
+  throw new ApiError(500, `Failed to fetch fundamentals for ${ticker}`);
+});

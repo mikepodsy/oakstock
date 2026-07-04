@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Oakstock
 
-## Getting Started
+A personal investing dashboard built with Next.js. Tracks portfolios and watchlists, analyzes options strategies and volatility, follows superinvestor 13F filings, and surfaces market data, momentum alerts, economic indicators, and an AI-generated daily news brief.
 
-First, run the development server:
+## Features
+
+- **Dashboard** — portfolio summary, market overview, daily brief
+- **Portfolio** — multiple portfolios with lot-level holdings, performance vs benchmark, allocation/sector breakdowns
+- **Watchlists** — multiple lists with quotes and pre/post-market moves
+- **Stock pages** — candlestick charts (indicators + drawing tools), fundamentals from SEC EDGAR + Yahoo, sentiment
+- **Options** — multi-leg strategy builder with payoff diagrams and time decay; IV/HV history, term structure, skew, and VRP analytics
+- **Experts** — superinvestor portfolios from Dataroma and SEC EDGAR 13F filings, per-manager detail and per-ticker activity
+- **Radar** — gainers/losers/trending scanner with sector filters
+- **Alerts** — moving-average crossing alerts for Mag 7, S&P 400, and ETFs
+- **Economic** — inflation, unemployment, rates, treasury yield curve, commodities, VIX
+- **Calendar** — earnings, dividends, economic events, IPOs
+- **COT** — CFTC Commitment of Traders visualization
+- **News** — macro + holdings-specific feed with a Claude-generated daily brief
+- **DCF** — multi-stage DCF calculator with sensitivity table
+
+## Stack
+
+Next.js (App Router) · React 19 · TypeScript (strict) · Tailwind CSS 4 · Zustand · Recharts + lightweight-charts · Supabase (Postgres) · Clerk (auth) · Vitest
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Other commands:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint       # ESLint
+npx tsc --noEmit   # typecheck
+npm test           # Vitest (npm run test:watch for watch mode)
+npm run build      # production build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+Create `.env.local` (never commit env files):
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Used for |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase client |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase (experts/superinvestors ingest, Questrade token storage) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | Clerk auth |
+| `QUESTRADE_REFRESH_TOKEN` | Bootstrap only — the live single-use rotating token is persisted in the Supabase `questrade_auth` table |
+| `ANTHROPIC_API_KEY` | Claude daily brief generation |
+| `FRED_API_KEY` | Economic indicators |
+| `FMP_API_KEY` | Financial Modeling Prep data |
+| `ALPACA_API_KEY`, `ALPACA_SECRET_KEY` | Alpaca market data |
+| `NEXT_PUBLIC_LOGO_DEV_TOKEN` | logo.dev company logos |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data sources
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Source | Purpose |
+|---|---|
+| Yahoo Finance (`yahoo-finance2`, server-side) | Quotes, history, financials, screening, news RSS |
+| SEC EDGAR | Fundamentals (10-K/10-Q), 13F filings |
+| Questrade API | Option chains with Greeks, candles. OAuth refresh token is single-use and rotates; persisted in Supabase |
+| DoltHub (public options DB) | Historical IV/HV backfill |
+| Dataroma (scraped) | Superinvestor grand portfolio |
+| CFTC | Commitment of Traders reports |
+| Anthropic Claude | Daily news brief |
 
-## Deploy on Vercel
+External responses are cached in-memory per data type (`src/lib/cache.ts`) with `Cache-Control: s-maxage` headers on API routes.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Repo layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/app/            pages + ~48 API routes (server-side proxies to data sources)
+src/components/     UI components by feature
+src/hooks/          data-fetching hooks
+src/lib/            integrations (questrade, dolthub, edgar/, dataroma/, options math, brief)
+src/services/       feature-level data services
+src/stores/         Zustand stores (portfolio/watchlist currently persist to localStorage)
+src/utils/          pure helpers (calculations, dcf, formatters)
+scripts/            seed-volatility-history.mjs — backfills IV/HV history into Supabase
+tools/              fetch_13f.py (SEC 13F ingest), generate_ticker_domains.mjs
+supabase/           SQL migrations
+```
+
+## Testing & CI
+
+Unit tests live next to their modules (`*.test.ts`) and run with Vitest. CI (GitHub Actions) runs lint, typecheck, tests, and build on pushes and PRs. A local pre-commit hook running lint + typecheck can be installed with:
+
+```bash
+ln -s ../../scripts/pre-commit .git/hooks/pre-commit
+```

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-commit: lint staged files + typecheck. Install with:
+#   ln -s ../../scripts/pre-commit .git/hooks/pre-commit
+#
+# Lint is scoped to staged files because the repo has pre-existing lint
+# errors; widen to `npm run lint` once those are fixed.
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+if [ -n "$staged" ]; then
+  echo "pre-commit: eslint (staged files)"
+  # shellcheck disable=SC2086
+  npx eslint $staged
+fi
+
+echo "pre-commit: tsc --noEmit"
+npx tsc --noEmit
+
+echo "pre-commit: ok"

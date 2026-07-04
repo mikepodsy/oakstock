@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { questradeGet, questradePost, resolveSymbolId } from "@/lib/questrade";
 import { questradeOptionsCache } from "@/lib/cache";
+import { chunk } from "@/lib/chunk";
 import type {
   ExpiryWindow,
   OptionsChainResponse,
@@ -70,12 +71,6 @@ function computeFlip(rows: OptionStrikeRow[]): number | null {
     }
   }
   return null;
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
 }
 
 // Fetch all option-quote batches with bounded concurrency. Running them in

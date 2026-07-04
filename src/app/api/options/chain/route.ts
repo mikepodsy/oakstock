@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { questradeGet, questradePost, resolveSymbolId } from "@/lib/questrade";
 import { optionChainCache } from "@/lib/cache";
+import { chunk } from "@/lib/chunk";
 import type { OptionsExpiry } from "@/types";
 import type {
   ContractQuote,
@@ -50,12 +51,6 @@ interface OptionQuotesResponse {
 }
 interface SymbolQuotesResponse {
   quotes: Array<{ lastTradePrice: number | null }>;
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
 }
 
 function expiryDay(expiryDate: string): string {

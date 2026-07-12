@@ -9,6 +9,7 @@ import {
   type ISeriesApi,
 } from "lightweight-charts";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { MarketIndicator } from "@/types";
 import type { RatioCandle } from "@/lib/ratioCandles";
 
 const RANGES = [
@@ -27,8 +28,21 @@ function cssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-export function RspSpyCandles() {
-  const [range, setRange] = useState<string>("1y");
+interface CandleTileProps {
+  title: string;
+  symbol: MarketIndicator;
+  /** Price-axis decimals; 2 for prices/indices, 4 for the RSP/SPY ratio. */
+  precision?: number;
+  defaultRange?: string;
+}
+
+export function CandleTile({
+  title,
+  symbol,
+  precision = 2,
+  defaultRange = "1y",
+}: CandleTileProps) {
+  const [range, setRange] = useState<string>(defaultRange);
   const [candles, setCandles] = useState<RatioCandle[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,21 +50,25 @@ export function RspSpyCandles() {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
-  const fetchCandles = useCallback(async (r: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/market/rsp-spy-candles?range=${r}`);
-      if (!res.ok) throw new Error("candles");
-      const data: { candles?: RatioCandle[] } = await res.json();
-      setCandles(data.candles ?? []);
-    } catch {
-      setCandles([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchCandles = useCallback(
+    async (r: string) => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/market/candles?symbol=${symbol}&range=${r}`
+        );
+        if (!res.ok) throw new Error("candles");
+        const data: { candles?: RatioCandle[] } = await res.json();
+        setCandles(data.candles ?? []);
+      } catch {
+        setCandles([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [symbol]
+  );
 
-  // Fetch candles whenever the range changes.
   useEffect(() => {
     fetchCandles(range);
   }, [fetchCandles, range]);
@@ -59,6 +77,7 @@ export function RspSpyCandles() {
   useEffect(() => {
     if (!containerRef.current) return;
     const grid = cssVar("--border-primary", "#222222");
+    const minMove = 1 / Math.pow(10, precision);
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: {
@@ -70,14 +89,16 @@ export function RspSpyCandles() {
       rightPriceScale: { borderColor: grid },
       timeScale: { borderColor: grid, fixLeftEdge: true },
     });
+    const up = cssVar("--green-primary", "#22C55E");
+    const down = cssVar("--red-primary", "#EF4444");
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: cssVar("--green-primary", "#22C55E"),
-      downColor: cssVar("--red-primary", "#EF4444"),
-      borderUpColor: cssVar("--green-primary", "#22C55E"),
-      borderDownColor: cssVar("--red-primary", "#EF4444"),
-      wickUpColor: cssVar("--green-primary", "#22C55E"),
-      wickDownColor: cssVar("--red-primary", "#EF4444"),
-      priceFormat: { type: "price", precision: 4, minMove: 0.0001 },
+      upColor: up,
+      downColor: down,
+      borderUpColor: up,
+      borderDownColor: down,
+      wickUpColor: up,
+      wickDownColor: down,
+      priceFormat: { type: "price", precision, minMove },
     });
     chartRef.current = chart;
     seriesRef.current = series;
@@ -86,7 +107,7 @@ export function RspSpyCandles() {
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, []);
+  }, [precision]);
 
   // Push data to the series when it arrives.
   useEffect(() => {
@@ -98,7 +119,7 @@ export function RspSpyCandles() {
   return (
     <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-display text-text-primary">RSP / SPY (Breadth)</h3>
+        <h3 className="text-lg font-display text-text-primary">{title}</h3>
         <div className="flex gap-0.5 rounded-lg bg-bg-tertiary p-0.5">
           {RANGES.map((r) => (
             <button

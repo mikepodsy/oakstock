@@ -3,6 +3,7 @@
 import { useMarketData } from "@/hooks/useMarketData";
 import { EconomicChart } from "@/components/economic/EconomicChart";
 import { DispersionCard } from "@/components/dashboard/DispersionCard";
+import { MarketStatCard } from "@/components/dashboard/MarketStatCard";
 import { RspSpyCandles } from "@/components/dashboard/RspSpyCandles";
 
 export function MarketOverview() {
@@ -12,8 +13,10 @@ export function MarketOverview() {
 
   return (
     <div className="mb-6 space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <DispersionCard />
+        <MarketStatCard title="Gold" symbol="gold" prefix="$" />
+        <MarketStatCard title="S&P 500 (SPX)" symbol="sp500" />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <EconomicChart data={es.data} loading={es.loading} title="S&P 500 Futures (ES)" />

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCompactNumber, formatDate } from "@/utils/formatters";
 import type { EtfHoldingsResult } from "@/lib/edgar/nport";
@@ -17,6 +18,7 @@ const TOP_N = 18;
 
 interface Slice {
   name: string;
+  ticker: string | null;
   valUSD: number;
   pct: number;
   isOther: boolean;
@@ -82,7 +84,8 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
   const top = holdings.slice(0, TOP_N);
 
   const slices: Slice[] = top.map((h) => ({
-    name: h.title ?? h.name,
+    name: h.name,
+    ticker: h.ticker,
     valUSD: h.valUSD,
     pct: (h.valUSD / totalValue) * 100,
     isOther: false,
@@ -96,6 +99,7 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
   if (otherCount > 0 && otherValue > 0) {
     slices.push({
       name: `Other (${otherCount} holdings)`,
+      ticker: null,
       valUSD: otherValue,
       pct: (otherValue / totalValue) * 100,
       isOther: true,
@@ -138,22 +142,42 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
           </ResponsiveContainer>
         </div>
 
-        {/* Legend list */}
-        <div className="w-full space-y-1 max-h-[340px] overflow-y-auto pr-2">
-          {slices.map((item, index) => (
-            <div key={`${item.name}-${index}`} className="flex items-center gap-2.5 py-1">
+        {/* Legend — three across to keep the list compact */}
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
+          {slices.map((item, index) => {
+            const dot = (
               <span
                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: sliceColor(index, item.isOther) }}
               />
-              <span className="text-sm text-text-primary font-financial truncate min-w-0">
-                {item.name}
-              </span>
+            );
+            const pct = (
               <span className="ml-auto text-sm text-text-primary font-financial flex-shrink-0 tabular-nums">
                 {item.pct.toFixed(2)}%
               </span>
-            </div>
-          ))}
+            );
+            return item.ticker ? (
+              <Link
+                key={`${item.name}-${index}`}
+                href={`/stock/${encodeURIComponent(item.ticker)}`}
+                className="flex items-center gap-2.5 py-1 min-w-0 group"
+              >
+                {dot}
+                <span className="text-sm text-text-primary font-financial truncate min-w-0 group-hover:text-green-primary group-hover:underline">
+                  {item.name}
+                </span>
+                {pct}
+              </Link>
+            ) : (
+              <div key={`${item.name}-${index}`} className="flex items-center gap-2.5 py-1 min-w-0">
+                {dot}
+                <span className="text-sm text-text-primary font-financial truncate min-w-0">
+                  {item.name}
+                </span>
+                {pct}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

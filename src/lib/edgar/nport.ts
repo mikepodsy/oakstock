@@ -1,7 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
-import { edgarFundCache } from "@/lib/cache";
+import { edgarFundCache, edgarNameTickerCache } from "@/lib/cache";
 import { getCik } from "./cik";
-import { fetchFundTickerMap, secFetchText } from "./client";
+import {
+  fetchFundTickerMap,
+  fetchNameTickerMap,
+  normalizeCompanyName,
+  secFetchText,
+} from "./client";
 
 // A single ETF constituent, as reported in the fund's NPORT-P filing.
 export interface EtfHolding {
@@ -9,6 +14,7 @@ export interface EtfHolding {
   title: string | null; // issuer's security title (e.g. "UNITED AIRLINES")
   cusip: string | null;
   valUSD: number; // market value of this position in USD
+  ticker: string | null; // resolved from the holding name, when confident
 }
 
 export interface EtfHoldingsResult {
@@ -116,6 +122,7 @@ async function fetchNportHoldings(
       title: cleanText(h.title),
       cusip: h.cusip != null ? String(h.cusip) : null,
       valUSD,
+      ticker: null, // filled in by enrichHoldingTickers once the list is capped
     });
   }
   if (holdings.length === 0) return null;
@@ -127,6 +134,28 @@ async function fetchNportHoldings(
     totalValue,
     holdingsCount: holdings.length,
   };
+}
+
+// Load (and cache) the reverse SEC name→ticker directory, mirroring getCik.
+async function getNameTickerMap(): Promise<Record<string, string> | null> {
+  let map = edgarNameTickerCache.get("map");
+  if (map === undefined) {
+    map = await fetchNameTickerMap();
+    edgarNameTickerCache.set("map", map);
+  }
+  return map ?? null;
+}
+
+// Best-effort: resolve each holding's Oakstock stock-page ticker from its name.
+// Unmatched holdings keep ticker=null and render as plain text (never a wrong link).
+async function enrichHoldingTickers(holdings: EtfHolding[]): Promise<void> {
+  const map = await getNameTickerMap();
+  if (!map) return;
+  for (const h of holdings) {
+    const byName = map[normalizeCompanyName(h.name)];
+    const byTitle = h.title ? map[normalizeCompanyName(h.title)] : undefined;
+    h.ticker = byName ?? byTitle ?? null;
+  }
 }
 
 // Full pipeline: ticker → filer → latest NPORT-P → parsed holdings. Returns null
@@ -153,6 +182,9 @@ export async function getEtfHoldings(
 
   const parsed = await fetchNportHoldings(cik, latest.accession);
   if (!parsed) return null;
+
+  // Only the capped list is returned, so enrichment stays cheap.
+  await enrichHoldingTickers(parsed.holdings);
 
   return {
     ticker: ticker.toUpperCase(),

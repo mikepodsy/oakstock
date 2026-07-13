@@ -62,6 +62,9 @@ export const edgarFundCache = getOrCreateCache<Record<string, { cik: string; ser
 // Parsed ETF holdings per ticker (from the latest NPORT-P filing). NPORT is
 // filed quarterly, so a day-long TTL is plenty. null = no holdings available.
 export const etfHoldingsCache = getOrCreateCache<unknown>("etf-holdings", 86400);
+// Reverse SEC directory: normalized company name -> ticker, for turning ETF
+// holding names into stock-page links. Whole map cached for a day.
+export const edgarNameTickerCache = getOrCreateCache<Record<string, string> | null>("edgar-name-ticker", 86400);
 export const radarCache = getOrCreateCache<string[]>("radar", 120);
 // Period % return per ticker for Radar timeframes. null = known-failed (skip refetch).
 export const radarReturnsCache = getOrCreateCache<number | null>("radar-returns", 300);

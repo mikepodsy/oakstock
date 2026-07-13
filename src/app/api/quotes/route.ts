@@ -83,6 +83,7 @@ async function fetchSingleQuote(ticker: string) {
       sector: profile?.sector ?? undefined,
       website: profile?.website ?? undefined,
       currency: price?.currency ?? "USD",
+      quoteType: price?.quoteType ?? undefined,
       extendedHours: price ? buildExtendedHours(price, 100) : undefined,
     };
     quoteCache.set(ticker, data);
@@ -111,6 +112,7 @@ async function fetchSingleQuote(ticker: string) {
       fiftyTwoWeekLow: result.fiftyTwoWeekLow ?? undefined,
       sector: undefined,
       currency: result.currency ?? "USD",
+      quoteType: result.quoteType ?? undefined,
       extendedHours: buildExtendedHours(result, 1),
     };
     quoteCache.set(ticker, data);

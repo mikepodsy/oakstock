@@ -6,6 +6,8 @@ import { useWatchlistStore } from "@/stores/watchlistStore";
 import { useQuotes } from "@/hooks/useQuotes";
 import { TickerSearch } from "@/components/search/TickerSearch";
 import { WatchlistGrid } from "@/components/watchlist/WatchlistGrid";
+import { WatchlistPerfTab } from "@/components/watchlist/WatchlistPerfTab";
+import { useWatchlistPerformance } from "@/hooks/useWatchlistPerformance";
 import { CreateWatchlistDialog } from "@/components/watchlist/CreateWatchlistDialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -36,6 +38,7 @@ export default function WatchlistPage() {
 
   const tickers = useMemo(() => items.map((i) => i.ticker), [items]);
   const { quotes } = useQuotes(tickers);
+  const { perf, loading: perfLoading } = useWatchlistPerformance(watchlists);
 
   function handleAddTicker(result: { ticker: string; name: string }) {
     if (!selectedId) return;
@@ -109,20 +112,14 @@ export default function WatchlistPage() {
       {/* Watchlist Tabs */}
       <div className="flex items-center gap-2 mb-6 overflow-x-auto">
         {watchlists.map((w) => (
-          <button
+          <WatchlistPerfTab
             key={w.id}
-            onClick={() => setSelectedId(w.id)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              w.id === selectedId
-                ? "bg-green-primary text-bg-primary"
-                : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            {w.name}
-            <span className="ml-1.5 text-xs opacity-70">
-              {w.items.length}
-            </span>
-          </button>
+            watchlist={w}
+            isSelected={w.id === selectedId}
+            onSelect={() => setSelectedId(w.id)}
+            returns={perf[w.id]}
+            loading={perfLoading}
+          />
         ))}
 
         {selectedWatchlist && (

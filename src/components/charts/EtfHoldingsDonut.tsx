@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCompactNumber, formatDate } from "@/utils/formatters";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import type { EtfHoldingsResult } from "@/lib/edgar/nport";
 
 const CHART_COLORS = [
@@ -145,11 +146,24 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
         {/* Legend — three across to keep the list compact */}
         <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
           {slices.map((item, index) => {
-            const dot = (
+            const color = sliceColor(index, item.isOther);
+            // Small logo for named holdings; a color-filled tile otherwise. The
+            // border keeps the pie ↔ legend color mapping.
+            const icon = (
               <span
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: sliceColor(index, item.isOther) }}
-              />
+                className="w-6 h-6 rounded-md overflow-hidden border flex-shrink-0 flex items-center justify-center bg-white"
+                style={{ borderColor: color }}
+              >
+                {item.ticker ? (
+                  <CompanyLogo
+                    ticker={item.ticker}
+                    className="w-full h-full rounded-[3px]"
+                    textClassName="text-[8px]"
+                  />
+                ) : (
+                  <span className="w-full h-full" style={{ backgroundColor: color }} />
+                )}
+              </span>
             );
             const pct = (
               <span className="ml-auto text-sm text-text-primary font-financial flex-shrink-0 tabular-nums">
@@ -162,7 +176,7 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
                 href={`/stock/${encodeURIComponent(item.ticker)}`}
                 className="flex items-center gap-2.5 py-1 min-w-0 group"
               >
-                {dot}
+                {icon}
                 <span className="text-sm text-text-primary font-financial truncate min-w-0 group-hover:text-green-primary group-hover:underline">
                   {item.name}
                 </span>
@@ -170,7 +184,7 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
               </Link>
             ) : (
               <div key={`${item.name}-${index}`} className="flex items-center gap-2.5 py-1 min-w-0">
-                {dot}
+                {icon}
                 <span className="text-sm text-text-primary font-financial truncate min-w-0">
                   {item.name}
                 </span>

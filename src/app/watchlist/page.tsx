@@ -18,7 +18,7 @@ export default function WatchlistPage() {
   const deleteWatchlist = useWatchlistStore((s) => s.deleteWatchlist);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [compactTabs, setCompactTabs] = useState(false);
+  const [compactCards, setCompactCards] = useState(false);
 
   // Auto-select first watchlist if none selected or selected was deleted
   useEffect(() => {
@@ -120,7 +120,6 @@ export default function WatchlistPage() {
             onSelect={() => setSelectedId(w.id)}
             returns={perf[w.id]}
             loading={perfLoading}
-            compact={compactTabs}
           />
         ))}
 
@@ -128,9 +127,9 @@ export default function WatchlistPage() {
           {/* Card size toggle */}
           <div className="flex items-center bg-bg-tertiary rounded-lg p-0.5">
             <button
-              onClick={() => setCompactTabs(false)}
+              onClick={() => setCompactCards(false)}
               className={`p-1.5 rounded-md transition-colors ${
-                !compactTabs
+                !compactCards
                   ? "bg-bg-elevated text-text-primary"
                   : "text-text-tertiary hover:text-text-secondary"
               }`}
@@ -139,9 +138,9 @@ export default function WatchlistPage() {
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setCompactTabs(true)}
+              onClick={() => setCompactCards(true)}
               className={`p-1.5 rounded-md transition-colors ${
-                compactTabs
+                compactCards
                   ? "bg-bg-elevated text-text-primary"
                   : "text-text-tertiary hover:text-text-secondary"
               }`}
@@ -186,6 +185,7 @@ export default function WatchlistPage() {
           quotes={quotes}
           expandedItemId={expandedItemId}
           onToggleExpand={handleToggleExpand}
+          compact={compactCards}
         />
       )}
     </div>

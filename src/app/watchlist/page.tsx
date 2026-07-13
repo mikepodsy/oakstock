@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Eye, Plus, Trash2 } from "lucide-react";
+import { Eye, LayoutGrid, List, Plus, Trash2 } from "lucide-react";
 import { useWatchlistStore } from "@/stores/watchlistStore";
 import { useQuotes } from "@/hooks/useQuotes";
 import { TickerSearch } from "@/components/search/TickerSearch";
@@ -18,6 +18,7 @@ export default function WatchlistPage() {
   const deleteWatchlist = useWatchlistStore((s) => s.deleteWatchlist);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [compactTabs, setCompactTabs] = useState(false);
 
   // Auto-select first watchlist if none selected or selected was deleted
   useEffect(() => {
@@ -119,18 +120,47 @@ export default function WatchlistPage() {
             onSelect={() => setSelectedId(w.id)}
             returns={perf[w.id]}
             loading={perfLoading}
+            compact={compactTabs}
           />
         ))}
 
-        {selectedWatchlist && (
-          <button
-            onClick={handleDeleteWatchlist}
-            className="ml-auto p-1.5 rounded-lg text-text-tertiary hover:text-red-primary hover:bg-red-muted transition-colors"
-            title={`Delete "${selectedWatchlist.name}"`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* Card size toggle */}
+          <div className="flex items-center bg-bg-tertiary rounded-lg p-0.5">
+            <button
+              onClick={() => setCompactTabs(false)}
+              className={`p-1.5 rounded-md transition-colors ${
+                !compactTabs
+                  ? "bg-bg-elevated text-text-primary"
+                  : "text-text-tertiary hover:text-text-secondary"
+              }`}
+              title="Large cards"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setCompactTabs(true)}
+              className={`p-1.5 rounded-md transition-colors ${
+                compactTabs
+                  ? "bg-bg-elevated text-text-primary"
+                  : "text-text-tertiary hover:text-text-secondary"
+              }`}
+              title="Compact cards"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+
+          {selectedWatchlist && (
+            <button
+              onClick={handleDeleteWatchlist}
+              className="p-1.5 rounded-lg text-text-tertiary hover:text-red-primary hover:bg-red-muted transition-colors"
+              title={`Delete "${selectedWatchlist.name}"`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search Bar */}

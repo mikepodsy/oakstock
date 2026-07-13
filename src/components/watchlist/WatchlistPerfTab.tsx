@@ -29,15 +29,21 @@ export function WatchlistPerfTab({
   onSelect,
   returns,
   loading,
+  compact = false,
 }: {
   watchlist: Watchlist;
   isSelected: boolean;
   onSelect: () => void;
   returns?: WatchlistReturns;
   loading: boolean;
+  compact?: boolean;
 }) {
   const today = returns?.["1D"] ?? null;
   const showValue = returns != null && (!loading || today != null);
+
+  const selectedClasses = isSelected
+    ? "border-green-primary bg-green-muted"
+    : "border-border-primary bg-bg-tertiary hover:border-text-tertiary";
 
   return (
     <PreviewCard.Root>
@@ -45,35 +51,50 @@ export function WatchlistPerfTab({
         delay={200}
         closeDelay={100}
         render={
-          <button
-            type="button"
-            onClick={onSelect}
-            className={`flex w-32 shrink-0 flex-col items-start gap-0.5 rounded-xl border px-3 py-1.5 text-left transition-colors ${
-              isSelected
-                ? "border-green-primary bg-green-muted"
-                : "border-border-primary bg-bg-tertiary hover:border-text-tertiary"
-            }`}
-          >
-            <span className="flex w-full items-center justify-between gap-1">
+          compact ? (
+            <button
+              type="button"
+              onClick={onSelect}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-left transition-colors ${selectedClasses}`}
+            >
               <span className="truncate text-sm font-medium text-text-primary">
                 {watchlist.name}
               </span>
-              <span className="text-xs text-text-tertiary">{watchlist.items.length}</span>
-            </span>
-            {showValue ? (
-              <span className={`flex items-center gap-0.5 text-sm font-semibold ${pctColor(today)}`}>
-                {today != null &&
-                  (today >= 0 ? (
-                    <ArrowUp className="h-3 w-3" />
-                  ) : (
-                    <ArrowDown className="h-3 w-3" />
-                  ))}
-                {formatPct(today)}
+              {showValue ? (
+                <span className={`text-xs font-semibold ${pctColor(today)}`}>
+                  {formatPct(today)}
+                </span>
+              ) : (
+                <Skeleton className="h-3 w-10" />
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onSelect}
+              className={`flex w-32 shrink-0 flex-col items-start gap-0.5 rounded-xl border px-3 py-1.5 text-left transition-colors ${selectedClasses}`}
+            >
+              <span className="flex w-full items-center justify-between gap-1">
+                <span className="truncate text-sm font-medium text-text-primary">
+                  {watchlist.name}
+                </span>
+                <span className="text-xs text-text-tertiary">{watchlist.items.length}</span>
               </span>
-            ) : (
-              <Skeleton className="h-4 w-16" />
-            )}
-          </button>
+              {showValue ? (
+                <span className={`flex items-center gap-0.5 text-sm font-semibold ${pctColor(today)}`}>
+                  {today != null &&
+                    (today >= 0 ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    ))}
+                  {formatPct(today)}
+                </span>
+              ) : (
+                <Skeleton className="h-4 w-16" />
+              )}
+            </button>
+          )
         }
       />
       <PreviewCard.Portal>

@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         sector: profile?.sector ?? undefined,
         website: profile?.website ?? undefined,
         currency: price?.currency ?? "USD",
+        quoteType: price?.quoteType ?? undefined,
       });
     } catch {
       // Fallback to quote() for indices and tickers that don't support quoteSummary
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
         sector: undefined,
         website: undefined,
         currency: result.currency ?? "USD",
+        quoteType: result.quoteType ?? undefined,
       });
     }
   } catch {

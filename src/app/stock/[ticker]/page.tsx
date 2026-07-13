@@ -4,8 +4,10 @@ import { useParams } from "next/navigation";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useFinancials } from "@/hooks/useFinancials";
 import { useFundamentals } from "@/hooks/useFundamentals";
+import { useEtfHoldings } from "@/hooks/useEtfHoldings";
 import { StockHeader } from "@/components/stock/StockHeader";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
+import { EtfHoldingsDonut } from "@/components/charts/EtfHoldingsDonut";
 import { KeyStatsRow } from "@/components/stock/KeyStatsRow";
 import { FinancialChartsGrid } from "@/components/stock/FinancialChartsGrid";
 import { FinancialsSummaryTable } from "@/components/stock/FinancialsSummaryTable";
@@ -28,6 +30,16 @@ export default function StockDetailPage() {
     error: fundamentalsError,
     refetch,
   } = useFundamentals(ticker);
+
+  // ETFs have no company fundamentals (P/E, revenue…). When the quote resolves
+  // to a fund, we show its NPORT-P holdings breakdown instead of the profile.
+  const isEtf = quote?.quoteType === "ETF";
+  const {
+    data: holdings,
+    loading: holdingsLoading,
+    error: holdingsError,
+    refetch: refetchHoldings,
+  } = useEtfHoldings(isEtf ? ticker : null);
 
   if (quotesLoading) {
     return (
@@ -89,46 +101,84 @@ export default function StockDetailPage() {
         />
       </div>
 
-      <SentimentSection ticker={ticker} />
-
-      <KeyStatsRow
-        quote={quote}
-        financials={financials}
-        loading={financialsLoading}
-      />
-
-      {fundamentalsLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-border-primary bg-bg-secondary p-4"
-            >
-              <Skeleton className="h-4 w-24 mb-3" />
-              <Skeleton className="h-[160px] w-full rounded-lg" />
+      {isEtf ? (
+        holdingsLoading ? (
+          <div className="rounded-xl border border-border-primary bg-bg-secondary p-4 mb-6">
+            <Skeleton className="h-4 w-24 mb-4" />
+            <div className="flex flex-col items-center gap-6">
+              <Skeleton className="w-[300px] h-[300px] rounded-full" />
+              <div className="w-full space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-5 w-full rounded" />
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      ) : fundamentalsError ? (
-        <div className="rounded-xl border border-border-primary bg-bg-secondary p-8 text-center mb-6">
-          <p className="text-sm text-text-secondary mb-2">
-            Failed to load financial data
-          </p>
-          <button
-            onClick={refetch}
-            className="text-sm text-green-primary hover:underline"
-          >
-            Retry
-          </button>
-        </div>
-      ) : fundamentals ? (
+          </div>
+        ) : holdingsError ? (
+          <div className="rounded-xl border border-border-primary bg-bg-secondary p-8 text-center mb-6">
+            <p className="text-sm text-text-secondary mb-2">
+              Failed to load ETF holdings
+            </p>
+            <button
+              onClick={refetchHoldings}
+              className="text-sm text-green-primary hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : holdings ? (
+          <EtfHoldingsDonut data={holdings} />
+        ) : (
+          <div className="rounded-xl border border-border-primary bg-bg-secondary p-8 text-center mb-6">
+            <p className="text-sm text-text-secondary">
+              Holdings unavailable for {ticker}
+            </p>
+          </div>
+        )
+      ) : (
         <>
-          <FinancialsSummaryTable data={fundamentals} />
-          <FinancialChartsGrid data={fundamentals} />
-        </>
-      ) : null}
+          <SentimentSection ticker={ticker} />
 
-      <InsiderTradingSection ticker={ticker} />
+          <KeyStatsRow
+            quote={quote}
+            financials={financials}
+            loading={financialsLoading}
+          />
+
+          {fundamentalsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-border-primary bg-bg-secondary p-4"
+                >
+                  <Skeleton className="h-4 w-24 mb-3" />
+                  <Skeleton className="h-[160px] w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          ) : fundamentalsError ? (
+            <div className="rounded-xl border border-border-primary bg-bg-secondary p-8 text-center mb-6">
+              <p className="text-sm text-text-secondary mb-2">
+                Failed to load financial data
+              </p>
+              <button
+                onClick={refetch}
+                className="text-sm text-green-primary hover:underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : fundamentals ? (
+            <>
+              <FinancialsSummaryTable data={fundamentals} />
+              <FinancialChartsGrid data={fundamentals} />
+            </>
+          ) : null}
+
+          <InsiderTradingSection ticker={ticker} />
+        </>
+      )}
 
       <CompanyDescription description={financials?.description ?? null} />
     </div>

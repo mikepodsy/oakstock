@@ -77,6 +77,7 @@ export interface QuoteData {
   sector?: string;
   website?: string;
   currency: string;
+  quoteType?: string; // Yahoo security type, e.g. "EQUITY" | "ETF" | "INDEX"
   extendedHours?: {
     session: "pre" | "post";
     changePercent: number; // already scaled to a percent, e.g. +0.42

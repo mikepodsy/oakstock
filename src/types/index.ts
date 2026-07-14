@@ -383,6 +383,9 @@ export type CotWeekCategory = CotCategory;
 export interface CotWeek {
   reportDate: string;
   categories: CotWeekCategory[];
+  // Total open interest for the market this week (CFTC open_interest_all).
+  // Used to express each category's longs/shorts as a share of the whole market.
+  openInterest: number;
 }
 
 // A self-contained set of categories + history (used for the legacy report
@@ -399,6 +402,8 @@ export interface CotReport {
   reportType: CotReportType;
   categories: CotCategory[];
   history: CotWeek[];
+  // Total open interest for the latest report week (CFTC open_interest_all).
+  openInterest: number;
   // Legacy report groups (Commercial / Non-Commercial / Non-Reportable).
   // null if the legacy dataset had no match / failed to load for this instrument.
   legacy: CotGroupSet | null;

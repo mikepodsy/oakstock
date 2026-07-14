@@ -7,6 +7,7 @@ import { CotPositionChart } from "@/components/cot/CotPositionChart";
 import { CotNetChart } from "@/components/cot/CotNetChart";
 import { CotIndexGauge } from "@/components/cot/CotIndexGauge";
 import { CotHistoryChart } from "@/components/cot/CotHistoryChart";
+import { CotParticipantShareCard } from "@/components/cot/CotParticipantShareCard";
 import { CotLoadingSkeleton } from "@/components/cot/CotLoadingSkeleton";
 import {
   DropdownMenu,
@@ -52,10 +53,11 @@ export default function CotPage() {
     weeks[weeks.length - 1] ??
     null;
   const displayCategories = selectedWeek?.categories ?? groups?.categories ?? [];
+  const openInterest = selectedWeek?.openInterest ?? report?.openInterest ?? 0;
   const isLatest = !selectedWeek || selectedWeek.reportDate === report?.reportDate;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -140,14 +142,27 @@ export default function CotPage() {
             </div>
           )}
 
-          {/* Long / Short chart (for the selected report week) */}
-          <CotPositionChart
-            categories={displayCategories}
-            title={`${report.instrument} — Long / Short Positioning (${viewLabel})`}
-          />
+          {/* Top row: Long/Short + Net charts, with the participant % of open
+              interest breakdown card beside them (stacks below on mobile). */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-4">
+              {/* Long / Short chart (for the selected report week) */}
+              <CotPositionChart
+                categories={displayCategories}
+                title={`${report.instrument} — Long / Short Positioning (${viewLabel})`}
+              />
 
-          {/* Net position chart */}
-          <CotNetChart categories={displayCategories} />
+              {/* Net position chart */}
+              <CotNetChart categories={displayCategories} />
+            </div>
+
+            {/* Each category's longs/shorts as a share of open interest */}
+            <CotParticipantShareCard
+              categories={displayCategories}
+              openInterest={openInterest}
+              title={`% of Open Interest (${viewLabel})`}
+            />
+          </div>
 
           {/* 3-year net-positioning index (bullishness / bearishness) */}
           <CotIndexGauge

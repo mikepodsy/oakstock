@@ -262,6 +262,7 @@ function buildHistory(
     .map((_, i) => ({
       reportDate: reportDateOf(records[i]),
       categories: buildCategoriesAt(records, i, categoryDefs),
+      openInterest: num(records[i], "open_interest_all"),
     }))
     .reverse();
 }
@@ -330,6 +331,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
     reportType: instrument.reportType,
     categories: detailed.categories,
     history: detailed.history,
+    openInterest: num(results[0], "open_interest_all"),
     legacy,
   };
 }
@@ -338,7 +340,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v6";
+  const CACHE_KEY = "cot-all-v7";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

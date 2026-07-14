@@ -211,20 +211,33 @@ function num(record: Record<string, unknown>, col: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// COT Index: places the current net position within its 3-year high/low range,
-// scaled 0–100. ≥80 = near the 3yr high (bullish), ≤20 = near the 3yr low (bearish).
-// Returns null when the range is flat or there are no records.
-function cotIndex(records: Record<string, unknown>[], cols: ColPair): number | null {
-  if (records.length === 0) return null;
-  const nets = records
-    .slice(0, INDEX_WEEKS)
-    .map((rec) => num(rec, cols.long) - num(rec, cols.short));
-  const current = nets[0];
-  const min = Math.min(...nets);
-  const max = Math.max(...nets);
+// Places the current value (values[0]) within the min/max range of the series,
+// scaled 0–100. ≥80 = near the high, ≤20 = near the low. Returns null when the
+// series is empty or the range is flat.
+function rangeIndex(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const current = values[0];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
   if (max === min) return null;
   const idx = ((current - min) / (max - min)) * 100;
   return Math.min(Math.max(idx, 0), 100);
+}
+
+// COT Index: places the current net position within its 3-year high/low range,
+// scaled 0–100. ≥80 = near the 3yr high (bullish), ≤20 = near the 3yr low (bearish).
+function cotIndex(records: Record<string, unknown>[], cols: ColPair): number | null {
+  const nets = records
+    .slice(0, INDEX_WEEKS)
+    .map((rec) => num(rec, cols.long) - num(rec, cols.short));
+  return rangeIndex(nets);
+}
+
+// Open Interest Index: places current open interest within its 3-year high/low
+// range, scaled 0–100. ≥80 = near the 3yr high, ≤20 = near the 3yr low.
+function oiIndex(records: Record<string, unknown>[]): number | null {
+  const ois = records.slice(0, INDEX_WEEKS).map((rec) => num(rec, "open_interest_all"));
+  return rangeIndex(ois);
 }
 
 // Build the full category set for the week at index `i` (0 = newest). netChange is
@@ -263,6 +276,7 @@ function buildHistory(
       reportDate: reportDateOf(records[i]),
       categories: buildCategoriesAt(records, i, categoryDefs),
       openInterest: num(records[i], "open_interest_all"),
+      openInterestIndex: oiIndex(records.slice(i)),
     }))
     .reverse();
 }
@@ -332,6 +346,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
     categories: detailed.categories,
     history: detailed.history,
     openInterest: num(results[0], "open_interest_all"),
+    openInterestIndex: oiIndex(results),
     legacy,
   };
 }
@@ -340,7 +355,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v7";
+  const CACHE_KEY = "cot-all-v8";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

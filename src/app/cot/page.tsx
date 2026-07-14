@@ -54,6 +54,7 @@ export default function CotPage() {
     null;
   const displayCategories = selectedWeek?.categories ?? groups?.categories ?? [];
   const openInterest = selectedWeek?.openInterest ?? report?.openInterest ?? 0;
+  const openInterestIndex = selectedWeek?.openInterestIndex ?? report?.openInterestIndex ?? null;
   const isLatest = !selectedWeek || selectedWeek.reportDate === report?.reportDate;
 
   return (
@@ -160,6 +161,7 @@ export default function CotPage() {
             <CotParticipantShareCard
               categories={displayCategories}
               openInterest={openInterest}
+              openInterestIndex={openInterestIndex}
               title={`% of Open Interest (${viewLabel})`}
             />
           </div>

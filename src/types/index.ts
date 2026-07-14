@@ -386,6 +386,9 @@ export interface CotWeek {
   // Total open interest for the market this week (CFTC open_interest_all).
   // Used to express each category's longs/shorts as a share of the whole market.
   openInterest: number;
+  // Open interest within its trailing 3-year high/low range, scaled 0–100.
+  // null when there isn't enough history or the range is flat.
+  openInterestIndex: number | null;
 }
 
 // A self-contained set of categories + history (used for the legacy report
@@ -404,6 +407,8 @@ export interface CotReport {
   history: CotWeek[];
   // Total open interest for the latest report week (CFTC open_interest_all).
   openInterest: number;
+  // Latest open interest within its trailing 3-year high/low range, scaled 0–100.
+  openInterestIndex: number | null;
   // Legacy report groups (Commercial / Non-Commercial / Non-Reportable).
   // null if the legacy dataset had no match / failed to load for this instrument.
   legacy: CotGroupSet | null;

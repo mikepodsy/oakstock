@@ -6,7 +6,17 @@ interface CotParticipantShareCardProps {
   categories: CotCategory[];
   // Total open interest for the displayed week (CFTC open_interest_all).
   openInterest: number;
+  // Open interest within its trailing 3-year range, scaled 0–100 (null if n/a).
+  openInterestIndex: number | null;
   title?: string;
+}
+
+// Neutral band label for the OI index — describes magnitude, not a bullish/bearish
+// signal (high open interest isn't inherently good or bad).
+function oiBand(index: number): string {
+  if (index >= 80) return "Near 3-yr high";
+  if (index <= 20) return "Near 3-yr low";
+  return "Mid-range";
 }
 
 // Format a fraction (0..1) of open interest as a one-decimal percentage.
@@ -28,6 +38,7 @@ function barWidth(value: number, openInterest: number): string {
 export function CotParticipantShareCard({
   categories,
   openInterest,
+  openInterestIndex,
   title = "% of Open Interest",
 }: CotParticipantShareCardProps) {
   return (
@@ -81,6 +92,39 @@ export function CotParticipantShareCard({
           <span className="inline-block w-2 h-2 rounded-sm bg-red-primary" />
           Short
         </span>
+      </div>
+
+      {/* Open Interest 3-year index — where current OI sits within its own 3-year
+          high/low range. Neutral (magnitude, not a bullish/bearish signal). */}
+      <div className="border-t border-border-primary pt-3 mt-4">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-xs text-text-secondary">3-Yr OI Index</span>
+          {openInterestIndex === null ? (
+            <span className="text-xs text-text-tertiary">— n/a</span>
+          ) : (
+            <span className="text-xs shrink-0">
+              <span className="font-mono text-text-primary">{Math.round(openInterestIndex)}</span>
+              <span className="ml-1.5 text-text-secondary">{oiBand(openInterestIndex)}</span>
+            </span>
+          )}
+        </div>
+        {/* Track with faint end zones (0–20 / 80–100) + neutral marker. */}
+        <div className="relative h-2 rounded-full bg-bg-tertiary">
+          <div
+            className="absolute inset-y-0 left-0 w-1/5 rounded-l-full bg-text-tertiary"
+            style={{ opacity: 0.12 }}
+          />
+          <div
+            className="absolute inset-y-0 right-0 w-1/5 rounded-r-full bg-text-tertiary"
+            style={{ opacity: 0.12 }}
+          />
+          {openInterestIndex !== null && (
+            <div
+              className="absolute top-1/2 h-3.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-oak-300"
+              style={{ left: `${openInterestIndex}%` }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

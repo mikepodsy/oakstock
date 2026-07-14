@@ -57,6 +57,15 @@ function formatAxisDate(date: string): string {
   }
 }
 
+// Props Recharts hands a Bar's custom `shape` for each data point. Kept loose so
+// the function stays assignable to Recharts' shape type (nullable geometry).
+interface NetShapeProps {
+  x?: number;
+  width?: number;
+  background?: { y?: number | null; height?: number | null };
+  payload?: Record<string, unknown>;
+}
+
 export function CotHistoryChart({ history, categoryNames, title }: CotHistoryChartProps) {
   const [metric, setMetric] = useState<Metric>("net");
   const [rangeWeeks, setRangeWeeks] = useState<number>(13);
@@ -73,16 +82,96 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
 
   const data = weeks.map((week) => {
     const row: Record<string, string | number> = { date: week.reportDate };
-    for (const cat of week.categories) {
-      if (metric === "net") {
+    if (metric === "net") {
+      // Anchor value so the custom shape is drawn for every week; the real per
+      // category nets are read from the row inside the shape.
+      row._anchor = 1;
+      for (const cat of week.categories) {
         row[cat.name] = cat.net;
-      } else {
+      }
+    } else {
+      for (const cat of week.categories) {
         row[`${cat.name} ▲`] = cat.longs;
         row[`${cat.name} ▼`] = -cat.shorts;
       }
     }
     return row;
   });
+
+  // Fixed y-domain for the net view so the custom shape can map values → pixels
+  // the same way the axis does. Always includes zero so up/down read correctly.
+  const netValues =
+    metric === "net" ? weeks.flatMap((w) => w.categories.map((c) => c.net)) : [];
+  const dMin = Math.min(0, ...netValues);
+  const dMax = Math.max(0, ...netValues);
+  const netRange = dMax - dMin || 1;
+  const netDomain: [number, number] = [dMin - netRange * 0.02, dMax + netRange * 0.06];
+
+  // Overlapping net bars: for each week draw every category as a full-width bar
+  // from zero (up when net long, down when net short). Larger magnitudes are
+  // drawn first (behind) and smaller ones last (in front) so no bar is hidden.
+  const renderNetBars = (props: NetShapeProps) => {
+    const { x = 0, width = 0, background, payload } = props;
+    if (!background || !payload) return <g />;
+    const bgY = background.y ?? 0;
+    const bgH = background.height ?? 0;
+    const [lo, hi] = netDomain;
+    if (hi === lo || bgH === 0) return <g />;
+    const pixel = (v: number) => bgY + ((hi - v) / (hi - lo)) * bgH;
+    const zeroY = pixel(0);
+
+    const bars = categoryNames
+      .map((name) => ({ name, v: Number(payload[name] ?? 0) }))
+      .filter((b) => b.v !== 0)
+      .sort((a, b) => Math.abs(b.v) - Math.abs(a.v)); // largest first → drawn behind
+
+    return (
+      <g>
+        {bars.map(({ name, v }) => {
+          const vy = pixel(v);
+          const top = Math.min(vy, zeroY);
+          const h = Math.max(Math.abs(zeroY - vy), 1);
+          return (
+            <rect key={name} x={x} y={top} width={width} height={h} rx={1} fill={color(name)} />
+          );
+        })}
+      </g>
+    );
+  };
+
+  // Custom tooltip for the net view — the overlapping bars are one Recharts
+  // series, so list each category's net from the hovered week's row.
+  const renderNetTooltip = (props: {
+    active?: boolean;
+    label?: unknown;
+    payload?: readonly { payload?: Record<string, unknown> }[];
+  }) => {
+    if (!props.active || !props.payload?.length) return null;
+    const row = props.payload[0]?.payload;
+    if (!row) return null;
+    const items = categoryNames
+      .map((name) => ({ name, v: Number(row[name] ?? 0) }))
+      .sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    return (
+      <div style={{ ...tooltipStyle, padding: "8px 10px" }}>
+        <div className="text-xs text-text-secondary mb-1">
+          {formatAxisDate(String(props.label))}
+        </div>
+        {items.map(({ name, v }) => (
+          <div key={name} className="flex items-center gap-1.5 text-xs">
+            <span
+              className="inline-block w-2 h-2 rounded-sm"
+              style={{ backgroundColor: color(name) }}
+            />
+            <span className="text-text-secondary">{name}</span>
+            <span className="ml-auto pl-3 font-mono text-text-primary">
+              {formatSignedContracts(v)}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="rounded-xl border border-border-primary bg-bg-secondary p-4">
@@ -91,7 +180,7 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
           <h3 className="text-sm font-medium text-text-primary">{title}</h3>
           <p className="text-xs text-text-tertiary mt-0.5">
             {metric === "net"
-              ? "Net position (longs − shorts) per week, by trader category."
+              ? "Net position (longs − shorts) per week — up = net long, down = net short. Bars overlap, smallest in front."
               : "Gross longs (up) and shorts (down) per week, stacked by category."}
           </p>
         </div>
@@ -172,6 +261,7 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
             tickLine={false}
           />
           <YAxis
+            domain={metric === "net" ? netDomain : undefined}
             tickFormatter={formatCompactNumber}
             tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
             axisLine={false}
@@ -179,36 +269,48 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
             width={48}
           />
           <ReferenceLine y={0} stroke="var(--border-primary)" />
-          <Tooltip
-            contentStyle={tooltipStyle}
-            labelFormatter={(label) => formatAxisDate(String(label))}
-            formatter={(value, name) => [
-              `${formatSignedContracts(Number(value))} contracts`,
-              String(name),
-            ]}
-            cursor={{ fill: "var(--bg-tertiary)", opacity: 0.4 }}
-          />
-          {metric === "net"
-            ? categoryNames.map((name) => (
-                // Stack the categories into one column per week (positives stack up,
-                // negatives down) so the chart uses far less horizontal space.
-                <Bar key={name} dataKey={name} stackId="net" fill={color(name)} />
-              ))
-            : categoryNames.flatMap((name) => [
-                <Bar
-                  key={`${name} ▲`}
-                  dataKey={`${name} ▲`}
-                  stackId="ls"
-                  fill={color(name)}
-                />,
-                <Bar
-                  key={`${name} ▼`}
-                  dataKey={`${name} ▼`}
-                  stackId="ls"
-                  fill={color(name)}
-                  fillOpacity={0.5}
-                />,
-              ])}
+          {metric === "net" ? (
+            <Tooltip
+              content={renderNetTooltip}
+              cursor={{ fill: "var(--bg-tertiary)", opacity: 0.4 }}
+            />
+          ) : (
+            <Tooltip
+              contentStyle={tooltipStyle}
+              labelFormatter={(label) => formatAxisDate(String(label))}
+              formatter={(value, name) => [
+                `${formatSignedContracts(Number(value))} contracts`,
+                String(name),
+              ]}
+              cursor={{ fill: "var(--bg-tertiary)", opacity: 0.4 }}
+            />
+          )}
+          {metric === "net" ? (
+            // Single series drives layout; the custom shape draws every category's
+            // overlapping bar for the week (see renderNetBars).
+            <Bar
+              dataKey="_anchor"
+              background={{ fill: "transparent" }}
+              shape={renderNetBars}
+              isAnimationActive={false}
+            />
+          ) : (
+            categoryNames.flatMap((name) => [
+              <Bar
+                key={`${name} ▲`}
+                dataKey={`${name} ▲`}
+                stackId="ls"
+                fill={color(name)}
+              />,
+              <Bar
+                key={`${name} ▼`}
+                dataKey={`${name} ▼`}
+                stackId="ls"
+                fill={color(name)}
+                fillOpacity={0.5}
+              />,
+            ])
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>

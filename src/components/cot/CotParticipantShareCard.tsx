@@ -50,7 +50,9 @@ export function CotParticipantShareCard({
         </span>
       </div>
       <p className="text-xs text-text-tertiary mb-4">
-        Each category&apos;s longs / shorts as a share of total open interest.
+        Longs / shorts as a share of total OI. Right:{" "}
+        <span className="text-oak-300">OI idx</span> = gross position (L+S) within
+        its own 3-yr range.
       </p>
 
       <div className="space-y-3">
@@ -64,19 +66,38 @@ export function CotParticipantShareCard({
                 <span className="text-red-primary">{sharePct(c.shorts, openInterest)}</span>
               </span>
             </div>
-            {/* Two-segment share bar: green = long share, red = short share of OI. */}
-            <div className="flex items-center gap-0.5 h-1.5">
-              <div className="flex-1 flex justify-end bg-bg-tertiary rounded-l-sm overflow-hidden">
-                <div
-                  className="h-1.5 bg-green-primary rounded-l-sm"
-                  style={{ width: barWidth(c.longs, openInterest) }}
-                />
+            <div className="flex items-center gap-2">
+              {/* Two-segment share bar: green = long share, red = short share of OI. */}
+              <div className="flex items-center gap-0.5 h-1.5 flex-1">
+                <div className="flex-1 flex justify-end bg-bg-tertiary rounded-l-sm overflow-hidden">
+                  <div
+                    className="h-1.5 bg-green-primary rounded-l-sm"
+                    style={{ width: barWidth(c.longs, openInterest) }}
+                  />
+                </div>
+                <div className="flex-1 flex justify-start bg-bg-tertiary rounded-r-sm overflow-hidden">
+                  <div
+                    className="h-1.5 bg-red-primary rounded-r-sm"
+                    style={{ width: barWidth(c.shorts, openInterest) }}
+                  />
+                </div>
               </div>
-              <div className="flex-1 flex justify-start bg-bg-tertiary rounded-r-sm overflow-hidden">
-                <div
-                  className="h-1.5 bg-red-primary rounded-r-sm"
-                  style={{ width: barWidth(c.shorts, openInterest) }}
-                />
+              {/* This category's gross-position (L+S) index within its own 3-yr range. */}
+              <div
+                className="shrink-0 flex items-center gap-1 w-16"
+                title="Gross position (longs + shorts) within its 3-year high/low range"
+              >
+                <div className="relative h-1.5 flex-1 rounded-full bg-bg-tertiary">
+                  {c.openInterestIndex !== null && (
+                    <div
+                      className="absolute top-1/2 h-2.5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-oak-300"
+                      style={{ left: `${c.openInterestIndex}%` }}
+                    />
+                  )}
+                </div>
+                <span className="font-mono text-[10px] text-oak-300 w-4 text-right tabular-nums">
+                  {c.openInterestIndex === null ? "—" : Math.round(c.openInterestIndex)}
+                </span>
               </div>
             </div>
           </div>
@@ -94,11 +115,11 @@ export function CotParticipantShareCard({
         </span>
       </div>
 
-      {/* Open Interest 3-year index — where current OI sits within its own 3-year
-          high/low range. Neutral (magnitude, not a bullish/bearish signal). */}
+      {/* Cumulative (total market) open-interest 3-year index — where current total
+          OI sits within its own 3-year range. Neutral (magnitude, not a signal). */}
       <div className="border-t border-border-primary pt-3 mt-4">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs text-text-secondary">3-Yr OI Index</span>
+          <span className="text-xs text-text-secondary">Total OI Index (3-Yr)</span>
           {openInterestIndex === null ? (
             <span className="text-xs text-text-tertiary">— n/a</span>
           ) : (

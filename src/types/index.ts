@@ -374,6 +374,9 @@ export interface CotCategory {
   // 3-year net-positioning index (COT Index), 0–100. ≥80 bullish, ≤20 bearish.
   // null when there isn't enough history or the 3yr range is flat.
   index: number | null;
+  // 3-year open-interest index for this category: its gross position (longs +
+  // shorts) within its own 3-year high/low range, 0–100. null when flat/insufficient.
+  openInterestIndex: number | null;
 }
 
 // Each history week carries full category data (net change vs the prior week and

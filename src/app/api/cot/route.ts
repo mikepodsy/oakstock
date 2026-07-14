@@ -240,6 +240,15 @@ function oiIndex(records: Record<string, unknown>[]): number | null {
   return rangeIndex(ois);
 }
 
+// Per-category open-interest index: the category's gross position (longs + shorts,
+// i.e. its footprint in open interest) within its own 3-year high/low range, 0–100.
+function grossIndex(records: Record<string, unknown>[], cols: ColPair): number | null {
+  const gross = records
+    .slice(0, INDEX_WEEKS)
+    .map((rec) => num(rec, cols.long) + num(rec, cols.short));
+  return rangeIndex(gross);
+}
+
 // Build the full category set for the week at index `i` (0 = newest). netChange is
 // vs the prior week (records[i+1]); the index uses the trailing 3-year window from
 // that week (records.slice(i)). Lets any historical week render like the latest one.
@@ -256,7 +265,15 @@ function buildCategoriesAt(
     const shorts = num(latest, cols.short);
     const net    = longs - shorts;
     const prevNet = prev ? num(prev, cols.long) - num(prev, cols.short) : 0;
-    return { name, longs, shorts, net, netChange: net - prevNet, index: cotIndex(window, cols) };
+    return {
+      name,
+      longs,
+      shorts,
+      net,
+      netChange: net - prevNet,
+      index: cotIndex(window, cols),
+      openInterestIndex: grossIndex(window, cols),
+    };
   });
 }
 
@@ -355,7 +372,7 @@ async function fetchInstrument(instrument: CotInstrument): Promise<CotReport | n
 export async function GET() {
   // Versioned key — bump when the response shape changes so long-lived caches
   // don't serve stale-shaped data after a deploy.
-  const CACHE_KEY = "cot-all-v8";
+  const CACHE_KEY = "cot-all-v9";
   const cached = cotCache.get(CACHE_KEY);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });

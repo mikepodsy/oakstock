@@ -190,7 +190,9 @@ export function CotHistoryChart({ history, categoryNames, title }: CotHistoryCha
           />
           {metric === "net"
             ? categoryNames.map((name) => (
-                <Bar key={name} dataKey={name} fill={color(name)} />
+                // Stack the categories into one column per week (positives stack up,
+                // negatives down) so the chart uses far less horizontal space.
+                <Bar key={name} dataKey={name} stackId="net" fill={color(name)} />
               ))
             : categoryNames.flatMap((name) => [
                 <Bar

@@ -1,7 +1,10 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { formatCurrency, formatPercent } from "@/utils/formatters";
+import { useMemo, useState } from "react";
+import { PieChart } from "@/components/charts/pie-chart";
+import { PieSlice } from "@/components/charts/pie-slice";
+import { PieCenter } from "@/components/charts/pie-center";
+import type { PieData } from "@/components/charts/pie-context";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 
 const CHART_COLORS = [
@@ -10,83 +13,49 @@ const CHART_COLORS = [
   "#84cc16", "#0ea5e9", "#d946ef", "#22d3ee", "#a78bfa",
 ];
 
+// Matches the previous recharts geometry: 300px box, 75 inner / 140 outer radius.
+const CHART_SIZE = 300;
+const INNER_RADIUS = 75;
+const HOVER_OFFSET = 10;
+
 interface AllocationDonutProps {
   holdings: { ticker: string; name: string; website?: string; marketValue: number }[];
   totalValue: number;
-}
-
-function DonutTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    payload: { ticker: string; name: string; marketValue: number; pct: number };
-  }>;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const data = payload[0].payload;
-  return (
-    <div className="rounded-lg border border-border-primary bg-bg-elevated px-3 py-2 shadow-lg">
-      <p className="text-xs font-financial text-text-primary">
-        {data.ticker} &middot; {data.name}
-      </p>
-      <p className="text-xs text-text-secondary">
-        {formatCurrency(data.marketValue)} ({formatPercent(data.pct)})
-      </p>
-    </div>
-  );
-}
-
-function PieLabel(props: {
-  cx?: number;
-  cy?: number;
-  midAngle?: number;
-  innerRadius?: number;
-  outerRadius?: number;
-  percent?: number;
-}) {
-  const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 } = props;
-  if (percent < 0.03) return null;
-
-  const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor="middle"
-      dominantBaseline="central"
-      className="text-xs font-financial"
-      fill="white"
-    >
-      {`${(percent * 100).toFixed(1)}%`}
-    </text>
-  );
 }
 
 export function AllocationDonut({
   holdings,
   totalValue,
 }: AllocationDonutProps) {
-  if (holdings.length === 0 || totalValue === 0) return null;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const chartData = holdings
-    .filter((h) => h.marketValue > 0)
-    .map((h) => ({
-      ticker: h.ticker,
-      name: h.name,
-      website: h.website,
-      marketValue: h.marketValue,
-      pct: (h.marketValue / totalValue) * 100,
-    }))
-    .sort((a, b) => b.marketValue - a.marketValue);
+  const chartData = useMemo(
+    () =>
+      holdings
+        .filter((h) => h.marketValue > 0)
+        .map((h) => ({
+          ticker: h.ticker,
+          name: h.name,
+          website: h.website,
+          marketValue: h.marketValue,
+          pct: (h.marketValue / totalValue) * 100,
+        }))
+        .sort((a, b) => b.marketValue - a.marketValue),
+    [holdings, totalValue]
+  );
+
+  // The center readout labels by ticker — the full name is too wide for the hole.
+  const pieData = useMemo<PieData[]>(
+    () =>
+      chartData.map((item, index) => ({
+        label: item.ticker,
+        value: item.marketValue,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      })),
+    [chartData]
+  );
+
+  if (holdings.length === 0 || totalValue === 0) return null;
 
   return (
     <div>
@@ -94,38 +63,37 @@ export function AllocationDonut({
         Allocation
       </h3>
       <div className="flex flex-col items-center gap-6">
-        <div className="w-[300px] h-[300px] flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={75}
-                outerRadius={140}
-                dataKey="marketValue"
-                nameKey="ticker"
-                label={PieLabel}
-                labelLine={false}
-                isAnimationActive={true}
-                animationDuration={800}
-              >
-                {chartData.map((_, index) => (
-                  <Cell
-                    key={index}
-                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<DonutTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <PieChart
+          data={pieData}
+          size={CHART_SIZE}
+          innerRadius={INNER_RADIUS}
+          hoverOffset={HOVER_OFFSET}
+          padAngle={0.01}
+          cornerRadius={2}
+          hoveredIndex={hoveredIndex}
+          onHoverChange={setHoveredIndex}
+        >
+          {pieData.map((slice, index) => (
+            <PieSlice key={slice.label} index={index} />
+          ))}
+          <PieCenter
+            defaultLabel="Total"
+            prefix="$"
+            formatOptions={{ notation: "compact", maximumFractionDigits: 1 }}
+          />
+        </PieChart>
 
-        {/* Legend list with logos */}
+        {/* Legend list with logos — hovering a row highlights its slice */}
         <div className="w-full space-y-1 max-h-[340px] overflow-y-auto pr-2">
           {chartData.map((item, index) => (
-            <div key={item.ticker} className="flex items-center gap-2.5 py-1">
+            <div
+              key={item.ticker}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              className={`flex items-center gap-2.5 py-1 rounded-md px-1 transition-colors ${
+                hoveredIndex === index ? "bg-bg-tertiary" : ""
+              }`}
+            >
               <div className="flex-shrink-0 [&_img]:!w-7 [&_img]:!h-7 [&_img]:!rounded-md [&_div]:!w-7 [&_div]:!h-7 [&_div]:!rounded-md [&_div]:!text-xs">
                 <CompanyLogo ticker={item.ticker} website={item.website} />
               </div>

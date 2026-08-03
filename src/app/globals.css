@@ -84,6 +84,11 @@
   --color-chart-scale-04: var(--chart-scale-04);
   --color-chart-scale-05: var(--chart-scale-05);
   --color-chart-scale-pattern-color: var(--chart-scale-pattern-color);
+  --color-legend: var(--legend);
+  --color-legend-foreground: var(--legend-foreground);
+  --color-legend-muted: var(--legend-muted);
+  --color-legend-muted-foreground: var(--legend-muted-foreground);
+  --color-legend-track: var(--legend-track);
 }
 
 /* ─── Dark Mode (Default) ─────────────────────────── */
@@ -173,6 +178,11 @@
   --chart-scale-04: #8B7355;
   --chart-scale-05: #D4C4A8;
   --chart-scale-pattern-color: #151512;
+  --legend: var(--bg-secondary);
+  --legend-foreground: var(--text-primary);
+  --legend-muted: var(--bg-tertiary);
+  --legend-muted-foreground: var(--text-secondary);
+  --legend-track: var(--border-primary);
 }
 
 /* ─── Light Mode ──────────────────────────────────── */

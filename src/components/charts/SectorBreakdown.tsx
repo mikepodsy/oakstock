@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart } from "@/components/charts/pie-chart";
+import { PieSlice } from "@/components/charts/pie-slice";
+import { PieCenter } from "@/components/charts/pie-center";
+import type { PieData } from "@/components/charts/pie-context";
 import {
   Cpu, ShoppingCart, Factory, Stethoscope, Banknote,
   Zap, MessageSquare, Building2, Pickaxe, Wheat,
@@ -41,6 +44,11 @@ const CURRENCY_ICONS: Record<string, ReactNode> = {
   "CAD": <DollarSign className="w-4 h-4" />,
 };
 
+// Matches the previous recharts geometry: 300px box, 75 inner / 140 outer radius.
+const CHART_SIZE = 300;
+const INNER_RADIUS = 75;
+const HOVER_OFFSET = 10;
+
 type TabKey = "sectors" | "currencies";
 
 const TABS: { key: TabKey; label: string }[] = [
@@ -59,58 +67,6 @@ interface HoldingItem {
 interface SectorBreakdownProps {
   holdings: HoldingItem[];
   totalValue: number;
-}
-
-function ChartTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    payload: { label: string; value: number; pct: number };
-  }>;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const data = payload[0].payload;
-  return (
-    <div className="rounded-lg border border-border-primary bg-bg-elevated px-3 py-2 shadow-lg">
-      <p className="text-xs font-financial text-text-primary">{data.label}</p>
-      <p className="text-xs text-text-secondary">{data.pct.toFixed(1)}%</p>
-    </div>
-  );
-}
-
-function PieLabel(props: {
-  cx?: number;
-  cy?: number;
-  midAngle?: number;
-  innerRadius?: number;
-  outerRadius?: number;
-  percent?: number;
-}) {
-  const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 } = props;
-  if (percent < 0.03) return null;
-
-  const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor="middle"
-      dominantBaseline="central"
-      className="text-xs font-financial"
-      fill="white"
-    >
-      {`${(percent * 100).toFixed(1)}%`}
-    </text>
-  );
 }
 
 function groupBy(
@@ -150,6 +106,7 @@ export function SectorBreakdown({
 }: SectorBreakdownProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sectors");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   function toggleGroup(label: string) {
     setExpandedGroups((prev) => {
@@ -165,9 +122,17 @@ export function SectorBreakdown({
     [holdings, totalValue, activeTab]
   );
 
-  if (holdings.length === 0 || totalValue === 0) return null;
+  const pieData = useMemo<PieData[]>(
+    () =>
+      chartData.map((item, index) => ({
+        label: item.label,
+        value: item.value,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      })),
+    [chartData]
+  );
 
-  const maxPct = chartData[0]?.pct ?? 100;
+  if (holdings.length === 0 || totalValue === 0) return null;
 
   return (
     <div>
@@ -176,7 +141,10 @@ export function SectorBreakdown({
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setHoveredIndex(null); // slice indexes differ per tab
+            }}
             className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
               activeTab === tab.key
                 ? "bg-green-primary text-bg-primary"
@@ -189,33 +157,25 @@ export function SectorBreakdown({
       </div>
 
       <div className="flex flex-col items-center gap-6">
-        <div className="w-[300px] h-[300px] flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={75}
-                outerRadius={140}
-                dataKey="value"
-                nameKey="label"
-                label={PieLabel}
-                labelLine={false}
-                isAnimationActive={true}
-                animationDuration={800}
-              >
-                {chartData.map((_, index) => (
-                  <Cell
-                    key={index}
-                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<ChartTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <PieChart
+          data={pieData}
+          size={CHART_SIZE}
+          innerRadius={INNER_RADIUS}
+          hoverOffset={HOVER_OFFSET}
+          padAngle={0.01}
+          cornerRadius={2}
+          hoveredIndex={hoveredIndex}
+          onHoverChange={setHoveredIndex}
+        >
+          {pieData.map((slice, index) => (
+            <PieSlice key={slice.label} index={index} />
+          ))}
+          <PieCenter
+            defaultLabel="Total"
+            prefix="$"
+            formatOptions={{ notation: "compact", maximumFractionDigits: 1 }}
+          />
+        </PieChart>
 
         {/* Legend list with icons and percentage bars */}
         <div className="w-full space-y-1 max-h-[340px] overflow-y-auto pr-2">
@@ -224,7 +184,14 @@ export function SectorBreakdown({
             const color = CHART_COLORS[index % CHART_COLORS.length];
             return (
               <div key={item.label}>
-                <div className="flex items-center gap-2.5 text-sm">
+                {/* Hovering a row highlights its slice in the donut */}
+                <div
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`flex items-center gap-2.5 text-sm px-1 rounded-md transition-colors ${
+                    hoveredIndex === index ? "bg-bg-tertiary" : ""
+                  }`}
+                >
                   <span className="flex-shrink-0 text-text-secondary">
                     {getIcon(activeTab, item.label)}
                   </span>

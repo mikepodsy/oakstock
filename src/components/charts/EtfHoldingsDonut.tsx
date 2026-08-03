@@ -1,8 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { formatCompactNumber, formatDate } from "@/utils/formatters";
+import { PieChart } from "@/components/charts/pie-chart";
+import { PieSlice } from "@/components/charts/pie-slice";
+import { PieCenter } from "@/components/charts/pie-center";
+import type { PieData } from "@/components/charts/pie-context";
+import { formatDate } from "@/utils/formatters";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import type { EtfHoldingsResult } from "@/lib/edgar/nport";
 
@@ -17,6 +21,11 @@ const OTHER_COLOR = "#64748b"; // slate — the aggregated remainder slice
 // A broad ETF holds 500+ names; only the largest are worth their own slice.
 const TOP_N = 18;
 
+// Matches the previous recharts geometry: 300px box, 75 inner / 140 outer radius.
+const CHART_SIZE = 300;
+const INNER_RADIUS = 75;
+const HOVER_OFFSET = 10;
+
 interface Slice {
   name: string;
   ticker: string | null;
@@ -25,87 +34,54 @@ interface Slice {
   isOther: boolean;
 }
 
-function DonutTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: Slice }>;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  const data = payload[0].payload;
-  return (
-    <div className="rounded-lg border border-border-primary bg-bg-elevated px-3 py-2 shadow-lg">
-      <p className="text-xs font-financial text-text-primary">{data.name}</p>
-      <p className="text-xs text-text-secondary">
-        ${formatCompactNumber(data.valUSD)} ({data.pct.toFixed(2)}%)
-      </p>
-    </div>
-  );
-}
-
-function PieLabel(props: {
-  cx?: number;
-  cy?: number;
-  midAngle?: number;
-  innerRadius?: number;
-  outerRadius?: number;
-  percent?: number;
-}) {
-  const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 } = props;
-  if (percent < 0.03) return null;
-
-  const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor="middle"
-      dominantBaseline="central"
-      className="text-xs font-financial"
-      fill="white"
-    >
-      {`${(percent * 100).toFixed(1)}%`}
-    </text>
-  );
-}
-
 function sliceColor(index: number, isOther: boolean): string {
   return isOther ? OTHER_COLOR : CHART_COLORS[index % CHART_COLORS.length];
 }
 
 export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
   const { holdings, totalValue, holdingsCount, asOf } = data;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const slices = useMemo<Slice[]>(() => {
+    const top = holdings.slice(0, TOP_N);
+    const result: Slice[] = top.map((h) => ({
+      name: h.name,
+      ticker: h.ticker,
+      valUSD: h.valUSD,
+      pct: (h.valUSD / totalValue) * 100,
+      isOther: false,
+    }));
+
+    // "Other" covers every position not shown as its own slice — computed from the
+    // filing totals so it stays correct even though the payload is capped.
+    const shownValue = top.reduce((sum, h) => sum + h.valUSD, 0);
+    const otherValue = totalValue - shownValue;
+    const otherCount = holdingsCount - top.length;
+    if (otherCount > 0 && otherValue > 0) {
+      result.push({
+        name: `Other (${otherCount} holdings)`,
+        ticker: null,
+        valUSD: otherValue,
+        pct: (otherValue / totalValue) * 100,
+        isOther: true,
+      });
+    }
+    return result;
+  }, [holdings, totalValue, holdingsCount]);
+
+  // The center readout labels by ticker where there is one — full fund names
+  // are far too wide for the hole.
+  const pieData = useMemo<PieData[]>(
+    () =>
+      slices.map((slice, index) => ({
+        label: slice.ticker ?? slice.name,
+        value: slice.valUSD,
+        color: sliceColor(index, slice.isOther),
+      })),
+    [slices]
+  );
+
   if (holdings.length === 0 || totalValue === 0) return null;
-
-  const top = holdings.slice(0, TOP_N);
-
-  const slices: Slice[] = top.map((h) => ({
-    name: h.name,
-    ticker: h.ticker,
-    valUSD: h.valUSD,
-    pct: (h.valUSD / totalValue) * 100,
-    isOther: false,
-  }));
-
-  // "Other" covers every position not shown as its own slice — computed from the
-  // filing totals so it stays correct even though the payload is capped.
-  const shownValue = top.reduce((sum, h) => sum + h.valUSD, 0);
-  const otherValue = totalValue - shownValue;
-  const otherCount = holdingsCount - top.length;
-  if (otherCount > 0 && otherValue > 0) {
-    slices.push({
-      name: `Other (${otherCount} holdings)`,
-      ticker: null,
-      valUSD: otherValue,
-      pct: (otherValue / totalValue) * 100,
-      isOther: true,
-    });
-  }
 
   return (
     <div className="mb-6">
@@ -118,30 +94,25 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
         )}
       </div>
       <div className="flex flex-col items-center gap-6">
-        <div className="w-[300px] h-[300px] flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={slices}
-                cx="50%"
-                cy="50%"
-                innerRadius={75}
-                outerRadius={140}
-                dataKey="valUSD"
-                nameKey="name"
-                label={PieLabel}
-                labelLine={false}
-                isAnimationActive={true}
-                animationDuration={800}
-              >
-                {slices.map((s, index) => (
-                  <Cell key={index} fill={sliceColor(index, s.isOther)} />
-                ))}
-              </Pie>
-              <Tooltip content={<DonutTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <PieChart
+          data={pieData}
+          size={CHART_SIZE}
+          innerRadius={INNER_RADIUS}
+          hoverOffset={HOVER_OFFSET}
+          padAngle={0.01}
+          cornerRadius={2}
+          hoveredIndex={hoveredIndex}
+          onHoverChange={setHoveredIndex}
+        >
+          {pieData.map((slice, index) => (
+            <PieSlice key={`${slice.label}-${index}`} index={index} />
+          ))}
+          <PieCenter
+            defaultLabel="Net assets"
+            prefix="$"
+            formatOptions={{ notation: "compact", maximumFractionDigits: 1 }}
+          />
+        </PieChart>
 
         {/* Legend — three across to keep the list compact */}
         <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
@@ -170,11 +141,20 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
                 {item.pct.toFixed(2)}%
               </span>
             );
+            // Hovering a row highlights its slice in the donut.
+            const rowProps = {
+              onMouseEnter: () => setHoveredIndex(index),
+              onMouseLeave: () => setHoveredIndex(null),
+              className: `flex items-center gap-2.5 py-1 px-1 rounded-md min-w-0 transition-colors ${
+                hoveredIndex === index ? "bg-bg-tertiary" : ""
+              }`,
+            };
             return item.ticker ? (
               <Link
                 key={`${item.name}-${index}`}
                 href={`/stock/${encodeURIComponent(item.ticker)}`}
-                className="flex items-center gap-2.5 py-1 min-w-0 group"
+                {...rowProps}
+                className={`${rowProps.className} group`}
               >
                 {icon}
                 <span className="text-sm text-text-primary font-financial truncate min-w-0 group-hover:text-green-primary group-hover:underline">
@@ -183,7 +163,7 @@ export function EtfHoldingsDonut({ data }: { data: EtfHoldingsResult }) {
                 {pct}
               </Link>
             ) : (
-              <div key={`${item.name}-${index}`} className="flex items-center gap-2.5 py-1 min-w-0">
+              <div key={`${item.name}-${index}`} {...rowProps}>
                 {icon}
                 <span className="text-sm text-text-primary font-financial truncate min-w-0">
                   {item.name}

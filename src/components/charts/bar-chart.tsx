@@ -330,21 +330,41 @@ const ChartCore = memo(function ChartCore({
       lines,
       data,
       innerHeight,
-      // LOCAL PATCH: signed domain, matching `valueExtent` above.
+      // LOCAL PATCH: signed *and* stack-aware domain, matching `valueExtent`
+      // above. The registry took the largest single value even when stacking,
+      // so a stacked column taller than its tallest segment overflowed the plot
+      // — `Bar` and `YAxis` both scale through here.
       resolveDomain: (dataKeys) => {
         let min = 0;
         let max = 0;
         for (const d of data) {
+          let positiveSum = 0;
+          let negativeSum = 0;
           for (const key of dataKeys) {
             const value = d[key];
             if (typeof value !== "number") {
               continue;
             }
-            if (value > max) {
-              max = value;
+            if (value < 0) {
+              negativeSum += value;
+            } else {
+              positiveSum += value;
             }
-            if (value < min) {
-              min = value;
+            if (!stacked) {
+              if (value > max) {
+                max = value;
+              }
+              if (value < min) {
+                min = value;
+              }
+            }
+          }
+          if (stacked) {
+            if (positiveSum > max) {
+              max = positiveSum;
+            }
+            if (negativeSum < min) {
+              min = negativeSum;
             }
           }
         }
@@ -354,7 +374,7 @@ const ChartCore = memo(function ChartCore({
         return [min < 0 ? min * 1.1 : 0, max > 0 ? max * 1.1 : 0];
       },
     });
-  }, [data, innerHeight, isHorizontal, lines, valueScale]);
+  }, [data, innerHeight, isHorizontal, lines, valueScale, stacked]);
 
   const primaryYScale = getPrimaryYScale(yScales, valueScale);
 

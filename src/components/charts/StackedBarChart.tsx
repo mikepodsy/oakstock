@@ -73,7 +73,7 @@ function ChartContent({
   return (
     <>
       <Legend
-        className="mb-2 flex-row flex-wrap gap-x-4 gap-y-1"
+        className="mb-2 min-w-0 flex-row flex-wrap gap-x-4 gap-y-1"
         items={[
           { label: series1Label, value: 0, color: series1Color },
           { label: series2Label, value: 0, color: series2Color },
@@ -85,7 +85,10 @@ function ChartContent({
         </LegendItem>
       </Legend>
       <BarChart
-        className={heightClass}
+        // `min-w-0` matters inside the expand dialog: it's a grid container, and
+        // a grid item's default `min-width: auto` would let the measured SVG
+        // width ratchet the track wider than the dialog on every re-measure.
+        className={`min-w-0 ${heightClass}`}
         data={data}
         margin={{ top: 16, right: 8, bottom: 24, left: 56 }}
         stacked
@@ -145,13 +148,15 @@ export function StackedBarChart({
           <DialogTrigger className="p-1 rounded-md hover:bg-bg-tertiary transition-colors">
             <Maximize2 className="w-3.5 h-3.5 text-text-tertiary" />
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-[min(1400px,92vw)]">
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
             </DialogHeader>
             <ChartContent
               data={data}
-              heightClass="h-[350px]"
+              // Scales with the viewport so the expanded view actually fills the
+              // screen, with a ceiling so it stays readable on very tall displays.
+              heightClass="h-[min(72vh,760px)]"
               series1Color={series1Color}
               series1Label={series1Label}
               series2Color={series2Color}

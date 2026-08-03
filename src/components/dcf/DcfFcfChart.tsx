@@ -1,15 +1,12 @@
 "use client";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
+import { BandReferenceArea } from "@/components/charts/band-reference-area";
+import { Bar } from "@/components/charts/bar";
+import { BarChart } from "@/components/charts/bar-chart";
+import { BarXAxis } from "@/components/charts/bar-x-axis";
+import { Grid } from "@/components/charts/grid";
+import { ChartTooltip } from "@/components/charts/tooltip";
+import { YAxis } from "@/components/charts/y-axis";
 import { formatCompactNumber, formatCurrency } from "@/utils/formatters";
 
 interface DcfFcfChartProps {
@@ -20,9 +17,11 @@ interface DcfFcfChartProps {
 export function DcfFcfChart({ data, phase1Years }: DcfFcfChartProps) {
   const chartData = data.map((d) => ({
     label: `Y${d.year}`,
+    year: d.year,
     value: d.fcf,
-    phase: d.year <= phase1Years ? "Phase 1" : "Phase 2",
   }));
+
+  const hasPhase2 = phase1Years < data.length;
 
   return (
     <div className="rounded-xl border border-border-primary bg-bg-secondary p-6 mb-6">
@@ -33,57 +32,30 @@ export function DcfFcfChart({ data, phase1Years }: DcfFcfChartProps) {
         Phase 1 (high growth) &middot; Phase 2 (stable growth)
       </p>
 
-      <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -12 }}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="var(--border-primary)"
-            vertical={false}
-          />
-          <XAxis
-            dataKey="label"
-            tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tickFormatter={(v) => formatCompactNumber(v)}
-            tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            width={60}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "var(--bg-secondary)",
-              border: "1px solid var(--border-primary)",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
-            formatter={(v) => [formatCurrency(Number(v)), "FCF"]}
-            labelFormatter={(l) => `Year ${String(l).replace("Y", "")}`}
-          />
-          {phase1Years < data.length && (
-            <ReferenceLine
-              x={`Y${phase1Years}`}
-              stroke="var(--text-tertiary)"
-              strokeDasharray="4 4"
-              label={{
-                value: "Phase 2",
-                position: "top",
-                fill: "var(--text-tertiary)",
-                fontSize: 10,
-              }}
-            />
-          )}
-          <Bar
-            dataKey="value"
-            fill="var(--green-primary)"
-            radius={[3, 3, 0, 0]}
-            animationDuration={600}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+      <BarChart
+        className="h-[260px]"
+        data={chartData}
+        margin={{ top: 16, right: 8, bottom: 24, left: 56 }}
+        xDataKey="label"
+      >
+        <Grid horizontal />
+        {hasPhase2 ? (
+          <BandReferenceArea label="Phase 2" x1={`Y${phase1Years + 1}`} />
+        ) : null}
+        <Bar dataKey="value" />
+        <BarXAxis />
+        <YAxis formatValue={formatCompactNumber} />
+        <ChartTooltip
+          rows={(point) => [
+            {
+              color: "var(--chart-line-primary)",
+              label: `Year ${String(point.year)}`,
+              value: formatCurrency(Number(point.value)),
+            },
+          ]}
+          showDatePill={false}
+        />
+      </BarChart>
     </div>
   );
 }

@@ -64,6 +64,26 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Bklit UI chart tokens */
+  --color-chart-background: var(--chart-background);
+  --color-chart-foreground: var(--chart-foreground);
+  --color-chart-foreground-muted: var(--chart-foreground-muted);
+  --color-chart-crosshair: var(--chart-crosshair);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-muted: var(--chart-tooltip-muted);
+  --color-chart-marker-background: var(--chart-marker-background);
+  --color-chart-marker-border: var(--chart-marker-border);
+  --color-chart-marker-foreground: var(--chart-marker-foreground);
+  --color-chart-label: var(--chart-label);
+  --color-chart-scale-01: var(--chart-scale-01);
+  --color-chart-scale-02: var(--chart-scale-02);
+  --color-chart-scale-03: var(--chart-scale-03);
+  --color-chart-scale-04: var(--chart-scale-04);
+  --color-chart-scale-05: var(--chart-scale-05);
+  --color-chart-scale-pattern-color: var(--chart-scale-pattern-color);
 }
 
 /* ─── Dark Mode (Default) ─────────────────────────── */
@@ -128,6 +148,31 @@
   --chart-5: #4A3C2A;
 
   --radius: 0.75rem;
+
+  /* Bklit UI chart tokens → Oakstock dark */
+  --chart-background: #0C0C0C;
+  --chart-foreground: #F0EDE8;
+  --chart-foreground-muted: #A09882;
+  --chart-line-primary: var(--chart-1);
+  --chart-line-secondary: var(--chart-2);
+  --chart-crosshair: #6B6355;
+  --chart-grid: #2A2722;
+  --chart-brush-border: var(--chart-grid);
+  --chart-tooltip-background: rgba(37, 36, 32, 0.92);
+  --chart-tooltip-foreground: #F0EDE8;
+  --chart-tooltip-muted: #A09882;
+  --chart-marker-background: #252420;
+  --chart-marker-border: #2A2722;
+  --chart-marker-foreground: #F0EDE8;
+  --chart-marker-badge-background: var(--chart-marker-background);
+  --chart-marker-badge-foreground: var(--chart-marker-foreground);
+  --chart-label: #A09882;
+  --chart-scale-01: #1E1D1A;
+  --chart-scale-02: #4A3C2A;
+  --chart-scale-03: #6B5740;
+  --chart-scale-04: #8B7355;
+  --chart-scale-05: #D4C4A8;
+  --chart-scale-pattern-color: #151512;
 }
 
 /* ─── Light Mode ──────────────────────────────────── */
@@ -190,6 +235,26 @@
   --chart-3: #6B5740;
   --chart-4: #B8A88E;
   --chart-5: #D4C4A8;
+
+  /* Bklit UI chart tokens → Oakstock light */
+  --chart-background: #FFFFFF;
+  --chart-foreground: #1A1814;
+  --chart-foreground-muted: #6B6355;
+  --chart-crosshair: #A09882;
+  --chart-grid: #E0DCD4;
+  --chart-tooltip-background: rgba(26, 24, 20, 0.92);
+  --chart-tooltip-foreground: #FAF8F5;
+  --chart-tooltip-muted: #A09882;
+  --chart-marker-background: #FFFFFF;
+  --chart-marker-border: #E0DCD4;
+  --chart-marker-foreground: #1A1814;
+  --chart-label: #6B6355;
+  --chart-scale-01: #F0EDE8;
+  --chart-scale-02: #D4C4A8;
+  --chart-scale-03: #B8A88E;
+  --chart-scale-04: #8B7355;
+  --chart-scale-05: #6B5740;
+  --chart-scale-pattern-color: #FAF8F5;
 }
 
 @layer base {

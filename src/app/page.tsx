@@ -10,6 +10,7 @@ import { CreatePortfolioDialog } from "@/components/dashboard/CreatePortfolioDia
 import { PortfolioSummaryCards } from "@/components/dashboard/PortfolioSummaryCards";
 import { DailyBrief } from "@/components/dashboard/DailyBrief";
 import { MarketOverview } from "@/components/dashboard/MarketOverview";
+import { ChartGrid } from "@/components/dashboard/grid/ChartGrid";
 
 export default function DashboardPage() {
   const portfolios = usePortfolioStore((s) => s.portfolios);
@@ -36,43 +37,56 @@ export default function DashboardPage() {
     return portfolioTotals(allHoldings);
   }, [portfolios, quotes, allTickers.length]);
 
+  // Charts don't depend on owning a portfolio, so the workspace renders in the
+  // empty state too — just without the portfolio-derived cards.
   if (portfolios.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-104px)] px-6 text-center">
-        <TreeDeciduous className="h-16 w-16 text-oak-300 mb-4 opacity-60" />
-        <h1 className="font-display text-2xl text-text-primary mb-2">
-          Plant your first portfolio
-        </h1>
-        <p className="text-text-secondary text-sm mb-6 max-w-sm">
-          Start tracking your investments with Oakstock. Create a portfolio to
-          get started.
-        </p>
-        <CreatePortfolioDialog>
-          <Button size="lg" className="font-semibold">
-            Create Portfolio
-          </Button>
-        </CreatePortfolioDialog>
+      <div className="p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+            <TreeDeciduous className="h-16 w-16 text-oak-300 mb-4 opacity-60" />
+            <h1 className="font-display text-2xl text-text-primary mb-2">
+              Plant your first portfolio
+            </h1>
+            <p className="text-text-secondary text-sm mb-6 max-w-sm">
+              Start tracking your investments with Oakstock. Create a portfolio to
+              get started.
+            </p>
+            <CreatePortfolioDialog>
+              <Button size="lg" className="font-semibold">
+                Create Portfolio
+              </Button>
+            </CreatePortfolioDialog>
+          </div>
+        </div>
+
+        <ChartGrid />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-display text-2xl text-text-primary">Dashboard</h1>
-        <CreatePortfolioDialog>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            New Portfolio
-          </Button>
-        </CreatePortfolioDialog>
+    <div className="p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="font-display text-2xl text-text-primary">Dashboard</h1>
+          <CreatePortfolioDialog>
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              New Portfolio
+            </Button>
+          </CreatePortfolioDialog>
+        </div>
+
+        <PortfolioSummaryCards data={summary} loading={loading} />
+
+        <MarketOverview />
+
+        <DailyBrief />
       </div>
 
-      <PortfolioSummaryCards data={summary} loading={loading} />
-
-      <MarketOverview />
-
-      <DailyBrief />
+      {/* Full-bleed: the grid wants the whole viewport width, not the 7xl column. */}
+      <ChartGrid />
     </div>
   );
 }

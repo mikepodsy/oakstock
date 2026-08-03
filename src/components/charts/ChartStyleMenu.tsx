@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Settings, Check, RotateCcw } from "lucide-react";
-import { useChartStyleStore, type ColorGroupId } from "@/stores/chartStyleStore";
+import { type ColorGroupId } from "@/stores/chartStyleStore";
+import { useChartStyle } from "./ChartConfigContext";
 import { ColorControl } from "./ColorControl";
 
 // Small checkbox matching the IndicatorsMenu styling.
@@ -22,9 +23,9 @@ function CheckBox({ checked, onChange }: { checked: boolean; onChange: () => voi
 
 // A Body / Borders / Wick row: visibility toggle + up & down color controls.
 function CandlePartRow({ id, label }: { id: ColorGroupId; label: string }) {
-  const group = useChartStyleStore((s) => s[id]);
-  const setColor = useChartStyleStore((s) => s.setColor);
-  const toggleVisible = useChartStyleStore((s) => s.toggleVisible);
+  const group = useChartStyle((s) => s[id]);
+  const setColor = useChartStyle((s) => s.setColor);
+  const toggleVisible = useChartStyle((s) => s.toggleVisible);
 
   return (
     <div className="flex items-center gap-2 py-1">
@@ -47,8 +48,8 @@ function CandlePartRow({ id, label }: { id: ColorGroupId; label: string }) {
 // OHLC bar up/down colors — no visibility toggle (bars are the series itself).
 // Indented to align with the candle rows, which carry a leading checkbox.
 function BarColorRow() {
-  const bar = useChartStyleStore((s) => s.bar);
-  const setBarColor = useChartStyleStore((s) => s.setBarColor);
+  const bar = useChartStyle((s) => s.bar);
+  const setBarColor = useChartStyle((s) => s.setBarColor);
 
   return (
     <div className="flex items-center gap-2 py-1">
@@ -69,8 +70,8 @@ function BarColorRow() {
 
 // Line chart color — a single swatch (no up/down or visibility).
 function LineColorRow() {
-  const line = useChartStyleStore((s) => s.line);
-  const setLineColor = useChartStyleStore((s) => s.setLineColor);
+  const line = useChartStyle((s) => s.line);
+  const setLineColor = useChartStyle((s) => s.setLineColor);
 
   return (
     <div className="flex items-center gap-2 py-1">
@@ -117,13 +118,13 @@ export function ChartStyleMenu({
   const isBars = chartType === "bars";
   const isLine = chartType === "line";
 
-  const background = useChartStyleStore((s) => s.background);
-  const candleUpOpacity = useChartStyleStore((s) => s.candleUpOpacity);
-  const candleDownOpacity = useChartStyleStore((s) => s.candleDownOpacity);
-  const backgroundOpacity = useChartStyleStore((s) => s.backgroundOpacity);
-  const setBackground = useChartStyleStore((s) => s.setBackground);
-  const setOpacity = useChartStyleStore((s) => s.setOpacity);
-  const reset = useChartStyleStore((s) => s.reset);
+  const background = useChartStyle((s) => s.background);
+  const candleUpOpacity = useChartStyle((s) => s.candleUpOpacity);
+  const candleDownOpacity = useChartStyle((s) => s.candleDownOpacity);
+  const backgroundOpacity = useChartStyle((s) => s.backgroundOpacity);
+  const setBackground = useChartStyle((s) => s.setBackground);
+  const setOpacity = useChartStyle((s) => s.setOpacity);
+  const reset = useChartStyle((s) => s.reset);
 
   useEffect(() => {
     if (!open) return;

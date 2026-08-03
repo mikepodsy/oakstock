@@ -147,6 +147,72 @@ export function rsi(candles: QuestradeCandle[], period: number): LinePoint[] {
   return out;
 }
 
+// Volume-weighted average price.
+//
+// `session` (the trading convention) resets the cumulative sums at each new US
+// Eastern calendar day, so an intraday chart shows one VWAP curve per day
+// rather than one continuous line across the whole window. `rolling` is a
+// trailing N-bar VWAP, which is what makes the indicator meaningful on daily
+// and weekly candles where "the session" is the bar itself.
+//
+// Bars with no volume contribute nothing; if the whole window is volume-less
+// (some Yahoo-sourced series carry no volume) the result is empty rather than a
+// divide-by-zero line at 0.
+export function vwap(
+  candles: QuestradeCandle[],
+  anchor: "session" | "rolling" = "session",
+  period = 20
+): LinePoint[] {
+  const typical = (c: QuestradeCandle) => (c.high + c.low + c.close) / 3;
+
+  if (anchor === "rolling") {
+    if (period < 1) return [];
+    const out: LinePoint[] = [];
+    let pv = 0;
+    let vol = 0;
+    for (let i = 0; i < candles.length; i++) {
+      pv += typical(candles[i]) * candles[i].volume;
+      vol += candles[i].volume;
+      if (i >= period) {
+        pv -= typical(candles[i - period]) * candles[i - period].volume;
+        vol -= candles[i - period].volume;
+      }
+      if (i >= period - 1 && vol > 0) {
+        out.push({ time: ts(candles[i]), value: pv / vol });
+      }
+    }
+    return out;
+  }
+
+  const out: LinePoint[] = [];
+  let pv = 0;
+  let vol = 0;
+  let currentDay: string | null = null;
+
+  // Group by US Eastern calendar date so the reset lands on the session open,
+  // not on UTC midnight (which falls mid-session for US markets).
+  const dayFmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  for (const candle of candles) {
+    const time = ts(candle);
+    const day = dayFmt.format(new Date(time * 1000));
+    if (day !== currentDay) {
+      currentDay = day;
+      pv = 0;
+      vol = 0;
+    }
+    pv += typical(candle) * candle.volume;
+    vol += candle.volume;
+    if (vol > 0) out.push({ time, value: pv / vol });
+  }
+  return out;
+}
+
 // --- US-equity trading sessions (intraday only) -----------------------------
 
 export type Session = "pre" | "regular" | "after" | "closed";

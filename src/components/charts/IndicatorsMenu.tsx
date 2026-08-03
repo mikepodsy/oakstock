@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, X, Plus } from "lucide-react";
-import { useIndicatorStore } from "@/stores/indicatorStore";
+import { useIndicators } from "./ChartConfigContext";
 import { ColorControl } from "./ColorControl";
 import {
   PARAM_BOUNDS,
@@ -114,11 +114,11 @@ function PeriodAdder({ onAdd }: { onAdd: (v: number) => void }) {
 // Editable list of length chips for SMA / EMA. Each chip carries an editable
 // color swatch (defaults to the auto-cycled palette).
 function PeriodChips({ id }: { id: MultiLineId }) {
-  const periods = useIndicatorStore((s) => s[id].periods);
-  const colors = useIndicatorStore((s) => s[id].colors);
-  const addPeriod = useIndicatorStore((s) => s.addPeriod);
-  const removePeriod = useIndicatorStore((s) => s.removePeriod);
-  const setPeriodColor = useIndicatorStore((s) => s.setPeriodColor);
+  const periods = useIndicators((s) => s[id].periods);
+  const colors = useIndicators((s) => s[id].colors);
+  const addPeriod = useIndicators((s) => s.addPeriod);
+  const removePeriod = useIndicators((s) => s.removePeriod);
+  const setPeriodColor = useIndicators((s) => s.setPeriodColor);
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1 pl-6">
       {periods.map((p, idx) => {
@@ -154,8 +154,8 @@ function PeriodChips({ id }: { id: MultiLineId }) {
 
 // A color swatch for a single-line indicator (Bollinger / Donchian / RSI).
 function LineColorControl({ id, fallback }: { id: SingleColorId; fallback: string }) {
-  const color = useIndicatorStore((s) => s[id].color) ?? fallback;
-  const setLineColor = useIndicatorStore((s) => s.setLineColor);
+  const color = useIndicators((s) => s[id].color) ?? fallback;
+  const setLineColor = useIndicators((s) => s.setLineColor);
   return (
     <ColorControl
       value={color}
@@ -170,7 +170,7 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const s = useIndicatorStore();
+  const s = useIndicators();
 
   useEffect(() => {
     if (!open) return;
@@ -196,6 +196,7 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
     s.bollinger.enabled,
     s.donchian.enabled,
     s.rsi.enabled,
+    s.vwap?.enabled,
     s.volume.enabled,
     s.volumeProfile.enabled,
     s.sessions.enabled && isIntraday,
@@ -236,6 +237,46 @@ export function IndicatorsMenu({ isIntraday }: IndicatorsMenuProps) {
               <span className="text-[10px] text-text-tertiary">(dashed)</span>
             </div>
             {s.ema.enabled && <PeriodChips id="ema" />}
+          </div>
+
+          {/* VWAP */}
+          <div className="py-1">
+            <div className="flex items-center gap-2">
+              <CheckBox
+                checked={s.vwap?.enabled ?? false}
+                onChange={() => s.toggle("vwap")}
+                color={INDICATOR_COLORS.vwap}
+              />
+              <span className="text-sm text-text-primary">VWAP</span>
+              <span className="ml-auto">
+                <LineColorControl id="vwap" fallback={INDICATOR_COLORS.vwap} />
+              </span>
+            </div>
+            {s.vwap?.enabled && (
+              <div className="mt-1 flex flex-wrap items-center gap-2 pl-6">
+                {/* Session-anchored VWAP only means something intraday — on daily
+                    candles each bar is its own session, so force rolling there. */}
+                <select
+                  value={isIntraday ? s.vwap.anchor : "rolling"}
+                  disabled={!isIntraday}
+                  onChange={(e) =>
+                    s.setVwapAnchor(e.target.value as "session" | "rolling")
+                  }
+                  className="rounded border border-border-primary bg-bg-secondary px-1 py-0.5 text-xs text-text-primary disabled:opacity-50"
+                >
+                  <option value="session">Session</option>
+                  <option value="rolling">Rolling</option>
+                </select>
+                {(!isIntraday || s.vwap.anchor === "rolling") && (
+                  <NumberField
+                    label="Length"
+                    value={s.vwap.period}
+                    bounds={PARAM_BOUNDS.period}
+                    onChange={(v) => s.setParam("vwap", "period", v)}
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           <div className="my-1 border-t border-border-primary" />

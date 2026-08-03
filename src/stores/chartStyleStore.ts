@@ -67,7 +67,60 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-interface ChartStyleStore extends ChartStyleState {
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+// ---------------------------------------------------------------------------
+// Pure reducers over ChartStyleState.
+//
+// Sole copy of the mutation logic: the global persisted store below wraps each
+// in `set()`, and the dashboard's per-tile config (ChartConfigContext) applies
+// the same functions to a tile's own style.
+// ---------------------------------------------------------------------------
+
+export function setColor(
+  s: ChartStyleState,
+  group: ColorGroupId,
+  side: "up" | "down",
+  hex: string
+): ChartStyleState {
+  return { ...s, [group]: { ...s[group], [side]: hex } };
+}
+
+export function setBarColor(
+  s: ChartStyleState,
+  side: "up" | "down",
+  hex: string
+): ChartStyleState {
+  return { ...s, bar: { ...s.bar, [side]: hex } };
+}
+
+export function setLineColor(s: ChartStyleState, hex: string): ChartStyleState {
+  return { ...s, line: hex };
+}
+
+export function toggleVisible(s: ChartStyleState, group: ColorGroupId): ChartStyleState {
+  return { ...s, [group]: { ...s[group], visible: !s[group].visible } };
+}
+
+export function setBackground(s: ChartStyleState, hex: string): ChartStyleState {
+  return { ...s, background: hex };
+}
+
+export function setOpacity(
+  s: ChartStyleState,
+  which: "candleUpOpacity" | "candleDownOpacity" | "backgroundOpacity",
+  value: number
+): ChartStyleState {
+  return { ...s, [which]: clamp01(value) };
+}
+
+export function resetStyle(): ChartStyleState {
+  return { ...DEFAULT_CHART_STYLE };
+}
+
+// Exported so the dashboard's per-tile config (ChartConfigContext) can present
+// an identically-shaped object and swap in for this store transparently.
+export interface ChartStyleStore extends ChartStyleState {
   setColor: (group: ColorGroupId, side: "up" | "down", hex: string) => void;
   setBarColor: (side: "up" | "down", hex: string) => void;
   setLineColor: (hex: string) => void;
@@ -80,31 +133,26 @@ interface ChartStyleStore extends ChartStyleState {
   reset: () => void;
 }
 
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-
 export const useChartStyleStore = create<ChartStyleStore>()(
   persist(
     (set) => ({
       ...DEFAULT_CHART_STYLE,
 
-      setColor: (group, side, hex) =>
-        set((s) => ({ [group]: { ...s[group], [side]: hex } }) as Partial<ChartStyleStore>),
+      // Each action delegates to the pure reducer above, shared with the
+      // dashboard's per-tile chart config.
+      setColor: (group, side, hex) => set((s) => setColor(s, group, side, hex)),
 
-      setBarColor: (side, hex) => set((s) => ({ bar: { ...s.bar, [side]: hex } })),
+      setBarColor: (side, hex) => set((s) => setBarColor(s, side, hex)),
 
-      setLineColor: (hex) => set({ line: hex }),
+      setLineColor: (hex) => set((s) => setLineColor(s, hex)),
 
-      toggleVisible: (group) =>
-        set(
-          (s) =>
-            ({ [group]: { ...s[group], visible: !s[group].visible } }) as Partial<ChartStyleStore>
-        ),
+      toggleVisible: (group) => set((s) => toggleVisible(s, group)),
 
-      setBackground: (hex) => set({ background: hex }),
+      setBackground: (hex) => set((s) => setBackground(s, hex)),
 
-      setOpacity: (which, value) => set({ [which]: clamp01(value) } as Partial<ChartStyleStore>),
+      setOpacity: (which, value) => set((s) => setOpacity(s, which, value)),
 
-      reset: () => set({ ...DEFAULT_CHART_STYLE }),
+      reset: () => set(resetStyle()),
     }),
     {
       name: "oakstock-chart-style",

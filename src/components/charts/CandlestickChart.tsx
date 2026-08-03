@@ -50,8 +50,8 @@ import { fetchQuestradeCandles, fetchOptionStrikes } from "@/services/questrade"
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
-import { useChartStyleStore, withAlpha } from "@/stores/chartStyleStore";
-import { useIndicatorStore } from "@/stores/indicatorStore";
+import { withAlpha } from "@/stores/chartStyleStore";
+import { useChartStyle, useIndicators } from "./ChartConfigContext";
 import {
   useDrawingStore,
   type TrendPoint,
@@ -67,6 +67,7 @@ import {
   bollinger as bollingerCalc,
   donchian as donchianCalc,
   rsi as rsiCalc,
+  vwap as vwapCalc,
   sessionSegments,
   type LinePoint,
 } from "@/utils/indicators";
@@ -81,7 +82,22 @@ interface CandlestickChartProps {
   ticker: string;
   name?: string;
   website?: string;
+  // Fill the parent instead of the fixed 300px embedded height. Set by dashboard
+  // tiles, whose height is driven by the resizable grid.
+  fillHeight?: boolean;
+  // Hide the "Price Chart" caption — dashboard tiles show the symbol in their
+  // own header, so repeating it wastes a row.
+  hideHeading?: boolean;
+  // Interval and chart type are uncontrolled by default (stock page keeps its
+  // own local state). Passing a value + handler makes them controlled, which is
+  // how dashboard tiles persist them per-tile.
+  interval?: string;
+  onIntervalChange?: (interval: string) => void;
+  chartType?: ChartType;
+  onChartTypeChange?: (type: ChartType) => void;
 }
+
+type ChartType = "candles" | "bars" | "line";
 
 // Intraday candle sizes — show time (not just date) on the axis for these.
 const INTRADAY_INTERVALS = new Set([
@@ -131,10 +147,33 @@ export function CandlestickChart({
   ticker,
   name,
   website,
+  fillHeight = false,
+  hideHeading = false,
+  interval: intervalProp,
+  onIntervalChange,
+  chartType: chartTypeProp,
+  onChartTypeChange,
 }: CandlestickChartProps) {
-  const [interval, setInterval] = useState("OneDay");
-  const [chartType, setChartType] = useState<"candles" | "bars" | "line">(
-    "candles"
+  // Controlled when the parent supplies a value, otherwise locally owned. Both
+  // setters keep the same signature so every existing call site is unchanged.
+  const [intervalState, setIntervalState] = useState("OneDay");
+  const interval = intervalProp ?? intervalState;
+  const setInterval = useCallback(
+    (next: string) => {
+      setIntervalState(next);
+      onIntervalChange?.(next);
+    },
+    [onIntervalChange]
+  );
+
+  const [chartTypeState, setChartTypeState] = useState<ChartType>("candles");
+  const chartType = chartTypeProp ?? chartTypeState;
+  const setChartType = useCallback(
+    (next: ChartType) => {
+      setChartTypeState(next);
+      onChartTypeChange?.(next);
+    },
+    [onChartTypeChange]
   );
   const [data, setData] = useState<QuestradeCandle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,20 +206,31 @@ export function CandlestickChart({
     changePercent: number;
   } | null>(null);
   const theme = useThemeStore((s) => s.theme);
-  // Candle/background style config (persisted globally). Applied live to the
-  // existing chart via applyOptions, so edits don't recreate the canvas.
-  const chartStyle = useChartStyleStore();
+  // Candle/background style config — this tile's own when the chart sits inside
+  // a ChartConfigProvider (dashboard), the global persisted store otherwise.
+  // Applied live to the existing chart via applyOptions, so edits don't recreate
+  // the canvas.
+  const chartStyle = useChartStyle();
+  // Latest style for the chart-creation effect below, which must not re-run when
+  // a color changes. Seeded on mount, then kept fresh by the effect underneath.
+  const chartStyleRef = useRef(chartStyle);
+  useEffect(() => {
+    chartStyleRef.current = chartStyle;
+  }, [chartStyle]);
 
-  // Indicator config (persisted globally). Selected as individual slices so each
-  // effect only re-runs when its own indicator changes.
-  const smaCfg = useIndicatorStore((s) => s.sma);
-  const emaCfg = useIndicatorStore((s) => s.ema);
-  const bollingerCfg = useIndicatorStore((s) => s.bollinger);
-  const donchianCfg = useIndicatorStore((s) => s.donchian);
-  const rsiCfg = useIndicatorStore((s) => s.rsi);
-  const volumeCfg = useIndicatorStore((s) => s.volume);
-  const volumeProfileCfg = useIndicatorStore((s) => s.volumeProfile);
-  const sessionsCfg = useIndicatorStore((s) => s.sessions);
+  // Indicator config (per-tile or global, same as the style above). Selected as
+  // individual slices so each effect only re-runs when its own indicator changes.
+  const smaCfg = useIndicators((s) => s.sma);
+  const emaCfg = useIndicators((s) => s.ema);
+  const bollingerCfg = useIndicators((s) => s.bollinger);
+  const donchianCfg = useIndicators((s) => s.donchian);
+  const rsiCfg = useIndicators((s) => s.rsi);
+  // Optional-chained at every use: persisted indicator state written before VWAP
+  // existed has no `vwap` key until zustand's merge fills in the default.
+  const vwapCfg = useIndicators((s) => s.vwap);
+  const volumeCfg = useIndicators((s) => s.volume);
+  const volumeProfileCfg = useIndicators((s) => s.volumeProfile);
+  const sessionsCfg = useIndicators((s) => s.sessions);
 
   // User-drawn horizontal lines for this ticker (persisted, per-symbol).
   const linesRaw = useDrawingStore((s) => s.lines[ticker]);
@@ -409,7 +459,7 @@ export function CandlestickChart({
     // Read the latest style imperatively so this effect doesn't recreate the
     // chart on every color tweak — the dedicated style effect below applies
     // those live. Theme CSS vars remain the fallback for unset values.
-    const style = useChartStyleStore.getState();
+    const style = chartStyleRef.current;
     const up = withAlpha(style.body.up, style.candleUpOpacity);
     const down = withAlpha(style.body.down, style.candleDownOpacity);
     const barUp = withAlpha(style.bar.up, style.candleUpOpacity);
@@ -653,6 +703,36 @@ export function CandlestickChart({
         })
       );
     }
+    if (vwapCfg?.enabled) {
+      // Session-anchored VWAP is drawn as one series per day so the line breaks
+      // at each reset instead of snapping vertically across the session gap.
+      // On daily+ candles every bar is its own session, so a session anchor
+      // would just retrace the typical price — fall back to the rolling window.
+      const anchor = INTRADAY_INTERVALS.has(interval) ? vwapCfg.anchor : "rolling";
+      const points = vwapCalc(data, anchor, vwapCfg.period);
+      const color = vwapCfg.color ?? INDICATOR_COLORS.vwap;
+      if (anchor === "session") {
+        let segment: typeof points = [];
+        for (let i = 0; i < points.length; i++) {
+          // A reset restarts the cumulative average, so the value jumps back to
+          // the bar's own typical price — detect the boundary by day.
+          const prev = points[i - 1];
+          const isNewDay =
+            prev !== undefined &&
+            new Date(points[i].time * 1000).getUTCDate() !==
+              new Date(prev.time * 1000).getUTCDate() &&
+            points[i].time - prev.time > 3600;
+          if (isNewDay && segment.length) {
+            addLine(segment, { color, lineWidth: 2 });
+            segment = [];
+          }
+          segment.push(points[i]);
+        }
+        if (segment.length) addLine(segment, { color, lineWidth: 2 });
+      } else {
+        addLine(points, { color, lineWidth: 2 });
+      }
+    }
     if (bollingerCfg.enabled) {
       const color = bollingerCfg.color ?? INDICATOR_COLORS.bollinger;
       const b = bollingerCalc(data, bollingerCfg.period, bollingerCfg.mult);
@@ -713,6 +793,8 @@ export function CandlestickChart({
     bollingerCfg,
     donchianCfg,
     rsiCfg,
+    vwapCfg,
+    interval,
     volumeCfg,
     autoscaleProvider,
   ]);
@@ -1260,19 +1342,30 @@ export function CandlestickChart({
       label: `DC ${donchianCfg.period}`,
       color: donchianCfg.color ?? INDICATOR_COLORS.donchian,
     });
+  if (vwapCfg?.enabled)
+    legend.push({
+      label: vwapCfg.anchor === "session" ? "VWAP" : `VWAP ${vwapCfg.period}`,
+      color: vwapCfg.color ?? INDICATOR_COLORS.vwap,
+    });
 
   return (
     <div
       className={
         fullscreen
           ? "fixed inset-0 z-50 flex flex-col bg-bg-primary p-4"
-          : undefined
+          : fillHeight
+            ? "flex h-full min-h-0 flex-col"
+            : undefined
       }
     >
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-sm font-medium text-text-primary">
-          Price Chart
-        </span>
+      <div
+        className={`flex items-center gap-2 ${fillHeight && !fullscreen ? "mb-2 shrink-0" : "mb-3"}`}
+      >
+        {!hideHeading && (
+          <span className="text-sm font-medium text-text-primary">
+            Price Chart
+          </span>
+        )}
 
         {/* Fullscreen: company logo + name between the label and the price. */}
         {fullscreen && (
@@ -1599,8 +1692,20 @@ export function CandlestickChart({
         )}
       </div>
 
-      <div className={fullscreen ? "flex flex-1 gap-2 min-h-0" : undefined}>
-      <div className={`relative ${fullscreen ? "flex-[2] min-w-0" : "h-[300px]"}`}>
+      <div
+        className={
+          fullscreen
+            ? "flex flex-1 gap-2 min-h-0"
+            : fillHeight
+              ? "flex min-h-0 flex-1"
+              : undefined
+        }
+      >
+      <div
+        className={`relative ${
+          fullscreen ? "flex-[2] min-w-0" : fillHeight ? "min-w-0 flex-1" : "h-[300px]"
+        }`}
+      >
         {/* Chart container stays mounted so lightweight-charts can attach. */}
         <div
           ref={containerRef}

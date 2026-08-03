@@ -4,24 +4,33 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   DEFAULT_INDICATORS,
+  addPeriod,
+  removePeriod,
+  setIndicatorLineColor,
+  setIndicatorParam,
+  setPeriodColor,
+  setVpRows,
+  setVwapAnchor,
+  toggleIndicator,
+  toggleVpValueArea,
   type IndicatorState,
   type MultiLineId,
   type SingleColorId,
 } from "@/utils/indicatorConfig";
 
-interface IndicatorStore extends IndicatorState {
+// Exported so the dashboard's per-tile config (ChartConfigContext) can present
+// an identically-shaped object and swap in for this store transparently.
+export interface IndicatorStore extends IndicatorState {
   toggle: (id: keyof IndicatorState) => void;
-  setParam: (
-    id: "bollinger" | "donchian" | "rsi",
-    key: "period" | "mult",
-    value: number
-  ) => void;
+  setParam: (id: SingleColorId, key: "period" | "mult", value: number) => void;
   addPeriod: (id: MultiLineId, period: number) => void;
   removePeriod: (id: MultiLineId, period: number) => void;
   // Color of a single-line indicator (Bollinger / Donchian / RSI).
   setLineColor: (id: SingleColorId, hex: string) => void;
   // Color of one SMA/EMA length.
   setPeriodColor: (id: MultiLineId, period: number, hex: string) => void;
+  // VWAP anchoring: reset each session, or a trailing N-bar window.
+  setVwapAnchor: (anchor: "session" | "rolling") => void;
   // Volume Profile settings.
   setVpRows: (rows: number) => void;
   toggleVpValueArea: () => void;
@@ -32,66 +41,25 @@ export const useIndicatorStore = create<IndicatorStore>()(
     (set) => ({
       ...DEFAULT_INDICATORS,
 
-      toggle: (id) =>
-        set(
-          (s) =>
-            ({ [id]: { ...s[id], enabled: !s[id].enabled } }) as Partial<IndicatorStore>
-        ),
+      // Every action delegates to the pure reducer in utils/indicatorConfig so
+      // the dashboard's per-tile config can reuse the exact same logic.
+      toggle: (id) => set((s) => toggleIndicator(s, id)),
 
-      setParam: (id, key, value) =>
-        set(
-          (s) =>
-            ({ [id]: { ...s[id], [key]: value } }) as Partial<IndicatorStore>
-        ),
+      setParam: (id, key, value) => set((s) => setIndicatorParam(s, id, key, value)),
 
-      addPeriod: (id, period) =>
-        set((s) => {
-          const cur = s[id];
-          if (!Number.isFinite(period) || period < 1 || cur.periods.includes(period)) {
-            return {} as Partial<IndicatorStore>;
-          }
-          return {
-            [id]: { ...cur, periods: [...cur.periods, period].sort((a, b) => a - b) },
-          } as Partial<IndicatorStore>;
-        }),
+      addPeriod: (id, period) => set((s) => addPeriod(s, id, period)),
 
-      removePeriod: (id, period) =>
-        set((s) => {
-          const colors = { ...(s[id].colors ?? {}) };
-          delete colors[period];
-          return {
-            [id]: {
-              ...s[id],
-              periods: s[id].periods.filter((p) => p !== period),
-              colors,
-            },
-          } as Partial<IndicatorStore>;
-        }),
+      removePeriod: (id, period) => set((s) => removePeriod(s, id, period)),
 
-      setLineColor: (id, hex) =>
-        set((s) => ({ [id]: { ...s[id], color: hex } }) as Partial<IndicatorStore>),
+      setLineColor: (id, hex) => set((s) => setIndicatorLineColor(s, id, hex)),
 
-      setPeriodColor: (id, period, hex) =>
-        set(
-          (s) =>
-            ({
-              [id]: { ...s[id], colors: { ...(s[id].colors ?? {}), [period]: hex } },
-            }) as Partial<IndicatorStore>
-        ),
+      setPeriodColor: (id, period, hex) => set((s) => setPeriodColor(s, id, period, hex)),
 
-      setVpRows: (rows) =>
-        set((s) => {
-          if (!Number.isFinite(rows) || rows < 1) return {} as Partial<IndicatorStore>;
-          return { volumeProfile: { ...s.volumeProfile, rows } };
-        }),
+      setVwapAnchor: (anchor) => set((s) => setVwapAnchor(s, anchor)),
 
-      toggleVpValueArea: () =>
-        set((s) => ({
-          volumeProfile: {
-            ...s.volumeProfile,
-            showValueArea: !s.volumeProfile.showValueArea,
-          },
-        })),
+      setVpRows: (rows) => set((s) => setVpRows(s, rows)),
+
+      toggleVpValueArea: () => set((s) => toggleVpValueArea(s)),
     }),
     {
       name: "oakstock-indicators",
@@ -102,6 +70,7 @@ export const useIndicatorStore = create<IndicatorStore>()(
         bollinger: s.bollinger,
         donchian: s.donchian,
         rsi: s.rsi,
+        vwap: s.vwap,
         volume: s.volume,
         volumeProfile: s.volumeProfile,
         sessions: s.sessions,

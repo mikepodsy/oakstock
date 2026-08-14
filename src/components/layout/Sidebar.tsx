@@ -10,6 +10,7 @@ import {
   Briefcase,
   Eye,
   Radar,
+  ScanLine,
   CalendarDays,
   TrendingUp,
   Calculator,
@@ -36,6 +37,7 @@ const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
+  { href: "/scanner", label: "Scanner", icon: ScanLine },
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/radar", label: "Radar", icon: Radar },
   { href: "/market-data", label: "Market Data", icon: Globe },
@@ -53,12 +55,12 @@ const STORAGE_KEY = "oakstock-sidebar-collapsed";
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
+  // Read after mount, not during render: the server has no localStorage, so
+  // seeding the initial state from it would hydrate against different markup.
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "true") setCollapsed(true);
-    setMounted(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
+    if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
   }, []);
 
   function toggleCollapsed() {

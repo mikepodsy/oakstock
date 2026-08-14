@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CandlestickChart as CandlestickIcon, PanelRightOpen } from "lucide-react";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
+import { useTechnicalRating } from "@/hooks/useTechnicalRating";
 import { useWatchlistStore } from "@/stores/watchlistStore";
 import {
   DEFAULT_CHART_TYPE,
@@ -15,6 +16,7 @@ import {
 } from "@/stores/scannerStore";
 import { SymbolListPanel } from "./SymbolListPanel";
 import { PanelResizeHandle } from "./PanelResizeHandle";
+import { TechnicalsDetail } from "./TechnicalsDetail";
 
 // The chart may never take more than this share of the workspace, so dragging
 // the panel wide can't squeeze it to nothing on a small window.
@@ -42,6 +44,10 @@ export function ScannerWorkspace() {
   // client render must ignore them or it won't match the server's.
   const hydrated = useScannerHydrated();
 
+  // Transient drill-down, deliberately not persisted: landing on a technicals
+  // table after a reload instead of the chart would be surprising.
+  const [view, setView] = useState<"chart" | "technicals">("chart");
+
   const containerRef = useRef<HTMLDivElement>(null);
   // Non-null only while a resize drag is in flight. Rendering `dragWidth ??
   // panelWidth` keeps an unrelated re-render (the 5-minute quote refresh) from
@@ -56,6 +62,23 @@ export function ScannerWorkspace() {
   const ticker = hydrated ? selectedTicker : null;
   const chartInterval = hydrated ? interval : DEFAULT_INTERVAL;
   const chartTypeValue = hydrated ? chartType : DEFAULT_CHART_TYPE;
+
+  // Fetched once here and handed to both the panel widget and the detail view,
+  // so opening the drill-down doesn't fire a second request.
+  const { rating, loading: ratingLoading } = useTechnicalRating(
+    ticker,
+    chartInterval
+  );
+
+  // Every user-driven symbol change comes back to the chart — arrowing down the
+  // list shouldn't leave you reading a technicals table you didn't ask for.
+  const selectTicker = useCallback(
+    (next: string) => {
+      setSelectedTicker(next);
+      setView("chart");
+    },
+    [setSelectedTicker]
+  );
 
   // Keep the active list pointing at something real (it may have been deleted
   // on another device since it was persisted). Waits for `initialized` — before
@@ -122,12 +145,12 @@ export function ScannerWorkspace() {
       e.preventDefault();
       const i = items.findIndex((x) => x.ticker === selectedTicker);
       const next = items[((i < 0 ? 0 : i + delta) + items.length) % items.length];
-      if (next) setSelectedTicker(next.ticker);
+      if (next) selectTicker(next.ticker);
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [collapsed, items, selectedTicker, setSelectedTicker]);
+  }, [collapsed, items, selectedTicker, selectTicker]);
 
   // ── Panel resize ─────────────────────────────────────────────────────────
   const handleResizeStart = useCallback(
@@ -193,9 +216,20 @@ export function ScannerWorkspace() {
       className="flex h-full min-h-0 flex-col md:flex-row"
     >
       <div className="relative flex h-[55%] min-h-[280px] shrink-0 flex-col p-3 md:h-auto md:min-h-0 md:min-w-0 md:flex-1">
-        {ticker ? (
+        {!ticker ? (
           // The chart is never given a placeholder ticker — that would fire a
           // doomed candles request and flash an error.
+          <ScannerEmptyChart />
+        ) : view === "technicals" ? (
+          <TechnicalsDetail
+            ticker={ticker}
+            interval={chartInterval}
+            rating={rating}
+            loading={ratingLoading}
+            onIntervalChange={setScannerInterval}
+            onBack={() => setView("chart")}
+          />
+        ) : (
           <CandlestickChart
             ticker={ticker}
             fillHeight
@@ -205,8 +239,6 @@ export function ScannerWorkspace() {
             chartType={chartTypeValue}
             onChartTypeChange={setChartType}
           />
-        ) : (
-          <ScannerEmptyChart />
         )}
 
         {collapsed && (
@@ -237,9 +269,12 @@ export function ScannerWorkspace() {
           items={items}
           selectedTicker={ticker}
           loading={loading || !initialized}
+          rating={rating}
+          ratingLoading={ratingLoading}
           onSelectWatchlist={setActiveWatchlistId}
-          onSelectTicker={setSelectedTicker}
+          onSelectTicker={selectTicker}
           onCollapse={togglePanel}
+          onOpenTechnicals={() => setView("technicals")}
         />
       )}
     </div>

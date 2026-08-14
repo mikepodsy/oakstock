@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, ListPlus, PanelRightClose, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { Watchlist, WatchlistItem } from "@/types";
+import type { TechnicalRating } from "@/utils/technicalRating";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useWatchlistStore } from "@/stores/watchlistStore";
 import { TickerSearch } from "@/components/search/TickerSearch";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WatchlistPicker } from "./WatchlistPicker";
 import { SymbolRow } from "./SymbolRow";
+import { TechnicalsSummary } from "./TechnicalsSummary";
 
 interface SymbolListPanelProps {
   width: number;
@@ -20,9 +22,12 @@ interface SymbolListPanelProps {
   items: WatchlistItem[];
   selectedTicker: string | null;
   loading: boolean;
+  rating: TechnicalRating | null;
+  ratingLoading: boolean;
   onSelectWatchlist: (id: string) => void;
   onSelectTicker: (ticker: string) => void;
   onCollapse: () => void;
+  onOpenTechnicals: () => void;
 }
 
 export function SymbolListPanel({
@@ -32,9 +37,12 @@ export function SymbolListPanel({
   items,
   selectedTicker,
   loading,
+  rating,
+  ratingLoading,
   onSelectWatchlist,
   onSelectTicker,
   onCollapse,
+  onOpenTechnicals,
 }: SymbolListPanelProps) {
   const addItem = useWatchlistStore((s) => s.addItem);
   const removeItem = useWatchlistStore((s) => s.removeItem);
@@ -205,6 +213,15 @@ export function SymbolListPanel({
             ))}
           </div>
         </>
+      )}
+
+      {/* Pinned below the list, which keeps its own scroll above. */}
+      {selectedTicker && (
+        <TechnicalsSummary
+          rating={rating}
+          loading={ratingLoading}
+          onOpenDetail={onOpenTechnicals}
+        />
       )}
     </aside>
   );

@@ -98,18 +98,28 @@ function buildLayout(name: string, tiles: ChartTile[], cols = 2): DashboardLayou
   };
 }
 
-/** Shipped so the grid is never empty on first load: the four macro instruments
- *  that motivated the feature, none of which the Questrade candle API can serve. */
+/** Shipped so the grid is never empty on first load: the four broad-market
+ *  benchmarks, charted through TradingView so index/ETF data is consistent. */
 function defaultLayouts(): DashboardLayout[] {
   return [
     buildLayout("Macro", [
-      createTile({ kind: "tradingview", symbol: "CME_MINI:ES1!", label: "S&P 500 futures", interval: "60" }),
-      createTile({ kind: "tradingview", symbol: "COMEX:GC1!", label: "Gold", interval: "D" }),
-      createTile({ kind: "tradingview", symbol: "CBOT:ZB1!", label: "30Y T-Bond", interval: "D" }),
-      createTile({ kind: "tradingview", symbol: "TVC:DXY", label: "Dollar Index", interval: "D" }),
+      createTile({ kind: "tradingview", symbol: "AMEX:SPY", label: "SPY", interval: "D" }),
+      createTile({ kind: "tradingview", symbol: "NASDAQ:QQQ", label: "QQQ", interval: "D" }),
+      createTile({ kind: "tradingview", symbol: "AMEX:GLD", label: "GLD (gold ETF)", interval: "D" }),
+      createTile({ kind: "tradingview", symbol: "AMEX:DIA", label: "DIA (Dow Jones)", interval: "D" }),
     ]),
   ];
 }
+
+/** v1 shipped futures/rates/FX defaults; v2 replaced them with the broad-market
+ *  ETFs above. Rewritten in place — same tile ids, so saved grid geometry, style
+ *  and indicator tweaks all survive the swap. */
+const V2_SYMBOL_SWAP: Record<string, { symbol: string; label: string }> = {
+  "CME_MINI:ES1!": { symbol: "AMEX:SPY", label: "SPY" },
+  "TVC:DXY": { symbol: "NASDAQ:QQQ", label: "QQQ" },
+  "COMEX:GC1!": { symbol: "AMEX:GLD", label: "GLD (gold ETF)" },
+  "CBOT:ZB1!": { symbol: "AMEX:DIA", label: "DIA (Dow Jones)" },
+};
 
 interface DashboardLayoutStore {
   layouts: DashboardLayout[];
@@ -228,7 +238,25 @@ export const useDashboardLayoutStore = create<DashboardLayoutStore>()(
     }),
     {
       name: "oakstock-dashboard-layouts",
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        if (!persisted || typeof persisted !== "object") {
+          return persisted as DashboardLayoutStore;
+        }
+        const p = persisted as Partial<DashboardLayoutStore>;
+        // Swap the retired v1 macro instruments wherever they were saved, not
+        // just in the shipped "Macro" layout, so they're gone everywhere.
+        if (version < 2 && p.layouts) {
+          p.layouts = p.layouts.map((l) => ({
+            ...l,
+            tiles: l.tiles.map((t) => {
+              const swap = t.kind === "tradingview" ? V2_SYMBOL_SWAP[t.symbol] : undefined;
+              return swap ? { ...t, ...swap } : t;
+            }),
+          }));
+        }
+        return persisted as DashboardLayoutStore;
+      },
       // Persist only the data, not the action functions.
       partialize: (s) => ({
         layouts: s.layouts,

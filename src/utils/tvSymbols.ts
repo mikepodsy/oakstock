@@ -73,6 +73,7 @@ export const TV_SYMBOL_GROUPS: TvSymbolGroup[] = [
     symbols: [
       { symbol: "AMEX:SPY", label: "SPY" },
       { symbol: "NASDAQ:QQQ", label: "QQQ" },
+      { symbol: "AMEX:DIA", label: "DIA (Dow Jones)" },
       { symbol: "NASDAQ:TLT", label: "TLT (20y+ treasuries)" },
       { symbol: "NASDAQ:IEF", label: "IEF (7-10y treasuries)" },
       { symbol: "AMEX:RSP", label: "RSP (equal weight)" },

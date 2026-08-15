@@ -13,8 +13,6 @@ export function MarketOverview() {
         <MarketStatCard title="S&P 500 (SPX)" symbol="sp500" />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <CandleTile title="S&P 500 Futures (ES)" symbol="es" />
-        <CandleTile title="Nasdaq 100 Futures (NQ)" symbol="nq" />
         <CandleTile title="VIX" symbol="vix" />
         <CandleTile title="RSP / SPY (Breadth)" symbol="rspSpy" precision={4} />
       </div>

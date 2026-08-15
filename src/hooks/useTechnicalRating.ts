@@ -1,18 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { QuestradeCandle } from "@/types";
 import { fetchQuestradeCandles } from "@/services/questrade";
 import { computeTechnicalRating } from "@/utils/technicalRating";
 
 interface FetchState {
-  /** `TICKER:INTERVAL` the candles belong to — "" before the first result. */
+  /** `TICKER:INTERVAL:NONCE` the candles belong to — "" before the first result. */
   key: string;
   candles: QuestradeCandle[];
-  error: string | null;
+  failed: boolean;
 }
 
-const EMPTY: FetchState = { key: "", candles: [], error: null };
+const EMPTY: FetchState = { key: "", candles: [], failed: false };
+
+export interface TechnicalRatingResult {
+  rating: ReturnType<typeof computeTechnicalRating>;
+  loading: boolean;
+  /**
+   * Why there's no rating, when there isn't one:
+   * - "fetch"  — the candles request failed (Questrade can't resolve the
+   *   symbol, or the request errored). Retryable.
+   * - "history" — candles came back, but too few to compute anything.
+   *
+   * Keeping these apart matters: reporting a failed request as "not enough
+   * history" sends you looking at the wrong problem.
+   */
+  reason: "fetch" | "history" | null;
+  retry: () => void;
+}
 
 /**
  * Technical rating for a symbol on a given candle interval.
@@ -25,9 +41,14 @@ const EMPTY: FetchState = { key: "", candles: [], error: null };
  * holds, rather than being flipped on before the request — that keeps every
  * state write inside the async continuation.
  */
-export function useTechnicalRating(ticker: string | null, interval: string) {
+export function useTechnicalRating(
+  ticker: string | null,
+  interval: string
+): TechnicalRatingResult {
   const [state, setState] = useState<FetchState>(EMPTY);
-  const key = ticker ? `${ticker}:${interval}` : "";
+  // Bumping this changes the key, which re-runs the effect — that's the retry.
+  const [nonce, setNonce] = useState(0);
+  const key = ticker ? `${ticker}:${interval}:${nonce}` : "";
 
   useEffect(() => {
     // No symbol: nothing to fetch, and nothing to clear either — the returned
@@ -38,11 +59,9 @@ export function useTechnicalRating(ticker: string | null, interval: string) {
     (async () => {
       try {
         const candles = await fetchQuestradeCandles(ticker, interval);
-        if (!cancelled) setState({ key, candles, error: null });
+        if (!cancelled) setState({ key, candles, failed: false });
       } catch {
-        if (!cancelled) {
-          setState({ key, candles: [], error: "Unable to load technicals" });
-        }
+        if (!cancelled) setState({ key, candles: [], failed: true });
       }
     })();
 
@@ -52,13 +71,19 @@ export function useTechnicalRating(ticker: string | null, interval: string) {
   }, [ticker, interval, key]);
 
   const rating = useMemo(
-    () => (state.candles.length ? computeTechnicalRating(state.candles) : null),
+    () => computeTechnicalRating(state.candles),
     [state.candles]
   );
 
+  const retry = useCallback(() => setNonce((n) => n + 1), []);
+
+  const settled = key !== "" && state.key === key;
+  const loading = key !== "" && !settled;
+
   return {
-    rating: state.key === key ? rating : null,
-    loading: key !== "" && state.key !== key,
-    error: state.key === key ? state.error : null,
+    rating: settled ? rating : null,
+    loading,
+    reason: !settled || rating ? null : state.failed ? "fetch" : "history",
+    retry,
   };
 }

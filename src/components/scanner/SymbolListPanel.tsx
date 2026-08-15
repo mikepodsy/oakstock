@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, ListPlus, PanelRightClose, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { Watchlist, WatchlistItem } from "@/types";
-import type { TechnicalRating } from "@/utils/technicalRating";
+import type { TechnicalRatingResult } from "@/hooks/useTechnicalRating";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useWatchlistStore } from "@/stores/watchlistStore";
 import { TickerSearch } from "@/components/search/TickerSearch";
@@ -22,8 +22,7 @@ interface SymbolListPanelProps {
   items: WatchlistItem[];
   selectedTicker: string | null;
   loading: boolean;
-  rating: TechnicalRating | null;
-  ratingLoading: boolean;
+  technicals: TechnicalRatingResult;
   onSelectWatchlist: (id: string) => void;
   onSelectTicker: (ticker: string) => void;
   onCollapse: () => void;
@@ -37,8 +36,7 @@ export function SymbolListPanel({
   items,
   selectedTicker,
   loading,
-  rating,
-  ratingLoading,
+  technicals,
   onSelectWatchlist,
   onSelectTicker,
   onCollapse,
@@ -217,11 +215,7 @@ export function SymbolListPanel({
 
       {/* Pinned below the list, which keeps its own scroll above. */}
       {selectedTicker && (
-        <TechnicalsSummary
-          rating={rating}
-          loading={ratingLoading}
-          onOpenDetail={onOpenTechnicals}
-        />
+        <TechnicalsSummary {...technicals} onOpenDetail={onOpenTechnicals} />
       )}
     </aside>
   );

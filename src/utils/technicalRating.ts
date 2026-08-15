@@ -400,13 +400,19 @@ function movingAverageReadings(candles: QuestradeCandle[]): IndicatorReading[] {
 }
 
 /**
+ * Fewest candles worth rating — below this even RSI(14) has nothing to say.
+ * Longer indicators simply drop out of the tally as history runs short.
+ */
+export const MIN_RATING_CANDLES = 15;
+
+/**
  * Rates the latest bar. Returns null when there isn't enough history for even
  * the shortest indicator to mean anything.
  */
 export function computeTechnicalRating(
   candles: QuestradeCandle[]
 ): TechnicalRating | null {
-  if (candles.length < 15) return null;
+  if (candles.length < MIN_RATING_CANDLES) return null;
 
   const oscillators = tally(oscillatorReadings(candles));
   const movingAverages = tally(movingAverageReadings(candles));

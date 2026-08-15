@@ -65,10 +65,7 @@ export function ScannerWorkspace() {
 
   // Fetched once here and handed to both the panel widget and the detail view,
   // so opening the drill-down doesn't fire a second request.
-  const { rating, loading: ratingLoading } = useTechnicalRating(
-    ticker,
-    chartInterval
-  );
+  const technicals = useTechnicalRating(ticker, chartInterval);
 
   // Every user-driven symbol change comes back to the chart — arrowing down the
   // list shouldn't leave you reading a technicals table you didn't ask for.
@@ -222,10 +219,9 @@ export function ScannerWorkspace() {
           <ScannerEmptyChart />
         ) : view === "technicals" ? (
           <TechnicalsDetail
+            {...technicals}
             ticker={ticker}
             interval={chartInterval}
-            rating={rating}
-            loading={ratingLoading}
             onIntervalChange={setScannerInterval}
             onBack={() => setView("chart")}
           />
@@ -269,8 +265,7 @@ export function ScannerWorkspace() {
           items={items}
           selectedTicker={ticker}
           loading={loading || !initialized}
-          rating={rating}
-          ratingLoading={ratingLoading}
+          technicals={technicals}
           onSelectWatchlist={setActiveWatchlistId}
           onSelectTicker={selectTicker}
           onCollapse={togglePanel}

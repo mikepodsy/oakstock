@@ -1,29 +1,27 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, RefreshCw } from "lucide-react";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { TechnicalRatingResult } from "@/hooks/useTechnicalRating";
 import {
   voteColor,
   voteLabel,
   type IndicatorReading,
-  type RatingGroup,
-  type TechnicalRating,
+  type RatingCounts,
 } from "@/utils/technicalRating";
 import { RatingGauge } from "./RatingGauge";
 
-interface TechnicalsDetailProps {
+interface TechnicalsDetailProps extends TechnicalRatingResult {
   ticker: string;
   interval: string;
-  rating: TechnicalRating | null;
-  loading: boolean;
   onIntervalChange: (interval: string) => void;
   onBack: () => void;
 }
 
-function CountsRow({ counts }: { counts: RatingGroup["counts"] }) {
+function CountsRow({ counts }: { counts: RatingCounts }) {
   return (
-    <div className="mt-3 grid w-full max-w-[280px] grid-cols-3 text-center">
+    <div className="mt-4 grid w-full max-w-[300px] grid-cols-3 gap-2 text-center">
       {(
         [
           ["Sell", counts.sell, "var(--red-primary)"],
@@ -32,8 +30,10 @@ function CountsRow({ counts }: { counts: RatingGroup["counts"] }) {
         ] as const
       ).map(([label, value, color]) => (
         <div key={label}>
-          <div className="text-xs text-text-tertiary">{label}</div>
-          <div className="font-financial text-lg" style={{ color }}>
+          <div className="whitespace-nowrap text-xs text-text-tertiary">
+            {label}
+          </div>
+          <div className="font-financial text-xl" style={{ color }}>
             {value}
           </div>
         </div>
@@ -50,33 +50,46 @@ function IndicatorTable({
   readings: IndicatorReading[];
 }) {
   return (
-    <div className="min-w-0">
-      <h3 className="mb-2 font-display text-base text-text-primary">{title}</h3>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border-primary text-xs text-text-tertiary">
-            <th className="py-2 text-left font-normal">Name</th>
-            <th className="py-2 text-right font-normal">Value</th>
-            <th className="py-2 text-right font-normal">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {readings.map((r) => (
-            <tr key={r.name} className="border-b border-border-secondary">
-              <td className="py-2 pr-2 text-text-secondary">{r.name}</td>
-              <td className="py-2 text-right font-financial tabular-nums text-text-primary">
-                {r.value == null ? "—" : r.value.toFixed(2)}
-              </td>
-              <td
-                className="py-2 pl-2 text-right"
-                style={{ color: r.vote ? voteColor(r.vote) : "var(--text-tertiary)" }}
-              >
-                {r.vote ? voteLabel(r.vote) : "—"}
-              </td>
+    <div className="min-w-0 rounded-xl border border-border-primary bg-bg-secondary p-4">
+      <h3 className="mb-3 text-sm font-medium text-text-primary">{title}</h3>
+
+      {/* Scrolls on its own if the column gets tight, so the page never does. */}
+      <div className="-mx-1 overflow-x-auto px-1">
+        <table className="w-full min-w-[320px] text-sm">
+          <thead>
+            <tr className="border-b border-border-primary text-xs text-text-tertiary">
+              <th className="py-2 pr-4 text-left font-normal">Name</th>
+              <th className="py-2 pr-4 text-right font-normal whitespace-nowrap">
+                Value
+              </th>
+              <th className="py-2 text-right font-normal whitespace-nowrap">
+                Action
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {readings.map((r) => (
+              <tr
+                key={r.name}
+                className="border-b border-border-secondary last:border-0"
+              >
+                <td className="py-2.5 pr-4 text-text-secondary">{r.name}</td>
+                <td className="py-2.5 pr-4 text-right font-financial tabular-nums whitespace-nowrap text-text-primary">
+                  {r.value == null ? "—" : r.value.toFixed(2)}
+                </td>
+                <td
+                  className="py-2.5 text-right font-medium whitespace-nowrap"
+                  style={{
+                    color: r.vote ? voteColor(r.vote) : "var(--text-tertiary)",
+                  }}
+                >
+                  {r.vote ? voteLabel(r.vote) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -93,55 +106,70 @@ export function TechnicalsDetail({
   interval,
   rating,
   loading,
+  reason,
+  retry,
   onIntervalChange,
   onBack,
 }: TechnicalsDetailProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-lg border border-border-primary bg-bg-secondary">
-      <div className="flex shrink-0 items-center justify-between border-b border-border-primary px-4 py-3">
-        <h2 className="font-display text-base text-text-primary">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4">
+        <h2 className="font-display text-xl text-text-primary">
           <span className="font-financial">{ticker}</span>
           <span className="text-text-tertiary"> · Technicals</span>
         </h2>
         <button
           onClick={onBack}
-          className="flex items-center gap-1 rounded-full border border-border-primary px-3 py-1 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-bg-tertiary px-4 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
         >
-          <ChevronLeft className="h-3.5 w-3.5" />
+          <ChevronLeft className="h-4 w-4" />
           Back to chart
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="mb-6 flex flex-wrap gap-1">
-          {QUESTRADE_INTERVALS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => onIntervalChange(opt.value)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                opt.value === interval
-                  ? "bg-bg-tertiary text-text-primary"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <div className="mb-5 flex shrink-0 flex-wrap items-center gap-2">
+        {QUESTRADE_INTERVALS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onIntervalChange(opt.value)}
+            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              opt.value === interval
+                ? "bg-green-primary text-bg-primary"
+                : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {loading ? (
           <div className="grid gap-6 md:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-40" />
+              <Skeleton key={i} className="h-56" />
             ))}
           </div>
         ) : !rating ? (
-          <p className="py-12 text-center text-sm text-text-tertiary">
-            Not enough history at this interval to rate {ticker}.
-          </p>
+          <div className="rounded-xl border border-border-primary bg-bg-secondary py-16 text-center">
+            <p className="text-sm text-text-secondary">
+              {reason === "fetch"
+                ? `Couldn't load candle data for ${ticker} at this interval.`
+                : `Not enough price history for ${ticker} at this interval.`}
+            </p>
+            {reason === "fetch" && (
+              <button
+                onClick={retry}
+                className="mt-4 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-bg-tertiary px-4 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try again
+              </button>
+            )}
+          </div>
         ) : (
           <>
-            <div className="grid gap-8 md:grid-cols-3">
+            <div className="grid gap-4 rounded-xl border border-border-primary bg-bg-secondary p-6 md:grid-cols-3 md:gap-8">
               <div className="flex flex-col items-center">
                 <RatingGauge
                   title="Oscillators"
@@ -171,7 +199,7 @@ export function TechnicalsDetail({
               </div>
             </div>
 
-            <div className="mt-10 grid gap-8 lg:grid-cols-2">
+            <div className="mt-6 grid gap-6 pb-2 lg:grid-cols-2">
               <IndicatorTable
                 title="Oscillators"
                 readings={rating.oscillators.readings}

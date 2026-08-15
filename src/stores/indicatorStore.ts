@@ -11,8 +11,10 @@ import {
   setPeriodColor,
   setVpRows,
   setVwapAnchor,
+  toggleHidden,
   toggleIndicator,
   toggleVpValueArea,
+  type IndicatorId,
   type IndicatorState,
   type MultiLineId,
   type SingleColorId,
@@ -21,7 +23,9 @@ import {
 // Exported so the dashboard's per-tile config (ChartConfigContext) can present
 // an identically-shaped object and swap in for this store transparently.
 export interface IndicatorStore extends IndicatorState {
-  toggle: (id: keyof IndicatorState) => void;
+  toggle: (id: IndicatorId) => void;
+  // Mute one line without discarding its config — the legend's eye control.
+  toggleHidden: (key: string) => void;
   setParam: (id: SingleColorId, key: "period" | "mult", value: number) => void;
   addPeriod: (id: MultiLineId, period: number) => void;
   removePeriod: (id: MultiLineId, period: number) => void;
@@ -44,6 +48,8 @@ export const useIndicatorStore = create<IndicatorStore>()(
       // Every action delegates to the pure reducer in utils/indicatorConfig so
       // the dashboard's per-tile config can reuse the exact same logic.
       toggle: (id) => set((s) => toggleIndicator(s, id)),
+
+      toggleHidden: (key) => set((s) => toggleHidden(s, key)),
 
       setParam: (id, key, value) => set((s) => setIndicatorParam(s, id, key, value)),
 
@@ -74,6 +80,7 @@ export const useIndicatorStore = create<IndicatorStore>()(
         volume: s.volume,
         volumeProfile: s.volumeProfile,
         sessions: s.sessions,
+        hidden: s.hidden,
       }),
     }
   )

@@ -22,7 +22,15 @@ export interface IndicatorState {
   volume: { enabled: boolean };
   volumeProfile: { enabled: boolean; rows: number; showValueArea: boolean };
   sessions: { enabled: boolean };
+  // Legend keys whose line is muted on the chart while staying configured — the
+  // eye control (see chartLegend.ts for the key format). Distinct from
+  // `enabled`: a hidden indicator keeps its row, settings and colors.
+  hidden: string[];
 }
+
+// The indicators themselves — every key of IndicatorState except the `hidden`
+// bookkeeping list. This is what `toggle` and the picker catalog range over.
+export type IndicatorId = Exclude<keyof IndicatorState, "hidden">;
 
 // Indicators carrying a single configurable line color and a `period` input.
 // (Not every member has `mult` — `setIndicatorParam` has always been loose here,
@@ -42,6 +50,7 @@ export const DEFAULT_INDICATORS: IndicatorState = {
   volume: { enabled: true },
   volumeProfile: { enabled: false, rows: 300, showValueArea: true },
   sessions: { enabled: false },
+  hidden: [],
 };
 
 // Distinct colours cycled across the moving-average lines so combined SMAs/EMAs
@@ -90,11 +99,42 @@ export function maColor(index: number): string {
 // identically without the logic being written twice.
 // ---------------------------------------------------------------------------
 
+// Switching an indicator on or off also forgets which of its lines were hidden:
+// off-then-on is the user asking for a clean slate, and it stops a stale key
+// from silently muting a freshly added indicator.
 export function toggleIndicator(
   s: IndicatorState,
-  id: keyof IndicatorState
+  id: IndicatorId
 ): IndicatorState {
-  return { ...s, [id]: { ...s[id], enabled: !s[id].enabled } };
+  return {
+    ...s,
+    [id]: { ...s[id], enabled: !s[id].enabled },
+    hidden: hiddenKeys(s).filter((k) => k !== id && !k.startsWith(`${id}:`)),
+  };
+}
+
+// `hidden` is absent from state persisted before visibility toggles existed
+// (localStorage, and dashboard tile snapshots), so every read goes through here.
+function hiddenKeys(s: IndicatorState): string[] {
+  return s.hidden ?? [];
+}
+
+export function isHidden(s: IndicatorState, key: string): boolean {
+  return hiddenKeys(s).includes(key);
+}
+
+export function toggleHidden(s: IndicatorState, key: string): IndicatorState {
+  const cur = hiddenKeys(s);
+  return {
+    ...s,
+    hidden: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key],
+  };
+}
+
+// The visibility key for one line. SMA/EMA carry several lines at once, so they
+// key per length; every other indicator draws one thing and keys on its id.
+export function hiddenKey(id: IndicatorId, period?: number): string {
+  return period === undefined ? id : `${id}:${period}`;
 }
 
 export function setIndicatorParam(
@@ -123,8 +163,9 @@ export function addPeriod(
   };
 }
 
-// Drops the length's custom color too, so re-adding it later picks up the
-// auto-cycled palette rather than a stale override.
+// Drops the length's custom color and hidden flag too, so re-adding it later
+// picks up the auto-cycled palette and comes back visible rather than
+// inheriting stale overrides.
 export function removePeriod(
   s: IndicatorState,
   id: MultiLineId,
@@ -132,12 +173,19 @@ export function removePeriod(
 ): IndicatorState {
   const colors = { ...(s[id].colors ?? {}) };
   delete colors[period];
+  const key = hiddenKey(id, period);
+  const periods = s[id].periods.filter((p) => p !== period);
   return {
     ...s,
+    hidden: hiddenKeys(s).filter((k) => k !== key),
     [id]: {
       ...s[id],
-      periods: s[id].periods.filter((p) => p !== period),
+      periods,
       colors,
+      // An enabled indicator with no lengths draws nothing and has no legend
+      // row to reach its settings from, so dropping the last one switches it
+      // off — the picker is then the way back in.
+      enabled: periods.length > 0 && s[id].enabled,
     },
   };
 }

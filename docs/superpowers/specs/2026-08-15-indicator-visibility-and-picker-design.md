@@ -54,9 +54,13 @@ New pure reducers in `src/utils/indicatorConfig.ts`, alongside the existing ones
 
 Two existing reducers grow cleanup:
 
-- `removePeriod` drops `"<id>:<period>"` from `hidden`.
-- `toggleIndicator`, when disabling, drops the indicator's key and (for SMA/EMA)
-  every `"<id>:*"` key.
+- `removePeriod` drops `"<id>:<period>"` from `hidden`. Removing the *last*
+  length also switches the indicator off: an enabled indicator with no lengths
+  draws nothing and has no legend row to reach its settings from, so the picker
+  needs to be the way back in.
+- `toggleIndicator` drops the indicator's key and (for SMA/EMA) every
+  `"<id>:*"` key — in both directions, so a stale key from an older build can
+  never silently mute a freshly added indicator.
 
 So re-adding an indicator or a length always comes back visible. Because both
 the persisted store (`src/stores/indicatorStore.ts`) and the per-tile config

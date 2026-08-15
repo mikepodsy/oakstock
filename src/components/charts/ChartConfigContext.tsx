@@ -34,6 +34,7 @@ import {
   setPeriodColor,
   setVpRows,
   setVwapAnchor,
+  toggleHidden,
   toggleIndicator,
   toggleVpValueArea,
   type IndicatorState,
@@ -84,6 +85,7 @@ export function ChartConfigProvider({
       indicators: {
         ...indicators,
         toggle: (id) => onIndicatorsChange(toggleIndicator(indicators, id)),
+        toggleHidden: (key) => onIndicatorsChange(toggleHidden(indicators, key)),
         setParam: (id, key, v) => onIndicatorsChange(setIndicatorParam(indicators, id, key, v)),
         addPeriod: (id, p) => onIndicatorsChange(addPeriod(indicators, id, p)),
         removePeriod: (id, p) => onIndicatorsChange(removePeriod(indicators, id, p)),

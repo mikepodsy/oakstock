@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_INDICATORS,
   addPeriod,
+  isHidden,
   maColorFor,
   removePeriod,
   setIndicatorLineColor,
   setIndicatorParam,
   setPeriodColor,
   setVpRows,
+  toggleHidden,
   toggleIndicator,
   toggleVpValueArea,
   type IndicatorState,
@@ -79,6 +81,85 @@ describe("setIndicatorParam / setIndicatorLineColor", () => {
 
   it("sets a single-line indicator color", () => {
     expect(setIndicatorLineColor(base(), "rsi", "#123456").rsi.color).toBe("#123456");
+  });
+});
+
+describe("removePeriod on the last length", () => {
+  it("switches the indicator off, since an empty one draws nothing", () => {
+    let s = toggleIndicator(base(), "sma");
+    s = removePeriod(s, "sma", 20);
+    expect(s.sma.enabled).toBe(true);
+
+    s = removePeriod(s, "sma", 50);
+    expect(s.sma.periods).toEqual([]);
+    expect(s.sma.enabled).toBe(false);
+  });
+
+  it("leaves a disabled indicator disabled", () => {
+    const s = removePeriod(removePeriod(base(), "sma", 20), "sma", 50);
+    expect(s.sma.enabled).toBe(false);
+  });
+});
+
+describe("toggleHidden / isHidden", () => {
+  it("hides and unhides a key", () => {
+    const hiddenOnce = toggleHidden(base(), "sma:20");
+    expect(isHidden(hiddenOnce, "sma:20")).toBe(true);
+    expect(isHidden(hiddenOnce, "sma:50")).toBe(false);
+    expect(isHidden(toggleHidden(hiddenOnce, "sma:20"), "sma:20")).toBe(false);
+  });
+
+  it("does not mutate the input", () => {
+    const s = base();
+    toggleHidden(s, "rsi");
+    expect(s.hidden).toEqual([]);
+  });
+
+  it("treats state persisted before `hidden` existed as nothing hidden", () => {
+    const legacy = base();
+    delete (legacy as Partial<IndicatorState>).hidden;
+    expect(isHidden(legacy, "sma:20")).toBe(false);
+    expect(toggleHidden(legacy, "sma:20").hidden).toEqual(["sma:20"]);
+  });
+
+  it("hiding is independent of enabled", () => {
+    const s = toggleHidden(toggleIndicator(base(), "rsi"), "rsi");
+    expect(s.rsi.enabled).toBe(true);
+    expect(isHidden(s, "rsi")).toBe(true);
+  });
+});
+
+describe("hidden cleanup", () => {
+  it("drops the key when a length is removed, so re-adding comes back visible", () => {
+    const s = toggleHidden(base(), "sma:20");
+    const removed = removePeriod(s, "sma", 20);
+    expect(isHidden(removed, "sma:20")).toBe(false);
+  });
+
+  it("leaves other hidden keys alone when a length is removed", () => {
+    const s = toggleHidden(toggleHidden(base(), "sma:20"), "sma:50");
+    expect(removePeriod(s, "sma", 20).hidden).toEqual(["sma:50"]);
+  });
+
+  it("clears every key of an indicator when it is switched off", () => {
+    let s = toggleIndicator(base(), "sma");
+    s = toggleHidden(toggleHidden(s, "sma:20"), "sma:50");
+    s = toggleHidden(s, "rsi");
+
+    const off = toggleIndicator(s, "sma");
+    expect(off.hidden).toEqual(["rsi"]);
+  });
+
+  it("clears a single-key indicator when it is switched off", () => {
+    const s = toggleHidden(toggleIndicator(base(), "bollinger"), "bollinger");
+    expect(toggleIndicator(s, "bollinger").hidden).toEqual([]);
+  });
+
+  // Switching an indicator on is a request to see it, so a stale hidden key
+  // (only reachable from state persisted by an older build) must not win.
+  it("clears hidden keys when an indicator is switched on too", () => {
+    const s = toggleHidden(base(), "rsi");
+    expect(toggleIndicator(s, "rsi").hidden).toEqual([]);
   });
 });
 

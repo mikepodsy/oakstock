@@ -188,7 +188,7 @@ export const TV_SUPPORTED_INDICATORS = [
 export function tvStudies(indicators: IndicatorState): string[] {
   const out: string[] = [];
   for (const id of TV_SUPPORTED_INDICATORS) {
-    const cfg = indicators[id as keyof IndicatorState] as { enabled?: boolean } | undefined;
+    const cfg = indicators[id] as { enabled?: boolean } | undefined;
     if (cfg?.enabled) out.push(STUDY_IDS[id]);
   }
   return out;

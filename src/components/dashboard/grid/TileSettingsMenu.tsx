@@ -113,7 +113,7 @@ export function TileSettingsMenu({ tile }: { tile: ChartTile }) {
                 Indicators
               </div>
               {TV_SUPPORTED_INDICATORS.map((id) => {
-                const cfg = tile.indicators[id as keyof IndicatorState] as
+                const cfg = tile.indicators[id] as
                   | { enabled?: boolean }
                   | undefined;
                 return (
@@ -121,9 +121,7 @@ export function TileSettingsMenu({ tile }: { tile: ChartTile }) {
                     key={id}
                     type="button"
                     onClick={() =>
-                      onIndicatorsChange(
-                        toggleIndicator(tile.indicators, id as keyof IndicatorState)
-                      )
+                      onIndicatorsChange(toggleIndicator(tile.indicators, id))
                     }
                     className="flex w-full cursor-pointer items-center gap-2 rounded px-1 py-1 text-left hover:bg-bg-tertiary"
                   >

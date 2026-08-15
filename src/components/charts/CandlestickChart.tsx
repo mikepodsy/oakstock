@@ -41,7 +41,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
-import { IndicatorsMenu } from "./IndicatorsMenu";
+import { IndicatorPickerDialog } from "./IndicatorPickerDialog";
+import { ChartLegend } from "./ChartLegend";
 import { ChartStyleMenu } from "./ChartStyleMenu";
 import { StrikeHistogram } from "./StrikeHistogram";
 import { GexHistogram } from "./GexHistogram";
@@ -71,7 +72,7 @@ import {
   sessionSegments,
   type LinePoint,
 } from "@/utils/indicators";
-import { maColorFor, INDICATOR_COLORS } from "@/utils/indicatorConfig";
+import { maColorFor, hiddenKey, INDICATOR_COLORS } from "@/utils/indicatorConfig";
 import type {
   QuestradeCandle,
   OptionsChainResponse,
@@ -127,6 +128,8 @@ const VOLUME_DOWN = "#EF4444";
 const EMPTY_LINES: { id: string; price: number }[] = [];
 // Stable empty reference for trendlines (same churn-avoidance reason as above).
 const EMPTY_TRENDLINES: Trendline[] = [];
+// Stable empty reference for the hidden-line list (same churn-avoidance reason).
+const EMPTY_HIDDEN: string[] = [];
 // How close (px) the cursor must be to a line to grab it.
 const LINE_HIT_PX = 6;
 // How close (px) the cursor must be to a trendline endpoint / segment to grab it.
@@ -231,6 +234,10 @@ export function CandlestickChart({
   const volumeCfg = useIndicators((s) => s.volume);
   const volumeProfileCfg = useIndicators((s) => s.volumeProfile);
   const sessionsCfg = useIndicators((s) => s.sessions);
+  // Lines muted from the legend's eye control. Hiding is separate from
+  // `enabled`, so each draw below asks "visible?" rather than "enabled?".
+  // Undefined on indicator state persisted before visibility toggles existed.
+  const hidden = useIndicators((s) => s.hidden) ?? EMPTY_HIDDEN;
 
   // User-drawn horizontal lines for this ticker (persisted, per-symbol).
   const linesRaw = useDrawingStore((s) => s.lines[ticker]);
@@ -690,20 +697,24 @@ export function CandlestickChart({
       return series;
     };
 
+    // The palette index stays tied to the length's position in the full list, so
+    // hiding one moving average never recolors the ones after it.
     if (smaCfg.enabled) {
-      smaCfg.periods.forEach((p, idx) =>
-        addLine(smaCalc(data, p), { color: maColorFor(smaCfg.colors, p, idx) })
-      );
+      smaCfg.periods.forEach((p, idx) => {
+        if (hidden.includes(hiddenKey("sma", p))) return;
+        addLine(smaCalc(data, p), { color: maColorFor(smaCfg.colors, p, idx) });
+      });
     }
     if (emaCfg.enabled) {
-      emaCfg.periods.forEach((p, idx) =>
+      emaCfg.periods.forEach((p, idx) => {
+        if (hidden.includes(hiddenKey("ema", p))) return;
         addLine(emaCalc(data, p), {
           color: maColorFor(emaCfg.colors, p, idx),
           lineStyle: LineStyle.Dashed,
-        })
-      );
+        });
+      });
     }
-    if (vwapCfg?.enabled) {
+    if (vwapCfg?.enabled && !hidden.includes(hiddenKey("vwap"))) {
       // Session-anchored VWAP is drawn as one series per day so the line breaks
       // at each reset instead of snapping vertically across the session gap.
       // On daily+ candles every bar is its own session, so a session anchor
@@ -733,7 +744,7 @@ export function CandlestickChart({
         addLine(points, { color, lineWidth: 2 });
       }
     }
-    if (bollingerCfg.enabled) {
+    if (bollingerCfg.enabled && !hidden.includes(hiddenKey("bollinger"))) {
       const color = bollingerCfg.color ?? INDICATOR_COLORS.bollinger;
       const b = bollingerCalc(data, bollingerCfg.period, bollingerCfg.mult);
       addLine(b.upper, { color, lineWidth: 1 });
@@ -744,7 +755,7 @@ export function CandlestickChart({
       });
       addLine(b.lower, { color, lineWidth: 1 });
     }
-    if (donchianCfg.enabled) {
+    if (donchianCfg.enabled && !hidden.includes(hiddenKey("donchian"))) {
       const color = donchianCfg.color ?? INDICATOR_COLORS.donchian;
       const d = donchianCalc(data, donchianCfg.period);
       addLine(d.upper, { color, lineWidth: 1 });
@@ -755,7 +766,7 @@ export function CandlestickChart({
       });
       addLine(d.lower, { color, lineWidth: 1 });
     }
-    if (rsiCfg.enabled) {
+    if (rsiCfg.enabled && !hidden.includes(hiddenKey("rsi"))) {
       const line = addLine(
         rsiCalc(data, rsiCfg.period),
         { color: rsiCfg.color ?? INDICATOR_COLORS.rsi, lineWidth: 2 },
@@ -783,7 +794,9 @@ export function CandlestickChart({
       all[1]?.setStretchFactor(1);
     }
 
-    volumeSeriesRef.current?.applyOptions({ visible: volumeCfg.enabled });
+    volumeSeriesRef.current?.applyOptions({
+      visible: volumeCfg.enabled && !hidden.includes(hiddenKey("volume")),
+    });
   }, [
     data,
     theme,
@@ -796,6 +809,7 @@ export function CandlestickChart({
     vwapCfg,
     interval,
     volumeCfg,
+    hidden,
     autoscaleProvider,
   ]);
 
@@ -832,7 +846,8 @@ export function CandlestickChart({
     const chart = chartRef.current;
     if (!candleSeries || !chart) return;
 
-    if (!volumeProfileCfg.enabled || data.length === 0) {
+    const vpHidden = hidden.includes(hiddenKey("volumeProfile"));
+    if (!volumeProfileCfg.enabled || vpHidden || data.length === 0) {
       if (volumeProfilePrimitiveRef.current) {
         try {
           candleSeries.detachPrimitive(volumeProfilePrimitiveRef.current);
@@ -887,7 +902,7 @@ export function CandlestickChart({
         /* chart already removed */
       }
     };
-  }, [volumeProfileCfg, data, theme, chartType, chartEpoch]);
+  }, [volumeProfileCfg, hidden, data, theme, chartType, chartEpoch]);
 
   // Render the drawn horizontal lines as native price lines on the candle
   // series — they span the full width, get a right-axis price label for free,
@@ -1317,37 +1332,6 @@ export function CandlestickChart({
     QUESTRADE_INTERVALS.find((r) => r.value === interval)?.label ?? interval;
   const isIntraday = INTRADAY_INTERVALS.has(interval);
 
-  // Legend for the price-pane overlays so combined lines are distinguishable
-  // (RSI lives in its own labelled pane, so it's omitted here).
-  const legend: { label: string; color: string; dashed?: boolean }[] = [];
-  if (smaCfg.enabled)
-    smaCfg.periods.forEach((p, idx) =>
-      legend.push({ label: `SMA ${p}`, color: maColorFor(smaCfg.colors, p, idx) })
-    );
-  if (emaCfg.enabled)
-    emaCfg.periods.forEach((p, idx) =>
-      legend.push({
-        label: `EMA ${p}`,
-        color: maColorFor(emaCfg.colors, p, idx),
-        dashed: true,
-      })
-    );
-  if (bollingerCfg.enabled)
-    legend.push({
-      label: `BB ${bollingerCfg.period}, ${bollingerCfg.mult}`,
-      color: bollingerCfg.color ?? INDICATOR_COLORS.bollinger,
-    });
-  if (donchianCfg.enabled)
-    legend.push({
-      label: `DC ${donchianCfg.period}`,
-      color: donchianCfg.color ?? INDICATOR_COLORS.donchian,
-    });
-  if (vwapCfg?.enabled)
-    legend.push({
-      label: vwapCfg.anchor === "session" ? "VWAP" : `VWAP ${vwapCfg.period}`,
-      color: vwapCfg.color ?? INDICATOR_COLORS.vwap,
-    });
-
   return (
     <div
       className={
@@ -1474,7 +1458,7 @@ export function CandlestickChart({
         </DropdownMenu>
 
         {/* Indicators (multi-select, configurable, persisted). */}
-        <IndicatorsMenu isIntraday={isIntraday} />
+        <IndicatorPickerDialog isIntraday={isIntraday} />
 
         {/* Drawing tools: arm a horizontal line (one click) or a trendline (two
             clicks), or clear everything. The badge counts both drawing types. */}
@@ -1785,24 +1769,7 @@ export function CandlestickChart({
           </button>
         )}
 
-        {!loading && !error && legend.length > 0 && (
-          <div className="absolute top-2 left-2 z-10 flex flex-col gap-0.5 rounded-md bg-bg-elevated/70 px-2 py-1 backdrop-blur">
-            {legend.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center gap-1.5 text-[11px] text-text-secondary"
-              >
-                <span
-                  className="inline-block w-3"
-                  style={{
-                    borderTop: `2px ${item.dashed ? "dashed" : "solid"} ${item.color}`,
-                  }}
-                />
-                {item.label}
-              </div>
-            ))}
-          </div>
-        )}
+        {!loading && !error && <ChartLegend isIntraday={isIntraday} />}
 
         {!loading && !error && data.length > 0 && (
           <div className="absolute top-2 right-20 z-10 flex items-center gap-1.5">

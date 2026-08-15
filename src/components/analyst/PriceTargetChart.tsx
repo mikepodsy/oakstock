@@ -1,11 +1,13 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import type { AnalystPriceTarget, HistoricalDataPoint } from "@/types";
 import {
   buildPriceTargetModel,
+  type PlottedPoint,
   type PriceTargetLayout,
 } from "@/utils/priceTargetModel";
+import { formatCurrency, formatDate } from "@/utils/formatters";
 
 interface PriceTargetChartProps {
   history: HistoricalDataPoint[];
@@ -18,21 +20,29 @@ interface PriceTargetChartProps {
 // ResizeObserver to keep in sync.
 const VB_W = 900;
 const VB_H = 340;
-const PAD_R = 92; // room for the price callouts down the right edge
+const PAD_L = 6;
+const PAD_R = 112; // room for the price callouts down the right edge
+const PAD_T = 18;
 const PAD_B = 34; // room for the year ticks
 
 const LAYOUT: PriceTargetLayout = {
-  padL: 6,
-  padT: 18,
-  plotW: VB_W - 6 - PAD_R,
-  plotH: VB_H - 18 - PAD_B,
+  padL: PAD_L,
+  padT: PAD_T,
+  plotW: VB_W - PAD_L - PAD_R,
+  plotH: VB_H - PAD_T - PAD_B,
   // 2y of history projects 1y forward, so the split holds whatever period of
   // history actually came back.
   forecastShare: 0.5,
-  labelGap: 19,
+  // At least the pill height, or nudged labels would overlap each other.
+  labelGap: 30,
 };
 
-const PILL_W = PAD_R - 12;
+const PILL_W = PAD_R - 14;
+const PILL_H = 26;
+
+// Hover readout box.
+const TIP_W = 150;
+const TIP_H = 44;
 
 export function PriceTargetChart({
   history,
@@ -40,11 +50,45 @@ export function PriceTargetChart({
   currentPrice,
 }: PriceTargetChartProps) {
   const gradientId = useId();
+  const upClipId = `${gradientId}-up`;
+  const downClipId = `${gradientId}-down`;
+
+  const [hover, setHover] = useState<PlottedPoint | null>(null);
 
   const model = useMemo(
     () => buildPriceTargetModel(history, target, currentPrice, LAYOUT),
     [history, target, currentPrice]
   );
+
+  const points = model?.points;
+  const anchorX = model?.anchorX;
+
+  const handleMove = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!points?.length || anchorX == null) return;
+
+      // The SVG is scaled to its container, so client pixels have to be mapped
+      // back into viewBox units before they mean anything.
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (!rect.width) return;
+      const vbX = ((e.clientX - rect.left) / rect.width) * VB_W;
+
+      // The forecast half has no observed prices to report.
+      if (vbX > anchorX + 4) {
+        setHover(null);
+        return;
+      }
+
+      let nearest = points[0];
+      for (const p of points) {
+        if (Math.abs(p.x - vbX) < Math.abs(nearest.x - vbX)) nearest = p;
+      }
+      setHover(nearest);
+    },
+    [points, anchorX]
+  );
+
+  const clearHover = useCallback(() => setHover(null), []);
 
   if (!model) {
     return (
@@ -54,12 +98,27 @@ export function PriceTargetChart({
     );
   }
 
+  // Sits to the right of the crosshair, flipping left when that would run past
+  // the plot's edge and under the callout pills.
+  const fitsRight = hover ? hover.x + 10 + TIP_W <= VB_W - PAD_R : true;
+  const tipX = !hover
+    ? 0
+    : fitsRight
+      ? hover.x + 10
+      : Math.max(PAD_L, hover.x - 10 - TIP_W);
+  const tipY = hover
+    ? Math.min(Math.max(PAD_T, hover.y - TIP_H - 12), model.baselineY - TIP_H)
+    : 0;
+
   return (
     <svg
       viewBox={`0 0 ${VB_W} ${VB_H}`}
-      className="w-full"
+      className="w-full touch-none"
       role="img"
       aria-label={`Price history and analyst target range, ${model.horizonLabel.toLowerCase()}`}
+      onPointerMove={handleMove}
+      onPointerLeave={clearHover}
+      onPointerCancel={clearHover}
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -74,20 +133,52 @@ export function PriceTargetChart({
             stopOpacity="0"
           />
         </linearGradient>
+
+        {/* Splitting the cone at the spot line by clipping, rather than by
+            computing the intersection, keeps it correct however the targets
+            straddle today's price — including entirely above or below it. */}
+        <clipPath id={upClipId}>
+          <rect
+            x={0}
+            y={PAD_T}
+            width={VB_W}
+            height={Math.max(0, model.spotY - PAD_T)}
+          />
+        </clipPath>
+        <clipPath id={downClipId}>
+          <rect
+            x={0}
+            y={model.spotY}
+            width={VB_W}
+            height={Math.max(0, model.baselineY - model.spotY)}
+          />
+        </clipPath>
       </defs>
 
       {/* Past / forecast split */}
       <line
         x1={model.anchorX}
-        y1={LAYOUT.padT}
+        y1={PAD_T}
         x2={model.anchorX}
         y2={model.baselineY}
         stroke="var(--border-primary)"
         strokeWidth="1"
       />
 
-      {/* The cone: high and low targets fanning out from today's price. */}
-      <path d={model.conePath} fill="var(--green-primary)" fillOpacity="0.14" />
+      {/* The cone: upside above today's price, downside below it. */}
+      <path
+        d={model.conePath}
+        fill="var(--green-primary)"
+        fillOpacity="0.14"
+        clipPath={`url(#${upClipId})`}
+      />
+      <path
+        d={model.conePath}
+        fill="var(--red-primary)"
+        fillOpacity="0.14"
+        clipPath={`url(#${downClipId})`}
+      />
+
       <line
         x1={model.anchorX}
         y1={model.anchorY}
@@ -100,7 +191,7 @@ export function PriceTargetChart({
 
       {/* Spot, carried across the forecast half so the callouts read against it */}
       <line
-        x1={LAYOUT.padL}
+        x1={PAD_L}
         y1={model.spotY}
         x2={model.endX}
         y2={model.spotY}
@@ -133,7 +224,7 @@ export function PriceTargetChart({
       ))}
 
       <text
-        x={(LAYOUT.padL + model.anchorX) / 2}
+        x={(PAD_L + model.anchorX) / 2}
         y={model.baselineY - 8}
         textAnchor="middle"
         fontSize="12"
@@ -174,21 +265,21 @@ export function PriceTargetChart({
               opacity="0.35"
             />
             <rect
-              x={model.endX + 6}
-              y={c.labelY - 10}
+              x={model.endX + 7}
+              y={c.labelY - PILL_H / 2}
               width={PILL_W}
-              height="20"
-              rx="5"
+              height={PILL_H}
+              rx="7"
               fill={c.solid ? color : "transparent"}
               stroke={c.solid ? "none" : color}
-              strokeWidth="1"
+              strokeWidth="1.25"
             />
             <text
-              x={model.endX + 6 + PILL_W / 2}
-              y={c.labelY + 4}
+              x={model.endX + 7 + PILL_W / 2}
+              y={c.labelY + 5}
               textAnchor="middle"
-              fontSize="12"
-              fontWeight="500"
+              fontSize="14"
+              fontWeight="600"
               fill={c.solid ? "var(--bg-primary)" : color}
             >
               {c.text}
@@ -196,6 +287,56 @@ export function PriceTargetChart({
           </g>
         );
       })}
+
+      {/* ── Hover crosshair ─────────────────────────────────────────────── */}
+      {hover && (
+        <g pointerEvents="none">
+          <line
+            x1={hover.x}
+            y1={PAD_T}
+            x2={hover.x}
+            y2={model.baselineY}
+            stroke="var(--text-tertiary)"
+            strokeWidth="1"
+            strokeDasharray="3,3"
+          />
+          <circle
+            cx={hover.x}
+            cy={hover.y}
+            r="4.5"
+            fill="var(--chart-line-primary)"
+            stroke="var(--bg-primary)"
+            strokeWidth="2"
+          />
+          <rect
+            x={tipX}
+            y={tipY}
+            width={TIP_W}
+            height={TIP_H}
+            rx="7"
+            fill="var(--bg-elevated)"
+            stroke="var(--border-primary)"
+            strokeWidth="1"
+          />
+          <text
+            x={tipX + 11}
+            y={tipY + 19}
+            fontSize="15"
+            fontWeight="600"
+            fill="var(--text-primary)"
+          >
+            {formatCurrency(hover.close)}
+          </text>
+          <text
+            x={tipX + 11}
+            y={tipY + 35}
+            fontSize="12"
+            fill="var(--text-tertiary)"
+          >
+            {formatDate(hover.date)}
+          </text>
+        </g>
+      )}
     </svg>
   );
 }

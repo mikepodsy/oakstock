@@ -109,6 +109,48 @@ describe("buildPriceTargetModel", () => {
     );
   });
 
+  describe("plotted points (hover hit-testing)", () => {
+    it("returns one point per usable close, in draw order", () => {
+      const m = buildPriceTargetModel(history(50, (i) => 100 + i), TARGET, 149, LAYOUT)!;
+      expect(m.points).toHaveLength(50);
+      for (let i = 1; i < m.points.length; i++) {
+        expect(m.points[i].x).toBeGreaterThan(m.points[i - 1].x);
+      }
+    });
+
+    it("puts the first point at the left edge and the last on the anchor", () => {
+      const m = buildPriceTargetModel(history(730, () => 300), TARGET, 300, LAYOUT)!;
+      expect(m.points[0].x).toBeCloseTo(LAYOUT.padL, 5);
+      expect(m.points[m.points.length - 1].x).toBeCloseTo(m.anchorX, 5);
+    });
+
+    it("carries the close and an ISO date for the readout", () => {
+      const m = buildPriceTargetModel(history(3, (i) => 100 + i), TARGET, 102, LAYOUT)!;
+      expect(m.points[0].close).toBe(100);
+      expect(m.points[0].date).toBe("2024-01-01");
+      expect(m.points[2].date).toBe("2024-01-03");
+    });
+
+    it("agrees with the drawn line, so the dot lands on it", () => {
+      const m = buildPriceTargetModel(history(5, (i) => 100 + i * 3), TARGET, 112, LAYOUT)!;
+      const last = m.points[m.points.length - 1];
+      expect(last.y).toBeCloseTo(m.anchorY, 5);
+      // And the path's final coordinate pair is that same point.
+      const coords = m.linePath.trim().split(/\s+/).slice(-2).map(Number);
+      expect(coords[0]).toBeCloseTo(last.x, 1);
+      expect(coords[1]).toBeCloseTo(last.y, 1);
+    });
+
+    it("excludes points that were filtered out of the series", () => {
+      const dirty = [
+        ...history(3, () => 100),
+        { date: "bad", close: 100 },
+      ] as HistoricalDataPoint[];
+      const m = buildPriceTargetModel(dirty, TARGET, 100, LAYOUT)!;
+      expect(m.points).toHaveLength(3);
+    });
+  });
+
   it("uses the last close when there is no live price", () => {
     const m = buildPriceTargetModel(history(730, () => 250), TARGET, null, LAYOUT)!;
     expect(m.callouts.find((c) => c.key === "spot")!.value).toBe(250);

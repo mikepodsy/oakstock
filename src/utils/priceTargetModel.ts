@@ -30,10 +30,21 @@ export interface PriceTargetCallout {
   positive: boolean;
 }
 
+/** A history point in viewBox space, for hit-testing the hover crosshair. */
+export interface PlottedPoint {
+  x: number;
+  y: number;
+  close: number;
+  /** ISO day, for the hover label. */
+  date: string;
+}
+
 export interface PriceTargetModel {
   linePath: string;
   areaPath: string;
   conePath: string;
+  /** History in draw order, left to right. */
+  points: PlottedPoint[];
   anchorX: number;
   anchorY: number;
   endX: number;
@@ -140,6 +151,12 @@ export function buildPriceTargetModel(
 
   return {
     linePath,
+    points: points.map((p) => ({
+      x: x(p.t),
+      y: y(p.close),
+      close: p.close,
+      date: new Date(p.t).toISOString().split("T")[0],
+    })),
     areaPath: `${linePath} L ${anchorX.toFixed(2)} ${baselineY.toFixed(2)} L ${padL.toFixed(2)} ${baselineY.toFixed(2)} Z`,
     // A triangle: each target is a straight line from today's price to a single
     // point one horizon out.

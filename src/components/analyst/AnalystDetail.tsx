@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft } from "lucide-react";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import type { AnalystRatingResult } from "@/hooks/useAnalystRating";
 import { AnalystForecast } from "./AnalystForecast";
 
@@ -24,9 +25,14 @@ export function AnalystDetail({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4">
-        <h2 className="font-display text-xl text-text-primary">
+        <h2 className="flex items-center gap-2.5 font-display text-xl text-text-primary">
+          <CompanyLogo
+            ticker={ticker}
+            className="h-7 w-7 rounded-md"
+            textClassName="text-[10px]"
+          />
           <span className="font-financial">{ticker}</span>
-          <span className="text-text-tertiary"> · Forecast</span>
+          <span className="text-text-tertiary">· Forecast</span>
         </h2>
         <button
           onClick={onBack}

@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { X } from "lucide-react";
 import type { QuoteData, WatchlistItem } from "@/types";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { formatPercent } from "@/utils/formatters";
 
 interface SymbolRowProps {
@@ -36,8 +37,17 @@ function SymbolRowInner({
           : "text-text-secondary hover:bg-bg-tertiary"
       }`}
     >
-      <span className="truncate font-financial font-medium text-text-primary">
-        {item.ticker}
+      {/* Logo and ticker share the grid's first column, so the Last/Chg/Chg%
+          columns stay aligned with the header row above. */}
+      <span className="flex min-w-0 items-center gap-2">
+        <CompanyLogo
+          ticker={item.ticker}
+          className="h-4 w-4 rounded-[3px]"
+          textClassName="text-[7px]"
+        />
+        <span className="truncate font-financial font-medium text-text-primary">
+          {item.ticker}
+        </span>
       </span>
 
       {quote ? (

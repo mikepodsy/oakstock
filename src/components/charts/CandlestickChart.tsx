@@ -1361,6 +1361,17 @@ export function CandlestickChart({
       <div
         className={`flex items-center gap-2 ${fillHeight && !fullscreen ? "mb-2 shrink-0" : "mb-3"}`}
       >
+        {/* Fullscreen renders its own larger logo alongside the company name
+            below, so this one would be a duplicate there. */}
+        {!fullscreen && (
+          <CompanyLogo
+            ticker={ticker}
+            website={website}
+            className="h-5 w-5 rounded"
+            textClassName="text-[9px]"
+          />
+        )}
+
         {!hideHeading && (
           <span className="text-sm font-medium text-text-primary">
             Price Chart

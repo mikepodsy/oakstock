@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, RefreshCw } from "lucide-react";
+import { CompanyLogo } from "@/components/shared/CompanyLogo";
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TechnicalRatingResult } from "@/hooks/useTechnicalRating";
@@ -114,9 +115,14 @@ export function TechnicalsDetail({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4">
-        <h2 className="font-display text-xl text-text-primary">
+        <h2 className="flex items-center gap-2.5 font-display text-xl text-text-primary">
+          <CompanyLogo
+            ticker={ticker}
+            className="h-7 w-7 rounded-md"
+            textClassName="text-[10px]"
+          />
           <span className="font-financial">{ticker}</span>
-          <span className="text-text-tertiary"> · Technicals</span>
+          <span className="text-text-tertiary">· Technicals</span>
         </h2>
         <button
           onClick={onBack}

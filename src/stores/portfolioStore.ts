@@ -53,6 +53,8 @@ function mapPortfolio(row: Record<string, unknown>): Portfolio {
     benchmark: row.benchmark as string,
     createdAt: row.created_at as string,
     holdings,
+    cashBalance: Number(row.cash_balance ?? 0),
+    cashCurrency: (row.cash_currency as "USD" | "CAD") ?? "USD",
   };
 }
 

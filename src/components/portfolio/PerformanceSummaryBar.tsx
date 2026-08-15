@@ -14,9 +14,14 @@ interface PerformanceData {
 export function PerformanceSummaryBar({
   data,
   loading,
+  cash = 0,
+  cashCurrency = "USD",
 }: {
   data: PerformanceData | null;
   loading: boolean;
+  /** Uninvested cash. Counts toward current value; never toward gain/loss. */
+  cash?: number;
+  cashCurrency?: "CAD" | "USD";
 }) {
   if (loading || !data) {
     return (
@@ -34,9 +39,19 @@ export function PerformanceSummaryBar({
   const stats = [
     {
       label: "Current Value",
-      value: formatCurrency(data.totalValue),
+      value: formatCurrency(data.totalValue + cash),
       color: "text-text-primary",
     },
+    // Gain/loss below stays holdings-only — cash can't gain or lose.
+    ...(cash > 0
+      ? [
+          {
+            label: "Cash",
+            value: formatCurrency(cash, cashCurrency),
+            color: "text-text-secondary",
+          },
+        ]
+      : []),
     {
       label: "Total Gain/Loss",
       value: formatCurrency(data.totalGainLoss),

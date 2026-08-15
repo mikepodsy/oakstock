@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { usePortfolioStore } from "@/stores/portfolioStore";
 import { useQuotes } from "@/hooks/useQuotes";
 import { usePortfolioHistory } from "@/hooks/usePortfolioHistory";
@@ -13,6 +13,7 @@ import {
 import { PerformanceSummaryBar } from "@/components/portfolio/PerformanceSummaryBar";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
 import { AddHoldingModal } from "@/components/portfolio/AddHoldingModal";
+import { AddCashModal } from "@/components/portfolio/AddCashModal";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { AllocationDonut } from "@/components/charts/AllocationDonut";
 import { SectorBreakdown } from "@/components/charts/SectorBreakdown";
@@ -22,7 +23,7 @@ import { DeletePortfolioDialog } from "@/components/dashboard/DeletePortfolioDia
 import { BenchmarkSelect } from "@/components/shared/BenchmarkSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, FolderOpen, ChevronDown } from "lucide-react";
+import { Plus, FolderOpen, ChevronDown, Wallet } from "lucide-react";
 
 export default function PortfolioPage() {
   const portfolios = usePortfolioStore((s) => s.portfolios);
@@ -32,21 +33,10 @@ export default function PortfolioPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
 
-  // Auto-select first portfolio
-  useEffect(() => {
-    if (portfolios.length === 0) {
-      setSelectedId(null);
-    } else if (!selectedId || !portfolios.find((p) => p.id === selectedId)) {
-      setSelectedId(portfolios[0].id);
-    }
-  }, [portfolios, selectedId]);
-
-  const portfolio = portfolios.find((p) => p.id === selectedId) ?? null;
-
-  // Sync name value when portfolio changes
-  useEffect(() => {
-    if (portfolio) setNameValue(portfolio.name);
-  }, [portfolio?.id, portfolio?.name]);
+  // selectedId only holds an explicit pick; the first portfolio is the default,
+  // and a pick that no longer exists falls back to it too.
+  const portfolio =
+    portfolios.find((p) => p.id === selectedId) ?? portfolios[0] ?? null;
 
   const tickers = useMemo(
     () => portfolio?.holdings.map((h) => h.ticker) ?? [],
@@ -63,10 +53,12 @@ export default function PortfolioPage() {
     [portfolio?.holdings, quotes]
   );
 
+  const cash = portfolio?.cashBalance ?? 0;
+
   const summary = useMemo(() => {
-    if (holdingsWithQuotes.length === 0) return null;
+    if (holdingsWithQuotes.length === 0 && cash === 0) return null;
     return portfolioTotals(holdingsWithQuotes);
-  }, [holdingsWithQuotes]);
+  }, [holdingsWithQuotes, cash]);
 
   const historyInputs = useMemo(
     () =>
@@ -170,7 +162,7 @@ export default function PortfolioPage() {
       <div className="flex items-center gap-4 mb-6">
         <div className="relative">
           <select
-            value={selectedId ?? ""}
+            value={portfolio?.id ?? ""}
             onChange={(e) => setSelectedId(e.target.value)}
             className="appearance-none rounded-lg border border-border-primary bg-bg-tertiary px-4 py-2 pr-8 text-sm font-medium text-text-primary outline-none cursor-pointer"
           >
@@ -207,7 +199,10 @@ export default function PortfolioPage() {
               ) : (
                 <h2
                   className="font-display text-2xl text-text-primary cursor-pointer hover:text-green-primary transition-colors"
-                  onClick={() => setEditingName(true)}
+                  onClick={() => {
+                    setNameValue(portfolio.name);
+                    setEditingName(true);
+                  }}
                   title="Click to edit"
                 >
                   {portfolio.name}
@@ -242,6 +237,16 @@ export default function PortfolioPage() {
                   Add Holding
                 </Button>
               </AddHoldingModal>
+              <AddCashModal
+                portfolioId={portfolio.id}
+                currentBalance={portfolio.cashBalance}
+                currency={portfolio.cashCurrency}
+              >
+                <Button size="sm" variant="outline">
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Add Cash
+                </Button>
+              </AddCashModal>
               <DeletePortfolioDialog
                 portfolioId={portfolio.id}
                 portfolioName={portfolio.name}
@@ -253,7 +258,12 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          <PerformanceSummaryBar data={summary} loading={loading} />
+          <PerformanceSummaryBar
+            data={summary}
+            loading={loading}
+            cash={cash}
+            cashCurrency={portfolio.cashCurrency}
+          />
 
           <PerformanceChart
             data={chartData}
@@ -286,7 +296,8 @@ export default function PortfolioPage() {
             <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
               <AllocationDonut
                 holdings={allocationData}
-                totalValue={summary?.totalValue ?? 0}
+                totalValue={(summary?.totalValue ?? 0) + cash}
+                cash={cash}
               />
             </div>
             <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">

@@ -15,12 +15,13 @@ import { PortfolioHeader } from "@/components/portfolio/PortfolioHeader";
 import { PerformanceSummaryBar } from "@/components/portfolio/PerformanceSummaryBar";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
 import { AddHoldingModal } from "@/components/portfolio/AddHoldingModal";
+import { AddCashModal } from "@/components/portfolio/AddCashModal";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { AllocationDonut } from "@/components/charts/AllocationDonut";
 import { SectorBreakdown } from "@/components/charts/SectorBreakdown";
 import { PortfolioMetricsCard } from "@/components/portfolio/PortfolioMetricsCard";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
 
 export default function PortfolioDetailPage() {
   const params = useParams();
@@ -47,10 +48,12 @@ export default function PortfolioDetailPage() {
     [portfolio?.holdings, quotes]
   );
 
+  const cash = portfolio?.cashBalance ?? 0;
+
   const summary = useMemo(() => {
-    if (holdingsWithQuotes.length === 0) return null;
+    if (holdingsWithQuotes.length === 0 && cash === 0) return null;
     return portfolioTotals(holdingsWithQuotes);
-  }, [holdingsWithQuotes]);
+  }, [holdingsWithQuotes, cash]);
 
   // Chart data inputs
   const historyInputs = useMemo(
@@ -118,7 +121,12 @@ export default function PortfolioDetailPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <PortfolioHeader portfolio={portfolio} />
-      <PerformanceSummaryBar data={summary} loading={loading} />
+      <PerformanceSummaryBar
+        data={summary}
+        loading={loading}
+        cash={cash}
+        cashCurrency={portfolio.cashCurrency}
+      />
 
       <PerformanceChart
         data={chartData}
@@ -132,15 +140,27 @@ export default function PortfolioDetailPage() {
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-display text-lg text-text-primary">Holdings</h2>
-        <AddHoldingModal
-          portfolioId={portfolio.id}
-          existingTickers={existingTickers}
-        >
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Holding
-          </Button>
-        </AddHoldingModal>
+        <div className="flex items-center gap-2">
+          <AddHoldingModal
+            portfolioId={portfolio.id}
+            existingTickers={existingTickers}
+          >
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Holding
+            </Button>
+          </AddHoldingModal>
+          <AddCashModal
+            portfolioId={portfolio.id}
+            currentBalance={portfolio.cashBalance}
+            currency={portfolio.cashCurrency}
+          >
+            <Button size="sm" variant="outline">
+              <Wallet className="h-4 w-4 mr-1" />
+              Add Cash
+            </Button>
+          </AddCashModal>
+        </div>
       </div>
 
       <HoldingsTable
@@ -157,7 +177,8 @@ export default function PortfolioDetailPage() {
         <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">
           <AllocationDonut
             holdings={allocationData}
-            totalValue={summary?.totalValue ?? 0}
+            totalValue={(summary?.totalValue ?? 0) + cash}
+            cash={cash}
           />
         </div>
         <div className="rounded-xl border border-border-primary bg-bg-secondary p-5">

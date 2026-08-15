@@ -6,6 +6,7 @@ import { PieSlice } from "@/components/charts/pie-slice";
 import { PieCenter } from "@/components/charts/pie-center";
 import type { PieData } from "@/components/charts/pie-context";
 import { CompanyLogo } from "@/components/shared/CompanyLogo";
+import { Wallet } from "lucide-react";
 
 const CHART_COLORS = [
   "#7c3aed", "#06b6d4", "#10b981", "#f43f5e", "#3b82f6",
@@ -21,28 +22,42 @@ const HOVER_OFFSET = 10;
 interface AllocationDonutProps {
   holdings: { ticker: string; name: string; website?: string; marketValue: number }[];
   totalValue: number;
+  /** Uninvested cash, drawn as its own slice. `totalValue` must already include it. */
+  cash?: number;
 }
 
 export function AllocationDonut({
   holdings,
   totalValue,
+  cash = 0,
 }: AllocationDonutProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const chartData = useMemo(
-    () =>
-      holdings
-        .filter((h) => h.marketValue > 0)
-        .map((h) => ({
-          ticker: h.ticker,
-          name: h.name,
-          website: h.website,
-          marketValue: h.marketValue,
-          pct: (h.marketValue / totalValue) * 100,
-        }))
-        .sort((a, b) => b.marketValue - a.marketValue),
-    [holdings, totalValue]
-  );
+  const chartData = useMemo(() => {
+    const items = holdings
+      .filter((h) => h.marketValue > 0)
+      .map((h) => ({
+        ticker: h.ticker,
+        name: h.name,
+        website: h.website as string | undefined,
+        marketValue: h.marketValue,
+        isCash: false,
+      }));
+
+    if (cash > 0) {
+      items.push({
+        ticker: "Cash",
+        name: "Uninvested cash",
+        website: undefined,
+        marketValue: cash,
+        isCash: true,
+      });
+    }
+
+    return items
+      .map((item) => ({ ...item, pct: (item.marketValue / totalValue) * 100 }))
+      .sort((a, b) => b.marketValue - a.marketValue);
+  }, [holdings, totalValue, cash]);
 
   // The center readout labels by ticker — the full name is too wide for the hole.
   const pieData = useMemo<PieData[]>(
@@ -55,7 +70,7 @@ export function AllocationDonut({
     [chartData]
   );
 
-  if (holdings.length === 0 || totalValue === 0) return null;
+  if (chartData.length === 0 || totalValue === 0) return null;
 
   return (
     <div>
@@ -95,7 +110,14 @@ export function AllocationDonut({
               }`}
             >
               <div className="flex-shrink-0 [&_img]:!w-7 [&_img]:!h-7 [&_img]:!rounded-md [&_div]:!w-7 [&_div]:!h-7 [&_div]:!rounded-md [&_div]:!text-xs">
-                <CompanyLogo ticker={item.ticker} website={item.website} />
+                {item.isCash ? (
+                  // Cash has no company behind it, so skip the logo lookup.
+                  <div className="w-7 h-7 rounded-md bg-bg-tertiary flex items-center justify-center">
+                    <Wallet className="h-4 w-4 text-text-secondary" />
+                  </div>
+                ) : (
+                  <CompanyLogo ticker={item.ticker} website={item.website} />
+                )}
               </div>
               <span
                 className="w-2 h-2 rounded-full flex-shrink-0"

@@ -6,6 +6,11 @@ export interface Portfolio {
   createdAt: string; // ISO date
   benchmark: string; // Ticker to benchmark against, e.g., "SPY", "XIU.TO"
   holdings: Holding[];
+  // Uninvested cash sitting in the account. Counts toward total value and the
+  // allocation donut, but never toward gain/loss — a dollar is always worth a
+  // dollar, so it has no cost basis to gain against.
+  cashBalance: number;
+  cashCurrency: "CAD" | "USD";
 }
 
 // ─── Holdings & Lots ─────────────────────────────────

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Wallet } from "lucide-react";
 import Link from "next/link";
 import type { Portfolio } from "@/types";
 import { usePortfolioStore } from "@/stores/portfolioStore";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DeletePortfolioDialog } from "@/components/dashboard/DeletePortfolioDialog";
 import { AddHoldingModal } from "./AddHoldingModal";
+import { AddCashModal } from "./AddCashModal";
 
 export function PortfolioHeader({ portfolio }: { portfolio: Portfolio }) {
   const updatePortfolio = usePortfolioStore((s) => s.updatePortfolio);
@@ -88,6 +89,16 @@ export function PortfolioHeader({ portfolio }: { portfolio: Portfolio }) {
               Add Holding
             </Button>
           </AddHoldingModal>
+          <AddCashModal
+            portfolioId={portfolio.id}
+            currentBalance={portfolio.cashBalance}
+            currency={portfolio.cashCurrency}
+          >
+            <Button size="sm" variant="outline">
+              <Wallet className="h-4 w-4 mr-1" />
+              Add Cash
+            </Button>
+          </AddCashModal>
           <DeletePortfolioDialog
             portfolioId={portfolio.id}
             portfolioName={portfolio.name}

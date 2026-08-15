@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { MarketIndicator, EconomicIndicatorData, EconomicTimeRange } from "@/types";
+import type {
+  MarketIndicator,
+  MarketInterval,
+  EconomicIndicatorData,
+  EconomicTimeRange,
+} from "@/types";
 import { fetchMarketData } from "@/services/economicService";
 
-export function useMarketData(symbol: MarketIndicator, range: EconomicTimeRange) {
+export function useMarketData(
+  symbol: MarketIndicator,
+  range: EconomicTimeRange,
+  interval?: MarketInterval
+) {
   const [data, setData] = useState<EconomicIndicatorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,14 +22,14 @@ export function useMarketData(symbol: MarketIndicator, range: EconomicTimeRange)
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchMarketData(symbol, range);
+      const result = await fetchMarketData(symbol, range, interval);
       setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch market data");
     } finally {
       setLoading(false);
     }
-  }, [symbol, range]);
+  }, [symbol, range, interval]);
 
   useEffect(() => {
     refetch();

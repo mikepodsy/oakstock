@@ -317,6 +317,9 @@ export interface SensitivityCell {
 // ─── Economic Indicators ─────────────────────────────
 export type EconomicIndicator = 'inflation' | 'unemployment' | 'oil' | 'tips' | 'fedrate';
 export type MarketIndicator = 'gold' | 'dxy' | 'sp500' | 'dowjones' | 'vix' | 'es' | 'nq' | 'rspSpy' | 'vixeqVix';
+
+/** Granularity of a market series. Only hourly-sourced symbols honour '1h'. */
+export type MarketInterval = '1d' | '1h';
 export type EconomicTimeRange = '1y' | '2y' | '5y' | '10y' | 'max';
 
 export interface EconomicDataPoint {

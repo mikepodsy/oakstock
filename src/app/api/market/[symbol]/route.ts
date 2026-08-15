@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { marketCache } from "@/lib/cache";
 import { downsample } from "@/lib/downsample";
+import { rollupToDaily } from "@/lib/dailyRollup";
 import type { MarketIndicator, EconomicIndicatorData, EconomicDataPoint } from "@/types";
 
 const yf = new YahooFinance();
@@ -12,11 +13,15 @@ type DerivedConfig = {
   op: "ratio" | "spread";
   name: string;
   unit: string;
-  // When set, the series is built from intraday bars over `lookbackDays` and
-  // the two tickers are aligned by hour bucket (used for indices such as
-  // ^VIXEQ that have no daily history on Yahoo, only recent intraday bars).
-  interval?: "1h";
-  lookbackDays?: number;
+  // When set, the series is built from hourly bars aligned by hour bucket
+  // (used for indices such as ^VIXEQ that have no daily history on Yahoo, only
+  // intraday bars). Daily points are then rolled up from those hourly closes.
+  source?: "1h";
+  // How far back hourly bars are available (Yahoo caps the 1h interval at ~730
+  // days) and how much of it the hourly view shows — a granularity that dense
+  // is unreadable, and heavy to ship, over the full window.
+  maxLookbackDays?: number;
+  hourlyLookbackDays?: number;
 };
 type SymbolConfig =
   | { ticker: string; name: string; unit: string }
@@ -37,8 +42,9 @@ const SYMBOL_CONFIG: Record<MarketIndicator, SymbolConfig> = {
     op: "spread",
     name: "VIXEQ − VIX (Dispersion)",
     unit: "Index",
-    interval: "1h",
-    lookbackDays: 5,
+    source: "1h",
+    maxLookbackDays: 725,
+    hourlyLookbackDays: 90,
   },
 };
 
@@ -111,9 +117,17 @@ export async function GET(
   }
 
   const range = request.nextUrl.searchParams.get("range") || "1y";
+  const granularity = request.nextUrl.searchParams.get("interval") || "1d";
   const config = SYMBOL_CONFIG[symbol as MarketIndicator];
 
-  const cacheKey = `${symbol}:${range}`;
+  if (granularity !== "1d" && granularity !== "1h") {
+    return NextResponse.json(
+      { error: `Invalid interval: ${granularity}. Must be one of: 1d, 1h` },
+      { status: 400 }
+    );
+  }
+
+  const cacheKey = `${symbol}:${range}:${granularity}`;
   const cached = marketCache.get(cacheKey);
   if (cached) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });
@@ -125,12 +139,18 @@ export async function GET(
     let data: EconomicDataPoint[];
     if (isDerived(config)) {
       // Derived two-ticker series: fetch both, align by shared key, combine.
-      // Intraday configs use recent hourly bars (aligned by hour bucket) for
-      // indices without daily history; daily configs align by calendar date.
-      const interval = config.interval ?? "1d";
-      const start = config.interval
-        ? new Date(Date.now() - (config.lookbackDays ?? 5) * 86_400_000)
-        : period1;
+      // Hourly-sourced configs align by hour bucket (for indices without daily
+      // history); the rest align by calendar date.
+      const interval = config.source ?? "1d";
+      let start = period1;
+      if (config.source === "1h") {
+        const requestedDays = (Date.now() - period1.getTime()) / 86_400_000;
+        const days =
+          granularity === "1h"
+            ? (config.hourlyLookbackDays ?? 90)
+            : Math.min(config.maxLookbackDays ?? 725, requestedDays);
+        start = new Date(Date.now() - days * 86_400_000);
+      }
       const [seriesA, seriesB] = await Promise.all([
         fetchSeries(config.a, start, interval),
         fetchSeries(config.b, start, interval),
@@ -146,6 +166,10 @@ export async function GET(
         }
         return acc;
       }, []);
+      // The hourly bars are the only source; daily points are their closes.
+      if (config.source === "1h" && granularity === "1d") {
+        data = rollupToDaily(data);
+      }
     } else {
       data = (await fetchSeries(config.ticker, period1)).map((p) => ({
         date: p.date,

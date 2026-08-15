@@ -11,7 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useMarketData } from "@/hooks/useMarketData";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -61,20 +61,29 @@ function classify(spread: number): Band {
   };
 }
 
+const TIMEFRAMES = [
+  { value: "1d", label: "Daily" },
+  { value: "1h", label: "Hourly" },
+] as const;
+
+type Timeframe = (typeof TIMEFRAMES)[number]["value"];
+
 function SpreadTooltip({
   active,
   payload,
   label,
+  timeframe,
 }: {
   active?: boolean;
   payload?: Array<{ value: number }>;
   label?: string;
+  timeframe: Timeframe;
 }) {
   if (!active || !payload?.length || !label) return null;
   return (
     <div className="rounded-lg border border-border-primary bg-bg-elevated p-3 shadow-lg">
       <p className="mb-1 text-xs text-text-secondary">
-        {format(new Date(label), "MMM d, h:mm a")}
+        {format(parseISO(label), timeframe === "1h" ? "MMM d, h:mm a" : "MMM d, yyyy")}
       </p>
       <p className="font-financial text-sm text-text-primary tabular-nums">
         {payload[0].value.toFixed(2)}
@@ -83,7 +92,13 @@ function SpreadTooltip({
   );
 }
 
-function SpreadChart({ data }: { data: EconomicDataPoint[] }) {
+function SpreadChart({
+  data,
+  timeframe,
+}: {
+  data: EconomicDataPoint[];
+  timeframe: Timeframe;
+}) {
   return (
     <ResponsiveContainer width="100%" height={340}>
       <LineChart data={data} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
@@ -91,7 +106,9 @@ function SpreadChart({ data }: { data: EconomicDataPoint[] }) {
         <XAxis
           dataKey="date"
           tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-          tickFormatter={(date: string) => format(new Date(date), "MMM d, h a")}
+          tickFormatter={(date: string) =>
+            format(parseISO(date), timeframe === "1h" ? "MMM d, h a" : "MMM d, yy")
+          }
           axisLine={false}
           tickLine={false}
           minTickGap={40}
@@ -103,7 +120,7 @@ function SpreadChart({ data }: { data: EconomicDataPoint[] }) {
           tickLine={false}
           width={50}
         />
-        <Tooltip content={<SpreadTooltip />} />
+        <Tooltip content={<SpreadTooltip timeframe={timeframe} />} />
         {/* Band boundaries, so the line can be read against the card's colour. */}
         <ReferenceLine
           y={YELLOW_THRESHOLD}
@@ -130,9 +147,45 @@ function SpreadChart({ data }: { data: EconomicDataPoint[] }) {
   );
 }
 
+function ChartFrame({
+  data,
+  loading,
+  timeframe,
+}: {
+  data: EconomicDataPoint[];
+  loading: boolean;
+  timeframe: Timeframe;
+}) {
+  if (loading && data.length === 0) {
+    return <Skeleton className="h-[340px] w-full rounded-lg" />;
+  }
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[340px] items-center justify-center">
+        <p className="text-sm text-text-secondary">No history available</p>
+      </div>
+    );
+  }
+  return <SpreadChart data={data} timeframe={timeframe} />;
+}
+
+/**
+ * Hourly view. Kept in its own component so the request only fires when the
+ * timeframe is actually selected, rather than on every card render.
+ */
+function HourlyChart() {
+  const { data, loading } = useMarketData("vixeqVix", "5y", "1h");
+  return (
+    <ChartFrame data={data?.data ?? []} loading={loading} timeframe="1h" />
+  );
+}
+
 export function DispersionCard() {
+  // Daily closes, rolled up server-side from the hourly bars that are the only
+  // source ^VIXEQ has. Goes back as far as Yahoo serves them (~2 years).
   const { data, loading } = useMarketData("vixeqVix", "5y");
   const [open, setOpen] = useState(false);
+  const [timeframe, setTimeframe] = useState<Timeframe>("1d");
   const spread = data?.currentValue ?? null;
   const change = data?.change ?? null;
   const history = data?.data ?? [];
@@ -180,21 +233,35 @@ export function DispersionCard() {
         {change !== null && (
           <p className="mt-1 text-xs text-text-tertiary tabular-nums">
             {change >= 0 ? "+" : ""}
-            {change.toFixed(2)} since prior bar
+            {change.toFixed(2)} since prior close
           </p>
         )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
+        <DialogHeader className="flex-row items-center justify-between pr-10">
           <DialogTitle>VIXEQ − VIX · Dispersion</DialogTitle>
-        </DialogHeader>
-        {history.length > 0 ? (
-          <SpreadChart data={history} />
-        ) : (
-          <div className="flex h-[340px] items-center justify-center">
-            <p className="text-sm text-text-secondary">No history available</p>
+          <div className="flex gap-0.5 rounded-lg bg-bg-tertiary p-0.5">
+            {TIMEFRAMES.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => setTimeframe(t.value)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs transition-colors",
+                  timeframe === t.value
+                    ? "bg-bg-secondary text-text-primary shadow-sm"
+                    : "text-text-tertiary hover:text-text-secondary"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
+        </DialogHeader>
+        {timeframe === "1h" ? (
+          <HourlyChart />
+        ) : (
+          <ChartFrame data={history} loading={loading} timeframe="1d" />
         )}
       </DialogContent>
     </Dialog>

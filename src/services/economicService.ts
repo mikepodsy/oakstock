@@ -1,6 +1,7 @@
 import type {
   EconomicIndicator,
   MarketIndicator,
+  MarketInterval,
   EconomicIndicatorData,
   EconomicTimeRange,
   TreasuryBundleData,
@@ -18,9 +19,11 @@ export async function fetchEconomicData(
 
 export async function fetchMarketData(
   symbol: MarketIndicator,
-  range: EconomicTimeRange
+  range: EconomicTimeRange,
+  interval?: MarketInterval
 ): Promise<EconomicIndicatorData> {
   const params = new URLSearchParams({ range });
+  if (interval) params.set("interval", interval);
   const res = await fetch(`/api/market/${symbol}?${params}`);
   if (!res.ok) throw new Error(`Failed to fetch ${symbol} data`);
   return res.json();

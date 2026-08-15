@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
           "recommendationTrend",
           "earningsTrend",
           "earnings",
+          "upgradeDowngradeHistory",
         ],
       },
       // Yahoo adds and drops fields without warning; a schema mismatch on one
@@ -108,6 +109,7 @@ export async function GET(request: NextRequest) {
     recommendationTrend: summary.recommendationTrend,
     earnings: summary.earnings,
     earningsTrend: summary.earningsTrend,
+    upgradeDowngradeHistory: summary.upgradeDowngradeHistory,
     annualEps:
       epsResult.status === "fulfilled"
         ? toAnnualEps(epsResult.value as AnnualRow[])

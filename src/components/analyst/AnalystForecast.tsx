@@ -154,7 +154,11 @@ export function AnalystForecast({
           </div>
 
           <div className="mt-4 border-t border-border-secondary pt-4">
-            <RatingDistribution distribution={data?.distribution ?? null} />
+            <RatingDistribution
+              distribution={data?.distribution ?? null}
+              firms={data?.firms}
+              currentPrice={data?.currentPrice}
+            />
           </div>
         </div>
       </div>

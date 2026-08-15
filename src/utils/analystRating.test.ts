@@ -101,6 +101,16 @@ describe("distributionRows", () => {
     expect(rows.map((r) => r.count)).toEqual([13, 44, 6, 0, 0]);
   });
 
+  it("exposes the bucket key, so firm-level rows can be matched to a bar", () => {
+    expect(rows.map((r) => r.key)).toEqual([
+      "strongBuy",
+      "buy",
+      "hold",
+      "sell",
+      "strongSell",
+    ]);
+  });
+
   it("returns an empty list for no coverage", () => {
     expect(distributionRows(null)).toEqual([]);
   });

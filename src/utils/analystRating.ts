@@ -8,6 +8,8 @@ import { ratingFromScore, type Rating } from "./rating";
 
 /** One bar in the recommendation breakdown. */
 export interface DistributionRow {
+  /** Bucket this row is for — matches AnalystFirmRating.bucket. */
+  key: keyof AnalystDistribution;
   label: string;
   count: number;
   /** 0…1 against the biggest bucket, for the bar's width. */
@@ -105,6 +107,7 @@ export function distributionRows(
   return BUCKETS.map((b) => {
     const count = dist[b.key] || 0;
     return {
+      key: b.key,
       label: b.label,
       count,
       fraction: max > 0 ? count / max : 0,

@@ -446,6 +446,19 @@ export interface EpsPeriod {
   estimate: number | null;
 }
 
+/** One firm's most recent published rating, with its price target. */
+export interface AnalystFirmRating {
+  firm: string;
+  /** The firm's own wording, e.g. "Overweight" — not every house says "Buy". */
+  grade: string;
+  bucket: keyof AnalystDistribution;
+  priceTarget: number | null;
+  /** ISO date of the note. */
+  date: string;
+  /** Yahoo's action code: up / down / init / main / reit. */
+  action: string | null;
+}
+
 export interface AnalystData {
   ticker: string;
   currency: string | null;
@@ -458,4 +471,10 @@ export interface AnalystData {
     annual: EpsPeriod[];
     quarterly: EpsPeriod[];
   };
+  /**
+   * Firm-level detail behind the distribution. Always a subset — Yahoo only
+   * publishes notes for a fraction of the analysts it counts, so these must
+   * never be presented as enumerating a bucket.
+   */
+  firms: AnalystFirmRating[];
 }

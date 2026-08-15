@@ -4,6 +4,7 @@ import type {
   AnalystPriceTarget,
   EpsPeriod,
 } from "@/types";
+import { buildFirmRatings, type RawGradeRow } from "./analystFirms";
 
 /**
  * Normalises Yahoo's analyst modules into the shape the UI wants.
@@ -51,6 +52,9 @@ export interface RawAnalystInput {
       endDate?: string | Date | null;
       earningsEstimate?: { avg?: number | null } | null;
     }[];
+  } | null;
+  upgradeDowngradeHistory?: {
+    history?: RawGradeRow[];
   } | null;
   /** Annual diluted EPS from the fundamentals time series, oldest first. */
   annualEps?: { year: number; eps: number | null }[];
@@ -230,5 +234,6 @@ export function buildAnalystData(
       annual: buildAnnualEps(raw.annualEps, estimates),
       quarterly: buildQuarterlyEps(raw.earnings, estimates),
     },
+    firms: buildFirmRatings(raw.upgradeDowngradeHistory?.history),
   };
 }

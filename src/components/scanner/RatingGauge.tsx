@@ -1,6 +1,6 @@
 "use client";
 
-import { ratingColor, ratingLabel, type Rating } from "@/utils/technicalRating";
+import { ratingColor, ratingLabel, type Rating } from "@/utils/rating";
 
 // Semicircular gauge: five fixed zones spanning a −1…1 score, all drawn in the
 // border colour except the one the needle is sitting in. Deliberately knows

@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, ListPlus, PanelRightClose, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { Watchlist, WatchlistItem } from "@/types";
+import type { AnalystRatingResult } from "@/hooks/useAnalystRating";
 import type { TechnicalRatingResult } from "@/hooks/useTechnicalRating";
+import { AnalystSummary } from "@/components/analyst/AnalystSummary";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useWatchlistStore } from "@/stores/watchlistStore";
 import { TickerSearch } from "@/components/search/TickerSearch";
@@ -23,10 +25,12 @@ interface SymbolListPanelProps {
   selectedTicker: string | null;
   loading: boolean;
   technicals: TechnicalRatingResult;
+  analysts: AnalystRatingResult;
   onSelectWatchlist: (id: string) => void;
   onSelectTicker: (ticker: string) => void;
   onCollapse: () => void;
   onOpenTechnicals: () => void;
+  onOpenAnalysts: () => void;
 }
 
 export function SymbolListPanel({
@@ -37,10 +41,12 @@ export function SymbolListPanel({
   selectedTicker,
   loading,
   technicals,
+  analysts,
   onSelectWatchlist,
   onSelectTicker,
   onCollapse,
   onOpenTechnicals,
+  onOpenAnalysts,
 }: SymbolListPanelProps) {
   const addItem = useWatchlistStore((s) => s.addItem);
   const removeItem = useWatchlistStore((s) => s.removeItem);
@@ -213,9 +219,15 @@ export function SymbolListPanel({
         </>
       )}
 
-      {/* Pinned below the list, which keeps its own scroll above. */}
+      {/* Pinned below the list, which keeps its own scroll above. Two stacked
+          gauges are taller than a short window can spare, so the pair gets its
+          own scroll and is capped at half the panel — the ticker list always
+          keeps the other half. */}
       {selectedTicker && (
-        <TechnicalsSummary {...technicals} onOpenDetail={onOpenTechnicals} />
+        <div className="max-h-[50%] shrink-0 overflow-y-auto border-t border-border-primary">
+          <TechnicalsSummary {...technicals} onOpenDetail={onOpenTechnicals} />
+          <AnalystSummary {...analysts} onOpenDetail={onOpenAnalysts} />
+        </div>
       )}
     </aside>
   );

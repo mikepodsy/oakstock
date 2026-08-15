@@ -416,3 +416,46 @@ export interface CotReport {
   // null if the legacy dataset had no match / failed to load for this instrument.
   legacy: CotGroupSet | null;
 }
+
+// ── Analyst ratings & forecasts ──────────────────────────────────────────────
+// Sell-side consensus from Yahoo. Every field is nullable: coverage varies a
+// lot by symbol, and ETFs / indices have none of it at all.
+
+/** Count of analysts at each recommendation, newest monthly snapshot. */
+export interface AnalystDistribution {
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+}
+
+export interface AnalystPriceTarget {
+  mean: number;
+  median: number | null;
+  high: number;
+  low: number;
+  /** Analysts contributing a price target — not the same as the rating count. */
+  analystCount: number | null;
+}
+
+/** One bar in the EPS chart. `actual` null = not yet reported (a forecast). */
+export interface EpsPeriod {
+  label: string;
+  actual: number | null;
+  estimate: number | null;
+}
+
+export interface AnalystData {
+  ticker: string;
+  currency: string | null;
+  currentPrice: number | null;
+  /** Yahoo's 1 (strong buy) … 5 (strong sell) consensus mean. */
+  consensusMean: number | null;
+  distribution: AnalystDistribution | null;
+  target: AnalystPriceTarget | null;
+  eps: {
+    annual: EpsPeriod[];
+    quarterly: EpsPeriod[];
+  };
+}

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CandlestickChart as CandlestickIcon, PanelRightOpen } from "lucide-react";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
+import { AnalystDetail } from "@/components/analyst/AnalystDetail";
+import { useAnalystRating } from "@/hooks/useAnalystRating";
 import { useTechnicalRating } from "@/hooks/useTechnicalRating";
 import { useWatchlistStore } from "@/stores/watchlistStore";
 import {
@@ -46,7 +48,7 @@ export function ScannerWorkspace() {
 
   // Transient drill-down, deliberately not persisted: landing on a technicals
   // table after a reload instead of the chart would be surprising.
-  const [view, setView] = useState<"chart" | "technicals">("chart");
+  const [view, setView] = useState<"chart" | "technicals" | "analysts">("chart");
 
   const containerRef = useRef<HTMLDivElement>(null);
   // Non-null only while a resize drag is in flight. Rendering `dragWidth ??
@@ -63,9 +65,11 @@ export function ScannerWorkspace() {
   const chartInterval = hydrated ? interval : DEFAULT_INTERVAL;
   const chartTypeValue = hydrated ? chartType : DEFAULT_CHART_TYPE;
 
-  // Fetched once here and handed to both the panel widget and the detail view,
-  // so opening the drill-down doesn't fire a second request.
+  // Both fetched once here and handed to the panel widgets and the detail
+  // views, so opening a drill-down doesn't fire a second request. The analyst
+  // rating takes no interval — consensus doesn't change with candle size.
   const technicals = useTechnicalRating(ticker, chartInterval);
+  const analysts = useAnalystRating(ticker);
 
   // Every user-driven symbol change comes back to the chart — arrowing down the
   // list shouldn't leave you reading a technicals table you didn't ask for.
@@ -225,6 +229,12 @@ export function ScannerWorkspace() {
             onIntervalChange={setScannerInterval}
             onBack={() => setView("chart")}
           />
+        ) : view === "analysts" ? (
+          <AnalystDetail
+            {...analysts}
+            ticker={ticker}
+            onBack={() => setView("chart")}
+          />
         ) : (
           <CandlestickChart
             ticker={ticker}
@@ -266,10 +276,12 @@ export function ScannerWorkspace() {
           selectedTicker={ticker}
           loading={loading || !initialized}
           technicals={technicals}
+          analysts={analysts}
           onSelectWatchlist={setActiveWatchlistId}
           onSelectTicker={selectTicker}
           onCollapse={togglePanel}
           onOpenTechnicals={() => setView("technicals")}
+          onOpenAnalysts={() => setView("analysts")}
         />
       )}
     </div>

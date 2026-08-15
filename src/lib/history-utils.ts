@@ -21,6 +21,8 @@ export function getPeriodStartDate(period: string): Date {
       return subYears(now, 5);
     case "ytd":
       return new Date(now.getFullYear(), 0, 1);
+    case "2y":
+      return subYears(now, 2);
     case "3y":
       return subYears(now, 3);
     case "max":

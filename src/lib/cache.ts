@@ -80,3 +80,6 @@ export const optionChainCache = getOrCreateCache<unknown>("option-chain", 60);
 // Assembled volatility dashboard (IV/HV history + term structure + skew).
 // Keyed TICKER; 30-min TTL — history is daily, term/skew tolerate slight lag.
 export const volatilityCache = getOrCreateCache<unknown>("volatility", 1800);
+// Analyst consensus, price targets and EPS estimates. Keyed TICKER; 30-min TTL
+// — sell-side revisions land daily at most, so this is generous but harmless.
+export const analystCache = getOrCreateCache<unknown>("analyst", 1800);

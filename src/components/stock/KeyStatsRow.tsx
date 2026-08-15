@@ -1,7 +1,6 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatCompactNumber } from "@/utils/formatters";
 import type { QuoteData, FinancialData } from "@/types";
 
@@ -20,13 +19,6 @@ function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
       </p>
     </div>
   );
-}
-
-function getRatingColor(rating: string): string {
-  const lower = rating.toLowerCase();
-  if (lower.includes("buy")) return "bg-green-muted text-green-primary";
-  if (lower.includes("hold")) return "bg-yellow-500/10 text-yellow-500";
-  return "bg-red-muted text-red-primary";
 }
 
 export function KeyStatsRow({ quote, financials, loading }: KeyStatsRowProps) {
@@ -90,14 +82,14 @@ export function KeyStatsRow({ quote, financials, loading }: KeyStatsRowProps) {
             : null
         }
       />
+      {/* The consensus verdict itself now has a gauge in the Forecast section
+          below, so this slot carries the number that isn't shown there. */}
       <StatCard
-        label="Analyst"
+        label="Price Target"
         value={
-          financials?.analystRating ? (
-            <Badge className={getRatingColor(financials.analystRating)}>
-              {financials.analystRating}
-            </Badge>
-          ) : null
+          financials?.targetPrice != null
+            ? formatCurrency(financials.targetPrice)
+            : null
         }
       />
     </div>

@@ -30,7 +30,13 @@ import {
 } from "./technicalIndicators";
 
 export type Vote = "buy" | "sell" | "neutral";
-export type Rating = "strongSell" | "sell" | "neutral" | "buy" | "strongBuy";
+
+// The verdict scale itself is shared with the analyst rating, so it lives in
+// its own module. Re-exported here because every existing caller imports it
+// from this file. (`export … from` alone wouldn't bind ratingFromScore locally,
+// and this file calls it.)
+import { ratingFromScore, type Rating } from "./rating";
+export { ratingColor, ratingFromScore, ratingLabel, type Rating } from "./rating";
 
 export interface IndicatorReading {
   name: string;
@@ -64,35 +70,11 @@ export interface TechnicalRating {
   };
 }
 
-const RATING_LABEL: Record<Rating, string> = {
-  strongSell: "Strong sell",
-  sell: "Sell",
-  neutral: "Neutral",
-  buy: "Buy",
-  strongBuy: "Strong buy",
-};
-
-const RATING_COLOR: Record<Rating, string> = {
-  strongSell: "var(--red-primary)",
-  sell: "var(--red-primary)",
-  neutral: "var(--text-tertiary)",
-  buy: "var(--green-primary)",
-  strongBuy: "var(--green-primary)",
-};
-
 const VOTE_COLOR: Record<Vote, string> = {
   buy: "var(--green-primary)",
   sell: "var(--red-primary)",
   neutral: "var(--text-tertiary)",
 };
-
-export function ratingLabel(rating: Rating): string {
-  return RATING_LABEL[rating];
-}
-
-export function ratingColor(rating: Rating): string {
-  return RATING_COLOR[rating];
-}
 
 export function voteLabel(vote: Vote): string {
   return vote === "buy" ? "Buy" : vote === "sell" ? "Sell" : "Neutral";
@@ -100,18 +82,6 @@ export function voteLabel(vote: Vote): string {
 
 export function voteColor(vote: Vote): string {
   return VOTE_COLOR[vote];
-}
-
-/**
- * TradingView's bands. The edges belong to the calmer verdict: −0.5 is Sell
- * (not Strong sell), ±0.1 are Neutral, 0.5 is Buy.
- */
-export function ratingFromScore(score: number): Rating {
-  if (score < -0.5) return "strongSell";
-  if (score < -0.1) return "sell";
-  if (score <= 0.1) return "neutral";
-  if (score <= 0.5) return "buy";
-  return "strongBuy";
 }
 
 /** Latest value of a series, or `back` points from the end. */

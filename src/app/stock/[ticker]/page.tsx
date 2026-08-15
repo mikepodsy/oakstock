@@ -14,6 +14,7 @@ import { FinancialsSummaryTable } from "@/components/stock/FinancialsSummaryTabl
 import { CompanyDescription } from "@/components/stock/CompanyDescription";
 import { InsiderTradingSection } from "@/components/stock/InsiderTradingSection";
 import { SentimentSection } from "@/components/stock/SentimentSection";
+import { AnalystSection } from "@/components/analyst/AnalystSection";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StockDetailPage() {
@@ -144,6 +145,8 @@ export default function StockDetailPage() {
             financials={financials}
             loading={financialsLoading}
           />
+
+          <AnalystSection ticker={ticker} />
 
           {fundamentalsLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

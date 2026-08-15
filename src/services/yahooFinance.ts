@@ -1,4 +1,4 @@
-import type { QuoteData, HistoricalDataPoint, FinancialData, FundamentalsData, BatchFinancialData } from "@/types";
+import type { QuoteData, HistoricalDataPoint, FinancialData, FundamentalsData, BatchFinancialData, AnalystData } from "@/types";
 import type { EtfHoldingsResult } from "@/lib/edgar/nport";
 
 export async function fetchQuote(ticker: string): Promise<QuoteData> {
@@ -102,5 +102,11 @@ export async function fetchBatchFinancials(tickers: string[]): Promise<BatchFina
     `/api/financials/batch?tickers=${tickers.map(encodeURIComponent).join(",")}`
   );
   if (!res.ok) throw new Error("Failed to fetch batch financials");
+  return res.json();
+}
+
+export async function fetchAnalyst(ticker: string): Promise<AnalystData> {
+  const res = await fetch(`/api/analyst?ticker=${encodeURIComponent(ticker)}`);
+  if (!res.ok) throw new Error(`Failed to fetch analyst data for ${ticker}`);
   return res.json();
 }

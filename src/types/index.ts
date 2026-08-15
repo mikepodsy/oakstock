@@ -446,6 +446,17 @@ export interface EpsPeriod {
   estimate: number | null;
 }
 
+/** One reported quarter measured against the consensus it was held to. */
+export interface EarningsSurprise {
+  /** Fiscal period, e.g. `3Q2025`. */
+  label: string;
+  /** ISO announcement date, when the source gives one. */
+  reportDate: string | null;
+  /** null until the quarter is reported. */
+  actual: number | null;
+  estimate: number | null;
+}
+
 /** One bar in the free cash flow chart, in the filer's reporting currency. */
 export interface CashFlowPeriod {
   label: string;
@@ -484,6 +495,8 @@ export interface AnalystData {
     annual: CashFlowPeriod[];
     quarterly: CashFlowPeriod[];
   };
+  /** Beat/miss history, oldest first. Far deeper than the EPS series. */
+  earningsSurprises: EarningsSurprise[];
   /**
    * Firm-level detail behind the distribution. Always a subset — Yahoo only
    * publishes notes for a fraction of the analysts it counts, so these must

@@ -136,6 +136,7 @@ export function EpsChart({ annual, quarterly }: EpsChartProps) {
                   value: fmtEps(Number(point[key])),
                 }))
             }
+            formatTitle={formatFiscalPeriod}
             showDatePill={false}
           />
         </BarChart>

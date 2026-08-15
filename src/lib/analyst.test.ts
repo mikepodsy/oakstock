@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildAnalystData,
   buildCashFlow,
+  buildEarningsSurprises,
   quarterLabel,
   type RawAnalystInput,
 } from "./analyst";
@@ -312,6 +313,115 @@ describe("buildAnalystData", () => {
       expect(annual).toHaveLength(10);
       expect(annual[0].label).toBe("2016");
       expect(quarterly).toHaveLength(12);
+    });
+  });
+
+  describe("earnings surprises", () => {
+    /** Report dates as FMP gives them, newest first. */
+    const fmpRows = [
+      { date: "2026-07-30", epsActual: 2.02, epsEstimated: 1.89 },
+      { date: "2026-04-30", epsActual: 2.01, epsEstimated: 1.95 },
+      { date: "2026-01-29", epsActual: 2.85, epsEstimated: 2.67 },
+      { date: "2025-10-30", epsActual: 1.85, epsEstimated: 1.73 },
+    ];
+
+    it("keys by announcement date, oldest first", () => {
+      const rows = buildEarningsSurprises(fmpRows, []);
+
+      expect(rows.map((r) => r.label)).toEqual([
+        "2025-10-30",
+        "2026-01-29",
+        "2026-04-30",
+        "2026-07-30",
+      ]);
+      expect(rows[0]).toEqual({
+        label: "2025-10-30",
+        reportDate: "2025-10-30",
+        actual: 1.85,
+        estimate: 1.73,
+      });
+    });
+
+    it("keeps two reports a filer squeezed into one quarter", () => {
+      // Lucid reports ~55 days after period end, so guessing the fiscal
+      // quarter from the report date used to collapse these into one band.
+      const rows = buildEarningsSurprises(
+        [
+          { date: "2026-05-05", epsActual: -3.46, epsEstimated: -2.72 },
+          { date: "2026-02-24", epsActual: -3.62, epsEstimated: -2.49 },
+        ],
+        []
+      );
+
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.actual)).toEqual([-3.62, -3.46]);
+    });
+
+    it("keeps an upcoming quarter that has an estimate but no result", () => {
+      const rows = buildEarningsSurprises(
+        [{ date: "2026-10-29", epsActual: null, epsEstimated: 1.98 }, ...fmpRows],
+        []
+      );
+
+      expect(rows).toHaveLength(5);
+      expect(rows[4]).toMatchObject({
+        label: "2026-10-29",
+        actual: null,
+        estimate: 1.98,
+      });
+    });
+
+    it("drops rows with no consensus to score the result against", () => {
+      const rows = buildEarningsSurprises(
+        [
+          // A date with nothing behind it yet.
+          { date: "2027-01-28", epsActual: null, epsEstimated: null },
+          // Pre-coverage years of a recent listing: a result nobody forecast,
+          // often at a per-share scale that dwarfs everything since.
+          { date: "2021-05-10", epsActual: -29.4, epsEstimated: null },
+          ...fmpRows,
+        ],
+        []
+      );
+
+      expect(rows).toHaveLength(4);
+      expect(rows.every((r) => r.estimate != null)).toBe(true);
+    });
+
+    it("keeps only the most recent quarters", () => {
+      const rows = buildEarningsSurprises(
+        Array.from({ length: 60 }, (_, i) => ({
+          date: new Date(Date.UTC(2000, i * 3, 15)).toISOString().split("T")[0],
+          epsActual: i,
+          epsEstimated: i,
+        })),
+        []
+      );
+
+      expect(rows).toHaveLength(40);
+    });
+
+    it("falls back to the Yahoo quarters when the deep history is missing", () => {
+      const d = buildAnalystData("GOOG", googInput());
+
+      expect(d.earningsSurprises).toEqual(
+        d.eps.quarterly.map((p) => ({
+          label: p.label,
+          reportDate: null,
+          actual: p.actual,
+          estimate: p.estimate,
+        }))
+      );
+    });
+
+    it("prefers the deep history over the Yahoo quarters", () => {
+      const d = buildAnalystData("AAPL", {
+        ...googInput(),
+        earningsSurprises: fmpRows,
+      });
+
+      expect(d.earningsSurprises).toHaveLength(4);
+      expect(d.earningsSurprises[0].reportDate).toBe("2025-10-30");
     });
   });
 

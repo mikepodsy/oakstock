@@ -5,6 +5,7 @@ import {
   buildAnalystData,
   type RawAnalystInput,
   type RawCashFlowRow,
+  type RawEarningsSurpriseRow,
 } from "@/lib/analyst";
 import type { AnalystData } from "@/types";
 
@@ -23,6 +24,11 @@ const EPS_HISTORY_START = "2015-01-01";
  * most away costs a slower response on every uncached symbol.
  */
 const QUARTERLY_HISTORY_YEARS = 4;
+
+const FMP_BASE = "https://financialmodelingprep.com/stable";
+
+/** Depth is a nice-to-have — don't hold the whole panel up for it. */
+const FMP_TIMEOUT_MS = 8000;
 
 /** The fields of a `fundamentalsTimeSeries` row this route reads. */
 type FundamentalsRow = {
@@ -93,6 +99,39 @@ function toAnnualEps(rows: FundamentalsRow[]): { year: number; eps: number | nul
  * Both are final: retrying returns the same thing. Matched on the message
  * because the library throws a plain Error with no code to switch on.
  */
+/**
+ * Decades of quarterly beat/miss history from FMP, which Yahoo caps at four
+ * quarters in every module that carries it.
+ *
+ * Never throws: the chart falls back to Yahoo's four quarters when this comes
+ * back empty, so a missing key or a symbol FMP doesn't cover costs depth, not
+ * the card. `limit` is deliberately omitted — this plan rejects any value
+ * above 5, while the unparameterised call returns the full history.
+ */
+async function fetchEarningsSurprises(
+  ticker: string
+): Promise<RawEarningsSurpriseRow[]> {
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const res = await fetch(
+      `${FMP_BASE}/earnings?symbol=${encodeURIComponent(ticker)}&apikey=${apiKey}`,
+      { signal: AbortSignal.timeout(FMP_TIMEOUT_MS) }
+    );
+    if (!res.ok) return [];
+
+    const raw: unknown = await res.json();
+    return Array.isArray(raw) ? (raw as RawEarningsSurpriseRow[]) : [];
+  } catch (err) {
+    console.warn(
+      `[api/analyst] earnings history fetch failed for ${ticker}:`,
+      err instanceof Error ? err.message : err
+    );
+    return [];
+  }
+}
+
 function isDefinitiveNoData(reason: unknown): boolean {
   const message = reason instanceof Error ? reason.message : String(reason);
   return /no fundamentals data found|quote not found/i.test(message);
@@ -118,6 +157,9 @@ export async function GET(request: NextRequest) {
   quarterlyStart.setUTCFullYear(
     quarterlyStart.getUTCFullYear() - QUARTERLY_HISTORY_YEARS
   );
+
+  // Kicked off before the await below so it runs alongside the Yahoo calls.
+  const surprisesPromise = fetchEarningsSurprises(ticker);
 
   // Settled, not all: the fundamentals history fails outright for ETFs and most
   // non-US listings, and that shouldn't cost us the rating and price target.
@@ -160,6 +202,7 @@ export async function GET(request: NextRequest) {
     quarterlyResult.status === "fulfilled"
       ? (quarterlyResult.value as FundamentalsRow[])
       : [];
+  const surpriseRows = await surprisesPromise;
 
   if (summaryResult.status === "rejected") {
     // A definitive "nothing here" is data, not a failure. Serving it as an
@@ -187,6 +230,7 @@ export async function GET(request: NextRequest) {
       annual: toCashFlowRows(annualRows),
       quarterly: toCashFlowRows(quarterlyRows),
     },
+    earningsSurprises: surpriseRows,
   });
 
   analystCache.set(ticker, data);

@@ -82,6 +82,13 @@ export interface ChartTooltipProps {
   indicatorFadeLength?: number;
   /** Per-chart override for the floating-panel spring. */
   boxSpringConfig?: SpringConfig;
+  /**
+   * LOCAL ADDITION (not in @bklit/chart-tooltip): render the panel heading
+   * from the category value on a bar chart. Pairs with `<BarXAxis formatLabel>`
+   * — without it the tooltip shows the raw data key while the axis beneath it
+   * shows the formatted one.
+   */
+  formatTitle?: (value: string) => string;
   /** Inline styles for the tooltip panel (background, blur, etc.). */
   panelStyle?: React.CSSProperties;
   /**
@@ -118,6 +125,7 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
   indicatorFadeEdges,
   indicatorFadeLength,
   boxSpringConfig,
+  formatTitle,
   panelStyle,
   backgroundColor,
 }: ChartTooltipInnerProps) {
@@ -246,11 +254,12 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
     }
     // For bar charts (horizontal or vertical), use the category name
     if (barXAccessor) {
-      return barXAccessor(tooltipData.point);
+      const category = barXAccessor(tooltipData.point);
+      return formatTitle ? formatTitle(category) : category;
     }
     // For line/area charts, use the date
     return weekdayDateFmt.format(xAccessor(tooltipData.point));
-  }, [tooltipData, barXAccessor, xAccessor]);
+  }, [tooltipData, barXAccessor, xAccessor, formatTitle]);
 
   const tooltipContent = (
     <>

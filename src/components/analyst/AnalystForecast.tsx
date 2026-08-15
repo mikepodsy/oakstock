@@ -188,7 +188,7 @@ export function AnalystForecast({
               />
             )}
           </div>
-          <EarningsSurpriseChart quarterly={data.eps.quarterly} />
+          <EarningsSurpriseChart surprises={data.earningsSurprises} />
         </div>
       )}
     </div>

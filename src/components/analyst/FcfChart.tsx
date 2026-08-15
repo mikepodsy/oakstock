@@ -111,7 +111,7 @@ export function FcfChart({ annual, quarterly, currency }: FcfChartProps) {
               const out = [
                 {
                   color: fcf < 0 ? NEGATIVE_COLOR : POSITIVE_COLOR,
-                  label: `FCF · ${formatFiscalPeriod(String(point.label))}`,
+                  label: "Free cash flow",
                   value: fmtMoney(fcf),
                 },
               ];
@@ -133,6 +133,7 @@ export function FcfChart({ annual, quarterly, currency }: FcfChartProps) {
               }
               return out;
             }}
+            formatTitle={formatFiscalPeriod}
             showDatePill={false}
           />
         </BarChart>

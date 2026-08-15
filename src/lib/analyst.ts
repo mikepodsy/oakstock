@@ -3,6 +3,7 @@ import type {
   AnalystDistribution,
   AnalystPriceTarget,
   CashFlowPeriod,
+  EarningsSurprise,
   EpsPeriod,
 } from "@/types";
 import { buildFirmRatings, type RawGradeRow } from "./analystFirms";
@@ -64,6 +65,16 @@ export interface RawAnalystInput {
     annual?: RawCashFlowRow[];
     quarterly?: RawCashFlowRow[];
   };
+  /** Deep beat/miss history, either order. Optional — Yahoo backs it up. */
+  earningsSurprises?: RawEarningsSurpriseRow[];
+}
+
+/** One row of FMP's per-symbol earnings history. */
+export interface RawEarningsSurpriseRow {
+  /** Announcement date, not the period end. */
+  date: string;
+  epsActual?: number | null;
+  epsEstimated?: number | null;
 }
 
 /** One period of the cash flow statement, straight off the time series. */
@@ -274,12 +285,70 @@ export function buildCashFlow(
     .slice(-CASH_FLOW_LIMIT[granularity]);
 }
 
+/**
+ * Quarters of beat/miss history kept — 10 years, which is past the point
+ * anyone reads a dot chart and well past what any free source publishes.
+ */
+const SURPRISE_LIMIT = 40;
+
+/**
+ * Beat/miss history, oldest first.
+ *
+ * Keyed by announcement date rather than fiscal quarter, because the source
+ * gives the announcement and the two can't be bridged reliably: NVDA reports
+ * 24 days after its quarter ends and Lucid 55, so any fixed offset from report
+ * date back to period end mislabels one of them — and two reports landing on
+ * the same guessed quarter silently drop one. The axis says when the result
+ * was published, which is a fact the data actually carries.
+ *
+ * `fallback` is the Yahoo quarterly EPS series, used whole when the deep
+ * history is missing — no FMP key configured, a symbol it doesn't cover, a
+ * failed request. Four quarters beats an empty card. Those rows are already
+ * keyed by fiscal quarter, so they keep those labels.
+ */
+export function buildEarningsSurprises(
+  rows: RawEarningsSurpriseRow[] | undefined,
+  fallback: EpsPeriod[]
+): EarningsSurprise[] {
+  const byDate = new Map<string, EarningsSurprise>();
+
+  for (const row of rows ?? []) {
+    const reported = toDate(row.date);
+    const actual = num(row.epsActual);
+    const estimate = num(row.epsEstimated);
+    if (!reported) continue;
+
+    // No consensus means nothing to beat or miss. Dropping these isn't just
+    // tidiness: the pre-coverage years of a recent listing carry wild
+    // per-share numbers that flatten every scored quarter against the axis.
+    if (estimate == null) continue;
+
+    const iso = reported.toISOString().split("T")[0];
+    byDate.set(iso, { label: iso, reportDate: iso, actual, estimate });
+  }
+
+  if (byDate.size === 0) {
+    return fallback.map((p) => ({
+      label: p.label,
+      reportDate: null,
+      actual: p.actual,
+      estimate: p.estimate,
+    }));
+  }
+
+  // ISO dates sort lexicographically, which is why they're kept as strings.
+  return [...byDate.values()]
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .slice(-SURPRISE_LIMIT);
+}
+
 export function buildAnalystData(
   ticker: string,
   raw: RawAnalystInput
 ): AnalystData {
   const fin = raw.financialData;
   const estimates = estimatesByPeriod(raw.earningsTrend);
+  const quarterlyEps = buildQuarterlyEps(raw.earnings, estimates);
 
   return {
     ticker,
@@ -290,12 +359,16 @@ export function buildAnalystData(
     target: buildTarget(fin),
     eps: {
       annual: buildAnnualEps(raw.annualEps, estimates),
-      quarterly: buildQuarterlyEps(raw.earnings, estimates),
+      quarterly: quarterlyEps,
     },
     freeCashFlow: {
       annual: buildCashFlow(raw.cashFlow?.annual, "annual"),
       quarterly: buildCashFlow(raw.cashFlow?.quarterly, "quarterly"),
     },
+    earningsSurprises: buildEarningsSurprises(
+      raw.earningsSurprises,
+      quarterlyEps
+    ),
     firms: buildFirmRatings(raw.upgradeDowngradeHistory?.history),
   };
 }

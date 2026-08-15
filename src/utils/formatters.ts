@@ -22,6 +22,17 @@ export function formatDate(date: string | Date): string {
   return format(d, "MMM d, yyyy");
 }
 
+/**
+ * Yahoo's period key as an axis label: `3Q2025` → `Q3 '25`.
+ *
+ * A plain year (the annual series) passes through untouched, so callers can
+ * hand it either granularity without branching.
+ */
+export function formatFiscalPeriod(label: string): string {
+  const m = /^(\d)Q(\d{4})$/.exec(label);
+  return m ? `Q${m[1]} '${m[2].slice(2)}` : label;
+}
+
 export function formatTicker(ticker: string): string {
   return ticker.toUpperCase();
 }

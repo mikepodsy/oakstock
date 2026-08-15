@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildAnalystData, quarterLabel, type RawAnalystInput } from "./analyst";
+import {
+  buildAnalystData,
+  buildCashFlow,
+  quarterLabel,
+  type RawAnalystInput,
+} from "./analyst";
 
 /** Trimmed from a live GOOG response on 2026-08-14. */
 function googInput(overrides: Partial<RawAnalystInput> = {}): RawAnalystInput {
@@ -226,6 +231,90 @@ describe("buildAnalystData", () => {
     });
   });
 
+  describe("free cash flow", () => {
+    it("labels annual periods by year, oldest first", () => {
+      const d = buildAnalystData("X", {
+        cashFlow: {
+          annual: [
+            { date: "2025-12-31", freeCashFlow: 3e9, operatingCashFlow: 5e9, capex: 2e9 },
+            { date: "2023-12-31", freeCashFlow: 1e9 },
+            { date: "2024-12-31", freeCashFlow: -2e9 },
+          ],
+        },
+      });
+
+      expect(d.freeCashFlow.annual.map((p) => p.label)).toEqual([
+        "2023",
+        "2024",
+        "2025",
+      ]);
+      expect(d.freeCashFlow.annual.map((p) => p.freeCashFlow)).toEqual([
+        1e9, -2e9, 3e9,
+      ]);
+      expect(d.freeCashFlow.annual[2]).toMatchObject({
+        operatingCashFlow: 5e9,
+        capex: 2e9,
+      });
+    });
+
+    it("labels quarterly periods by calendar quarter", () => {
+      const d = buildAnalystData("X", {
+        cashFlow: {
+          quarterly: [
+            { date: "2026-03-31", freeCashFlow: 2e9 },
+            { date: "2025-12-31", freeCashFlow: 1e9 },
+          ],
+        },
+      });
+
+      expect(d.freeCashFlow.quarterly.map((p) => p.label)).toEqual([
+        "4Q2025",
+        "1Q2026",
+      ]);
+    });
+
+    it("drops periods with no free cash flow on file", () => {
+      const periods = buildCashFlow(
+        [
+          { date: "2024-12-31", freeCashFlow: null },
+          { date: "2025-12-31", freeCashFlow: 4e9 },
+          { date: "not a date", freeCashFlow: 9e9 },
+        ],
+        "annual"
+      );
+
+      expect(periods).toEqual([
+        {
+          label: "2025",
+          freeCashFlow: 4e9,
+          operatingCashFlow: null,
+          capex: null,
+        },
+      ]);
+    });
+
+    it("keeps only the most recent periods", () => {
+      const annual = buildCashFlow(
+        Array.from({ length: 15 }, (_, i) => ({
+          date: `${2011 + i}-12-31`,
+          freeCashFlow: i,
+        })),
+        "annual"
+      );
+      const quarterly = buildCashFlow(
+        Array.from({ length: 20 }, (_, i) => ({
+          date: new Date(Date.UTC(2020, i * 3, 1)).toISOString(),
+          freeCashFlow: i,
+        })),
+        "quarterly"
+      );
+
+      expect(annual).toHaveLength(10);
+      expect(annual[0].label).toBe("2016");
+      expect(quarterly).toHaveLength(12);
+    });
+  });
+
   describe("thin or missing coverage", () => {
     it("returns nulls rather than throwing when Yahoo has nothing", () => {
       const d = buildAnalystData("SPY", {});
@@ -236,6 +325,8 @@ describe("buildAnalystData", () => {
       expect(d.currentPrice).toBeNull();
       expect(d.eps.annual).toEqual([]);
       expect(d.eps.quarterly).toEqual([]);
+      expect(d.freeCashFlow.annual).toEqual([]);
+      expect(d.freeCashFlow.quarterly).toEqual([]);
     });
 
     it("drops a price target with no high/low range to plot", () => {
@@ -243,6 +334,12 @@ describe("buildAnalystData", () => {
         financialData: { currentPrice: 10, targetMeanPrice: 12 },
       });
       expect(d.target).toBeNull();
+    });
+
+    it("keeps the rating when only the cash flow history is missing", () => {
+      const d = buildAnalystData("X", { cashFlow: {} });
+      expect(d.freeCashFlow.annual).toEqual([]);
+      expect(d.freeCashFlow.quarterly).toEqual([]);
     });
 
     it("treats an all-zero recommendation trend as no coverage", () => {

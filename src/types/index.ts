@@ -446,6 +446,15 @@ export interface EpsPeriod {
   estimate: number | null;
 }
 
+/** One bar in the free cash flow chart, in the filer's reporting currency. */
+export interface CashFlowPeriod {
+  label: string;
+  freeCashFlow: number;
+  /** Operating cash flow and capex behind the FCF, for the tooltip. */
+  operatingCashFlow: number | null;
+  capex: number | null;
+}
+
 /** One firm's most recent published rating, with its price target. */
 export interface AnalystFirmRating {
   firm: string;
@@ -470,6 +479,10 @@ export interface AnalystData {
   eps: {
     annual: EpsPeriod[];
     quarterly: EpsPeriod[];
+  };
+  freeCashFlow: {
+    annual: CashFlowPeriod[];
+    quarterly: CashFlowPeriod[];
   };
   /**
    * Firm-level detail behind the distribution. Always a subset — Yahoo only

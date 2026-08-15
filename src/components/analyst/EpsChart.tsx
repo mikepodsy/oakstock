@@ -14,6 +14,7 @@ import {
 } from "@/components/charts/legend";
 import { ChartTooltip } from "@/components/charts/tooltip";
 import { YAxis } from "@/components/charts/y-axis";
+import { formatFiscalPeriod } from "@/utils/formatters";
 import type { EpsPeriod } from "@/types";
 
 interface EpsChartProps {
@@ -100,7 +101,7 @@ export function EpsChart({ annual, quarterly }: EpsChartProps) {
       {/* Scrolls on its own when the bands get tight, so the page never does. */}
       <div className="-mx-1 overflow-x-auto px-1">
         <BarChart
-          className="h-[260px] min-w-[420px]"
+          className="h-[200px] min-w-[420px]"
           data={rows}
           margin={{ top: 12, right: 8, bottom: 28, left: 52 }}
           xDataKey="label"
@@ -116,7 +117,7 @@ export function EpsChart({ annual, quarterly }: EpsChartProps) {
           )}
           <Bar dataKey="Reported" fill={REPORTED_COLOR} />
           <Bar dataKey="Estimate" fill={ESTIMATE_COLOR} />
-          <BarXAxis />
+          <BarXAxis formatLabel={formatFiscalPeriod} />
           <YAxis formatValue={fmtEps} />
           <ChartTooltip
             rows={(point) =>

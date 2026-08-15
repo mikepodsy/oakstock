@@ -2,6 +2,7 @@ import type {
   AnalystData,
   AnalystDistribution,
   AnalystPriceTarget,
+  CashFlowPeriod,
   EpsPeriod,
 } from "@/types";
 import { buildFirmRatings, type RawGradeRow } from "./analystFirms";
@@ -58,6 +59,20 @@ export interface RawAnalystInput {
   } | null;
   /** Annual diluted EPS from the fundamentals time series, oldest first. */
   annualEps?: { year: number; eps: number | null }[];
+  /** Cash-flow rows from the fundamentals time series, either order. */
+  cashFlow?: {
+    annual?: RawCashFlowRow[];
+    quarterly?: RawCashFlowRow[];
+  };
+}
+
+/** One period of the cash flow statement, straight off the time series. */
+export interface RawCashFlowRow {
+  /** Period end date. */
+  date: string | Date;
+  freeCashFlow?: number | null;
+  operatingCashFlow?: number | null;
+  capex?: number | null;
 }
 
 function num(v: number | null | undefined): number | null {
@@ -216,6 +231,49 @@ function buildQuarterlyEps(
   );
 }
 
+/** Most recent periods kept per granularity — enough shape without crowding. */
+const CASH_FLOW_LIMIT = { annual: 10, quarterly: 12 } as const;
+
+/**
+ * Free cash flow bars, oldest first and capped to the most recent periods.
+ *
+ * A period with no FCF on file is dropped rather than zeroed: a zero bar reads
+ * as "this company burned exactly nothing", which is never what a gap means.
+ */
+export function buildCashFlow(
+  rows: RawCashFlowRow[] | undefined,
+  granularity: "annual" | "quarterly"
+): CashFlowPeriod[] {
+  const byLabel = new Map<string, CashFlowPeriod>();
+
+  for (const row of rows ?? []) {
+    const date = toDate(row.date);
+    const fcf = num(row.freeCashFlow);
+    if (!date || fcf == null) continue;
+
+    const label =
+      granularity === "annual"
+        ? String(date.getUTCFullYear())
+        : quarterLabel(date);
+
+    byLabel.set(label, {
+      label,
+      freeCashFlow: fcf,
+      operatingCashFlow: num(row.operatingCashFlow),
+      capex: num(row.capex),
+    });
+  }
+
+  const sortKey =
+    granularity === "annual"
+      ? (p: CashFlowPeriod) => Number(p.label)
+      : (p: CashFlowPeriod) => quarterSortKey(p.label);
+
+  return [...byLabel.values()]
+    .sort((a, b) => sortKey(a) - sortKey(b))
+    .slice(-CASH_FLOW_LIMIT[granularity]);
+}
+
 export function buildAnalystData(
   ticker: string,
   raw: RawAnalystInput
@@ -233,6 +291,10 @@ export function buildAnalystData(
     eps: {
       annual: buildAnnualEps(raw.annualEps, estimates),
       quarterly: buildQuarterlyEps(raw.earnings, estimates),
+    },
+    freeCashFlow: {
+      annual: buildCashFlow(raw.cashFlow?.annual, "annual"),
+      quarterly: buildCashFlow(raw.cashFlow?.quarterly, "quarterly"),
     },
     firms: buildFirmRatings(raw.upgradeDowngradeHistory?.history),
   };

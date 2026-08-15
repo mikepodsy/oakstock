@@ -7,12 +7,20 @@ import type { AnalystRatingResult } from "@/hooks/useAnalystRating";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
 import { distributionTotal, targetUpside } from "@/utils/analystRating";
 import { formatCurrency } from "@/utils/formatters";
+import { EarningsSurpriseChart } from "./EarningsSurpriseChart";
 import { EpsChart } from "./EpsChart";
+import { FcfChart } from "./FcfChart";
 import { PriceTargetChart } from "./PriceTargetChart";
 import { RatingDistribution } from "./RatingDistribution";
 
 interface AnalystForecastProps extends AnalystRatingResult {
   ticker: string;
+  /**
+   * Render the free cash flow chart. Off for the stock page, whose Financials
+   * section already charts FCF from the fundamentals feed — two of the same
+   * chart on one page is worse than one. Default: true.
+   */
+  showCashFlow?: boolean;
 }
 
 /** History window behind the forecast. The chart projects half of it forward. */
@@ -33,6 +41,7 @@ export function AnalystForecast({
   loading,
   reason,
   retry,
+  showCashFlow = true,
 }: AnalystForecastProps) {
   const { history, loading: historyLoading } = usePriceHistory(
     // Don't fetch history for a symbol with nothing to forecast.
@@ -163,9 +172,24 @@ export function AnalystForecast({
         </div>
       </div>
 
-      {/* ── EPS ────────────────────────────────────────────────────────── */}
+      {/* ── EPS + free cash flow, beside the beat/miss history ─────────── */}
+      {/* Splits later than the row above: a third of the width is under 300px on
+          a 1280 laptop, which crams the quarter labels. items-start keeps the
+          short earnings card from stretching to the EPS + FCF column. */}
       {data && (
-        <EpsChart annual={data.eps.annual} quarterly={data.eps.quarterly} />
+        <div className="grid items-start gap-6 xl:grid-cols-[2fr_1fr]">
+          <div className="flex min-w-0 flex-col gap-6">
+            <EpsChart annual={data.eps.annual} quarterly={data.eps.quarterly} />
+            {showCashFlow && (
+              <FcfChart
+                annual={data.freeCashFlow.annual}
+                currency={data.currency}
+                quarterly={data.freeCashFlow.quarterly}
+              />
+            )}
+          </div>
+          <EarningsSurpriseChart quarterly={data.eps.quarterly} />
+        </div>
       )}
     </div>
   );

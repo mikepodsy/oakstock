@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { analystCache } from "@/lib/cache";
-import { buildAnalystData, type RawAnalystInput } from "@/lib/analyst";
+import {
+  buildAnalystData,
+  type RawAnalystInput,
+  type RawCashFlowRow,
+} from "@/lib/analyst";
 import type { AnalystData } from "@/types";
 
 const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
@@ -13,13 +17,59 @@ const CACHE_HEADERS = {
 /** Annual diluted EPS this far back, for the reported bars in the EPS chart. */
 const EPS_HISTORY_START = "2015-01-01";
 
-type AnnualRow = { date?: unknown; dilutedEPS?: unknown; basicEPS?: unknown };
+/**
+ * Quarterly fundamentals this far back. Short on purpose: the FCF chart shows
+ * the last 12 quarters, and asking Yahoo for a decade of them just to throw
+ * most away costs a slower response on every uncached symbol.
+ */
+const QUARTERLY_HISTORY_YEARS = 4;
+
+/** The fields of a `fundamentalsTimeSeries` row this route reads. */
+type FundamentalsRow = {
+  date?: unknown;
+  dilutedEPS?: unknown;
+  basicEPS?: unknown;
+  freeCashFlow?: unknown;
+  operatingCashFlow?: unknown;
+  cashFlowFromContinuingOperatingActivities?: unknown;
+  capitalExpenditure?: unknown;
+};
+
+function numOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Cash-flow rows in the shape `buildCashFlow` wants.
+ *
+ * Capex comes off the statement negative (it's an outflow); it's flipped to a
+ * magnitude here so the tooltip can read "capex $12.4B" without a minus sign
+ * fighting the word.
+ */
+function toCashFlowRows(rows: FundamentalsRow[]): RawCashFlowRow[] {
+  return rows.flatMap((row) => {
+    const date = row.date instanceof Date ? row.date : new Date(String(row.date));
+    if (Number.isNaN(date.getTime())) return [];
+
+    const capex = numOrNull(row.capitalExpenditure);
+    return [
+      {
+        date,
+        freeCashFlow: numOrNull(row.freeCashFlow),
+        operatingCashFlow:
+          numOrNull(row.operatingCashFlow) ??
+          numOrNull(row.cashFlowFromContinuingOperatingActivities),
+        capex: capex == null ? null : Math.abs(capex),
+      },
+    ];
+  });
+}
 
 /**
  * Annual diluted EPS, oldest first. Falls back to basic EPS: some filers report
  * only that, and one share count is far better than an empty chart.
  */
-function toAnnualEps(rows: AnnualRow[]): { year: number; eps: number | null }[] {
+function toAnnualEps(rows: FundamentalsRow[]): { year: number; eps: number | null }[] {
   return rows
     .map((row) => {
       const date = row.date instanceof Date ? row.date : new Date(String(row.date));
@@ -63,31 +113,53 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(cached, { headers: CACHE_HEADERS });
   }
 
-  // Settled, not all: the EPS history fails outright for ETFs and most
+  const today = new Date().toISOString().split("T")[0];
+  const quarterlyStart = new Date();
+  quarterlyStart.setUTCFullYear(
+    quarterlyStart.getUTCFullYear() - QUARTERLY_HISTORY_YEARS
+  );
+
+  // Settled, not all: the fundamentals history fails outright for ETFs and most
   // non-US listings, and that shouldn't cost us the rating and price target.
-  const [summaryResult, epsResult] = await Promise.allSettled([
-    yf.quoteSummary(
-      ticker,
-      {
-        modules: [
-          "financialData",
-          "recommendationTrend",
-          "earningsTrend",
-          "earnings",
-          "upgradeDowngradeHistory",
-        ],
-      },
-      // Yahoo adds and drops fields without warning; a schema mismatch on one
-      // module shouldn't blank the whole panel.
-      { validateResult: false }
-    ),
-    yf.fundamentalsTimeSeries(ticker, {
-      period1: EPS_HISTORY_START,
-      period2: new Date().toISOString().split("T")[0],
-      type: "annual",
-      module: "all",
-    }),
-  ]);
+  const [summaryResult, annualResult, quarterlyResult] =
+    await Promise.allSettled([
+      yf.quoteSummary(
+        ticker,
+        {
+          modules: [
+            "financialData",
+            "recommendationTrend",
+            "earningsTrend",
+            "earnings",
+            "upgradeDowngradeHistory",
+          ],
+        },
+        // Yahoo adds and drops fields without warning; a schema mismatch on one
+        // module shouldn't blank the whole panel.
+        { validateResult: false }
+      ),
+      yf.fundamentalsTimeSeries(ticker, {
+        period1: EPS_HISTORY_START,
+        period2: today,
+        type: "annual",
+        module: "all",
+      }),
+      yf.fundamentalsTimeSeries(ticker, {
+        period1: quarterlyStart.toISOString().split("T")[0],
+        period2: today,
+        type: "quarterly",
+        module: "all",
+      }),
+    ]);
+
+  const annualRows =
+    annualResult.status === "fulfilled"
+      ? (annualResult.value as FundamentalsRow[])
+      : [];
+  const quarterlyRows =
+    quarterlyResult.status === "fulfilled"
+      ? (quarterlyResult.value as FundamentalsRow[])
+      : [];
 
   if (summaryResult.status === "rejected") {
     // A definitive "nothing here" is data, not a failure. Serving it as an
@@ -110,10 +182,11 @@ export async function GET(request: NextRequest) {
     earnings: summary.earnings,
     earningsTrend: summary.earningsTrend,
     upgradeDowngradeHistory: summary.upgradeDowngradeHistory,
-    annualEps:
-      epsResult.status === "fulfilled"
-        ? toAnnualEps(epsResult.value as AnnualRow[])
-        : [],
+    annualEps: toAnnualEps(annualRows),
+    cashFlow: {
+      annual: toCashFlowRows(annualRows),
+      quarterly: toCashFlowRows(quarterlyRows),
+    },
   });
 
   analystCache.set(ticker, data);

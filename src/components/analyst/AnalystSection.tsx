@@ -18,7 +18,9 @@ export function AnalystSection({ ticker }: { ticker: string }) {
   return (
     <section className="mb-6">
       <h2 className="mb-3 font-display text-lg text-text-primary">Forecast</h2>
-      <AnalystForecast ticker={ticker} {...result} />
+      {/* No FCF here — the Financials section further down this page already
+          charts it, with more history and its own period toggle. */}
+      <AnalystForecast showCashFlow={false} ticker={ticker} {...result} />
     </section>
   );
 }

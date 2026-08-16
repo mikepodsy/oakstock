@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oakbt"
+version = "0.1.0"
+description = "Oakstock backtesting engine"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "requests>=2.31",
+    "supabase>=2.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
+
+[tool.setuptools.packages.find]
+include = ["oakbt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A stale pytest-timeit is installed system-wide and crashes collection against
+# modern pytest (imports _pytest.mark.MarkerError, removed years ago). We don't
+# use it; disable it so a clean `pytest` works out of the box.
+addopts = "-p no:timeit"

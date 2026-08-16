@@ -101,6 +101,11 @@ that no feature value is visible on a bar before its `released_at`.
 
 ## Engine Pipeline
 
+`load_frame`, `run_backtest`, and feature resolution all live in `oakbt/engine/runner.py`.
+The dataclasses they pass around — `RunConfig`, `ExecutionConfig`, `FeatureContext`, `Trade`,
+`RunResult` — live in `oakbt/config.py`, so no engine module imports another engine module
+just for a type.
+
 ```python
 load_frame(ticker, start, end, features)   # daily OHLCV + point-in-time features → DataFrame
   → Strategy.generate_signals(df)          # → pd.Series of target weights in [-1, 1]  (user code)
@@ -184,24 +189,44 @@ benchmark of the same instrument over the same window. Risk-free rate is a confi
 
 ## Universe
 
-COT markets are not directly tradable, so each maps to a liquid ETF proxy in one config table
-(`oakbt/data/universe.py`):
+COT markets are not directly tradable, so each maps to a liquid ETF proxy. `universe.py` is the
+single source of truth tying together everything a market needs, keyed by `market_code`:
 
-| COT market | Proxy | | COT market | Proxy |
-|---|---|---|---|---|
-| S&P 500 | SPY | | WTI Crude | USO ⚠ |
-| Nasdaq 100 | QQQ | | Natural Gas | UNG ⚠ |
-| Russell 2000 | IWM | | USD Index | UUP |
-| Gold | GLD | | Euro FX | FXE |
-| Silver | SLV | | Japanese Yen | FXY |
-| Copper | CPER | | British Pound | FXB |
-| UST 30Y | TLT | | Canadian Dollar | FXC |
-| UST 10Y | IEF | | | |
+```python
+@dataclass(frozen=True)
+class Market:
+    market_code: str      # canonical key — used by --markets, cot_history.market_code
+    label: str            # display name, e.g. "S&P 500"
+    cftc_name: str        # exact Socrata market_and_exchange_names value
+    dataset: str          # 'tff' | 'disaggregated' | 'legacy' → cot_history.dataset
+    proxy: str            # tradable ETF ticker
+    proxy_quality: str    # 'good' | 'degraded'
+```
+
+`cftc_name` values must match Socrata exactly and are **ported from the `INSTRUMENTS` array in
+`src/app/api/cot/route.ts:25`**, which already carries verified strings (e.g.
+`"S&P 500 Consolidated - CHICAGO MERCANTILE EXCHANGE"`, `"GOLD - COMMODITY EXCHANGE INC."`).
+Dataset assignment follows the same route: financials use TFF, commodities use disaggregated,
+and every market additionally has a legacy series.
+
+| `market_code` | Label | Proxy | | `market_code` | Label | Proxy |
+|---|---|---|---|---|---|---|
+| `SP500` | S&P 500 | SPY | | `WTI` | WTI Crude | USO ⚠ |
+| `NASDAQ100` | Nasdaq 100 | QQQ | | `NATGAS` | Natural Gas | UNG ⚠ |
+| `RUSSELL2000` | Russell 2000 | IWM | | `USDINDEX` | USD Index | UUP |
+| `GOLD` | Gold | GLD | | `EUR` | Euro FX | FXE |
+| `SILVER` | Silver | SLV | | `JPY` | Japanese Yen | FXY |
+| `COPPER` | Copper | CPER | | `GBP` | British Pound | FXB |
+| `UST30Y` | UST 30Y | TLT | | `CAD` | Canadian Dollar | FXC |
+| `UST10Y` | UST 10Y | IEF | | | | |
+
+The COT route also covers VIX, DJIA, Nikkei, Brent, UST 5Y and UST 2Y. Those are excluded from
+v1 because they have no clean long-history ETF proxy (VIX especially — VXX's roll decay makes it
+unusable as a spot proxy). Adding one later is a single `Market` entry.
 
 ⚠ **USO and UNG suffer severe contango drag** and are poor multi-year proxies for spot
-WTI/natural gas. The mapping table carries a `proxy_quality` field (`good` | `degraded`), which
-is copied onto the run and surfaced in the UI, so a result is never read as if it tracked the
-underlying commodity.
+WTI/natural gas. `proxy_quality='degraded'` is copied onto the run and surfaced in the UI, so a
+result is never read as if it tracked the underlying commodity.
 
 ---
 
@@ -343,10 +368,14 @@ is an argument error):
 - `--market SP500` → looks up the proxy in the universe map, sets `ticker='SPY'`,
   `market_code='SP500'`, and carries `proxy_quality`.
 - `--ticker SPY` → sets `ticker='SPY'` and reverse-resolves `market_code` if that ticker is a
-  known proxy, else leaves it `NULL`. A `NULL` market_code is fine for price-only strategies and
-  raises `MissingMarketCodeError` if the strategy needs a COT feature.
+  known proxy, populating `proxy_quality` from the same entry. If the ticker is not a known proxy,
+  both stay `NULL`. A `NULL` market_code is fine for price-only strategies and raises
+  `MissingMarketCodeError` if the strategy needs a COT feature.
 
-This keeps `backtest_runs.ticker` non-null in every path.
+Both paths therefore agree: `proxy_quality` is set whenever a market is known, and
+`backtest_runs.ticker` is non-null in every path.
+
+`backfill` belongs to Phase 1; `run` and `list` to Phase 2.
 
 ---
 
@@ -367,7 +396,7 @@ Package root is `tools/backtest/`, with the importable package at `tools/backtes
 | `tools/backtest/oakbt/data/store.py` | Supabase read/write for the history tables |
 | `tools/backtest/oakbt/data/align.py` | Weekly COT → daily bars under the point-in-time rule |
 | `tools/backtest/oakbt/data/features.py` | Provider registry + COT provider (3yr index, net, z-score, OI index) |
-| `tools/backtest/oakbt/data/universe.py` | COT market → ETF proxy mapping + `proxy_quality` |
+| `tools/backtest/oakbt/data/universe.py` | `Market` registry: `market_code` → cftc_name, dataset, proxy, proxy_quality; forward + reverse lookup |
 | `tools/backtest/oakbt/engine/strategy.py` | `Strategy` ABC |
 | `tools/backtest/oakbt/engine/risk.py` | Vol targeting, leverage cap |
 | `tools/backtest/oakbt/engine/executor.py` | The bar loop |
@@ -431,7 +460,7 @@ a fit but is not one: it requires `period` and `onPeriodChange` props and render
 `TimeRangePicker`, which is meaningless for a stored run with a fixed window; it hardcodes the
 legend label `"Portfolio"` with no prop to change it; it formats the Y axis as currency; and it
 draws a cost-basis `ReferenceLine` keyed to `PortfolioChartPoint`. Bending it to fit would mean
-modifying a component three other pages depend on. `EquityCurveChart` and `DrawdownChart` are
+modifying a component both portfolio pages depend on. `EquityCurveChart` and `DrawdownChart` are
 therefore written fresh against the visx/bklit `src/components/charts/area-chart.tsx` kit, using
 the existing CSS variables (`--green-primary`, `--red-primary`, `--chart-1..5`) — no new palette.
 
@@ -473,7 +502,10 @@ touch those two files.
 - `test_registry.py` — duplicate provider registration raises; `UnknownFeatureError` names the
   missing feature; `MissingMarketCodeError` fires for a COT strategy on an unmapped ticker.
 - `test_universe.py` — every mapped market resolves to a proxy, reverse lookup is consistent,
-  and `proxy_quality` is set on every entry.
+  `proxy_quality` is set on every entry, and every `cftc_name` is non-empty with a valid `dataset`.
+- `test_cli.py` — the resolution rule: `--market` sets ticker + market_code + proxy_quality;
+  `--ticker` on a known proxy reverse-resolves all three; `--ticker` on an unknown ticker leaves
+  market_code `NULL`; supplying both or neither is an argument error.
 - `test_strategies.py` — each registered strategy returns weights within [-1, 1] on a fixture frame.
 
 **TypeScript (vitest)** — `environment: "node"`, `include: src/**/*.{test,spec}.ts` (`.tsx` is not

@@ -17,6 +17,7 @@ import {
   RADAR_RANKING_LIMIT,
   type RadarRanking,
 } from "@/utils/constants";
+import { radarSourceMode } from "@/utils/radarRanking";
 
 type ActiveTab = "stocks" | "etfs";
 
@@ -32,33 +33,49 @@ export default function RadarPage() {
   const [viewMode, setViewMode] = useState<RadarViewMode>("cards");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Resolve the stock universe from sector + ranking (may hit screener/trending)
+  // Resolve the stock universe from sector + ranking + timeframe. Gainers/losers
+  // on a non-"Today" timeframe come back already ranked by period return.
   const {
     tickers: stockTickers,
+    changes: rankedChanges,
     loading: sourceLoading,
     error: sourceError,
-  } = useRadarSource(selectedSector, ranking);
+    progress: rankProgress,
+  } = useRadarSource(selectedSector, ranking, timeframe);
 
   const etfTickers = useMemo(
     () => RADAR_ETF_CATEGORIES[selectedEtfCategory].tickers,
     [selectedEtfCategory]
   );
 
+  const sourceMode = useMemo(
+    () => radarSourceMode({ sector: selectedSector, ranking, timeframe }),
+    [selectedSector, ranking, timeframe]
+  );
+  // True when the server ranked this list by period return — its order and its
+  // change values are authoritative, so the page must not re-rank them.
+  const serverRanked = activeTab === "stocks" && sourceMode.kind === "movers";
+
   const activeTickers = activeTab === "stocks" ? stockTickers : etfTickers;
   const { quotes, loading: quotesLoading } = useQuotes(
     activeTickers as unknown as string[]
   );
-  // Period % return per ticker for non-"Today" timeframes (empty for "1d").
+  // Period % return per ticker for non-"Today" timeframes (empty for "1d", and
+  // skipped entirely when the server already returned ranked period changes).
   const { returns: periodReturns, loading: returnsLoading } = useRadarReturns(
-    activeTickers as unknown as string[],
+    serverRanked ? [] : (activeTickers as unknown as string[]),
     timeframe
   );
   const isDayTimeframe = timeframe === "1d";
   const loading = sourceLoading || quotesLoading;
 
+  const timeframeLabel =
+    RADAR_TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe;
   const isTrending = activeTab === "stocks" && ranking === "trending";
   const isRanked =
-    activeTab === "stocks" && (ranking === "gainers" || ranking === "losers");
+    activeTab === "stocks" &&
+    (ranking === "gainers" || ranking === "losers") &&
+    !serverRanked;
 
   // Reset expanded card + search whenever the displayed set changes
   function resetView() {
@@ -70,7 +87,11 @@ export default function RadarPage() {
     let items = activeTickers.map((t) => ({
       ticker: t,
       name: quotes[t]?.name ?? t,
-      change: isDayTimeframe ? quotes[t]?.dayChangePercent : periodReturns[t],
+      change: isDayTimeframe
+        ? quotes[t]?.dayChangePercent
+        : serverRanked
+          ? rankedChanges[t]
+          : periodReturns[t],
     }));
 
     // Sort + cap for gainers/losers (trending keeps Yahoo's order)
@@ -100,6 +121,8 @@ export default function RadarPage() {
     ranking,
     isDayTimeframe,
     periodReturns,
+    serverRanked,
+    rankedChanges,
   ]);
 
   function handleToggleExpand(ticker: string) {
@@ -215,6 +238,13 @@ export default function RadarPage() {
                 Trending is market-wide
               </span>
             )}
+            {/* Today's ranking is Yahoo's market-wide screen; longer timeframes
+                have no such screen, so they rank the Radar's own universe. */}
+            {serverRanked && (
+              <span className="text-xs text-text-tertiary">
+                Ranked by {timeframeLabel} return across the Radar universe
+              </span>
+            )}
           </>
         ) : (
           <RadarDropdown
@@ -264,11 +294,21 @@ export default function RadarPage() {
         <p className="text-sm text-text-tertiary mb-4">Loading…</p>
       )}
 
+      {/* A period ranking scores the whole universe, so it converges over a few
+          passes — say so rather than showing a partial list as if it were final. */}
+      {rankProgress && (
+        <p className="text-sm text-text-tertiary mb-4">
+          Ranking {rankProgress.covered.toLocaleString()} of{" "}
+          {rankProgress.total.toLocaleString()} companies by{" "}
+          {timeframeLabel} return…
+        </p>
+      )}
+
       {/* Grid */}
       <RadarGrid
         tickers={tickerItems}
         quotes={quotes}
-        changeLoading={!isDayTimeframe && returnsLoading}
+        changeLoading={!isDayTimeframe && !serverRanked && returnsLoading}
         expandedTicker={expandedTicker}
         onToggleExpand={handleToggleExpand}
         viewMode={viewMode}

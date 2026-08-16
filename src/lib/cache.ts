@@ -3,12 +3,20 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+const DEFAULT_MAX_ENTRIES = 2000;
+
 export class TTLCache<T = unknown> {
   private store = new Map<string, CacheEntry<T>>();
   private ttlMs: number;
+  private maxEntries: number;
 
-  constructor(ttlSeconds: number) {
+  constructor(ttlSeconds: number, maxEntries = DEFAULT_MAX_ENTRIES) {
     this.ttlMs = ttlSeconds * 1000;
+    this.maxEntries = maxEntries;
+  }
+
+  get size(): number {
+    return this.store.size;
   }
 
   get(key: string): T | undefined {
@@ -22,8 +30,18 @@ export class TTLCache<T = unknown> {
   }
 
   set(key: string, data: T): void {
-    if (this.store.size > 2000) this.prune();
+    if (this.store.size >= this.maxEntries) this.evict();
     this.store.set(key, { data, expiresAt: Date.now() + this.ttlMs });
+  }
+
+  // Drop expired entries first; if the cache is still full they're all live, so
+  // fall back to evicting the oldest (Map iterates in insertion order).
+  private evict(): void {
+    this.prune();
+    for (const key of this.store.keys()) {
+      if (this.store.size < this.maxEntries) break;
+      this.store.delete(key);
+    }
   }
 
   private prune(): void {
@@ -35,11 +53,15 @@ export class TTLCache<T = unknown> {
 }
 
 // Survive Next.js dev hot reloads by attaching to globalThis
-function getOrCreateCache<T>(key: string, ttlSeconds: number): TTLCache<T> {
+function getOrCreateCache<T>(
+  key: string,
+  ttlSeconds: number,
+  maxEntries?: number
+): TTLCache<T> {
   const globalKey = `__cache_${key}`;
   const g = globalThis as Record<string, unknown>;
   if (!g[globalKey]) {
-    g[globalKey] = new TTLCache<T>(ttlSeconds);
+    g[globalKey] = new TTLCache<T>(ttlSeconds, maxEntries);
   }
   return g[globalKey] as TTLCache<T>;
 }
@@ -67,7 +89,15 @@ export const etfHoldingsCache = getOrCreateCache<unknown>("etf-holdings", 86400)
 export const edgarNameTickerCache = getOrCreateCache<Record<string, string> | null>("edgar-name-ticker", 86400);
 export const radarCache = getOrCreateCache<string[]>("radar", 120);
 // Period % return per ticker for Radar timeframes. null = known-failed (skip refetch).
-export const radarReturnsCache = getOrCreateCache<number | null>("radar-returns", 300);
+// Ranking the full universe is ~1,500 chart calls, so the TTL is long enough for
+// that crawl to amortize — 1W+ returns barely move in 15 minutes anyway. Capacity
+// holds the whole universe across all five timeframes so a ranking pass can't
+// evict the entries an earlier pass just paid for.
+export const radarReturnsCache = getOrCreateCache<number | null>(
+  "radar-returns",
+  900,
+  12_000
+);
 // Questrade symbolId rarely changes — cache it long. Candles cache stays short.
 export const questradeSymbolCache = getOrCreateCache<number | null>("questrade-symbol", 86400);
 export const questradeCandlesCache = getOrCreateCache<unknown[]>("questrade-candles", 300);

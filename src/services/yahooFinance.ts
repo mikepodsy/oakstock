@@ -25,6 +25,31 @@ export async function fetchScreener(
   return res.json();
 }
 
+export interface RadarMoversResult {
+  ranked: { ticker: string; change: number }[];
+  universeSize: number;
+  covered: number;
+  complete: boolean;
+}
+
+/**
+ * Ranks a Radar sector by actual return over the period. A cold pass may return
+ * `complete: false` — call again to continue where it stopped.
+ */
+export async function fetchRadarMovers(
+  sector: string,
+  direction: "gainers" | "losers",
+  period: string,
+  limit = 50
+): Promise<RadarMoversResult> {
+  const res = await fetch(
+    `/api/radar/movers?sector=${encodeURIComponent(sector)}` +
+      `&direction=${direction}&period=${period}&limit=${limit}`
+  );
+  if (!res.ok) throw new Error("Failed to rank movers");
+  return res.json();
+}
+
 export async function fetchTrending(count = 25): Promise<string[]> {
   const res = await fetch(`/api/radar/trending?count=${count}`);
   if (!res.ok) throw new Error("Failed to fetch trending");

@@ -131,9 +131,13 @@ export function EquityCurveChart({
         />
         <Tooltip content={<CustomTooltip ticker={ticker} />} />
 
+        {/* A stored run is immutable, and these series are 1k-4k points — a
+            reveal animation costs a lot of path interpolation to show nothing
+            the user needs, and leaves the chart blank in headless capture. */}
         <Area
           dataKey="equity"
           fill="url(#equityFill)"
+          isAnimationActive={false}
           stroke="var(--green-primary)"
           strokeWidth={2}
           type="monotone"
@@ -141,6 +145,7 @@ export function EquityCurveChart({
         <Line
           dataKey="benchmark"
           dot={false}
+          isAnimationActive={false}
           stroke="var(--text-tertiary)"
           strokeDasharray="4 3"
           strokeWidth={1.5}

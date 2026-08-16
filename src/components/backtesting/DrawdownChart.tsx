@@ -80,6 +80,7 @@ export function DrawdownChart({ equity, height = 160 }: DrawdownChartProps) {
         <Area
           dataKey="drawdown"
           fill="url(#drawdownFill)"
+          isAnimationActive={false}
           stroke="var(--red-primary)"
           strokeWidth={1.5}
           type="monotone"

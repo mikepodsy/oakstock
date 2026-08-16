@@ -52,8 +52,14 @@ def range_index(series: pd.Series, window: int = INDEX_WINDOW_DAYS,
     lo = series.rolling(window, min_periods=mp).min()
     hi = series.rolling(window, min_periods=mp).max()
     span = hi - lo
+
     idx = (series - lo) / span * 100.0
-    return idx.where(span > 0, 50.0).clip(0.0, 100.0)
+    # A genuinely flat window is neutral. An *unformed* window (not enough history
+    # yet) must stay NaN — `span > 0` is False for NaN too, so filling on that
+    # condition would invent a confident 50 for bars that have no data behind
+    # them, and the strategy would start trading before its signal exists.
+    idx = idx.mask(span.eq(0.0), 50.0)
+    return idx.where(span.notna()).clip(0.0, 100.0)
 
 
 def zscore(series: pd.Series, window: int = ZSCORE_WINDOW_DAYS,
@@ -62,7 +68,9 @@ def zscore(series: pd.Series, window: int = ZSCORE_WINDOW_DAYS,
     mean = series.rolling(window, min_periods=mp).mean()
     std = series.rolling(window, min_periods=mp).std()
     z = (series - mean) / std
-    return z.where(std > 0, 0.0)
+    # Same distinction as range_index: flat window -> 0, unformed window -> NaN.
+    z = z.mask(std.eq(0.0), 0.0)
+    return z.where(std.notna())
 
 
 @runtime_checkable

@@ -54,6 +54,28 @@ def parse_params(pairs: list[str]) -> dict:
     return out
 
 
+# The two report families name the speculator cohort differently: TFF calls it
+# Leveraged Funds, disaggregated calls it Managed Money. Asking for lev_money on
+# gold produces no column at all, so pick the right default per dataset unless
+# the caller was explicit.
+DEFAULT_CATEGORY = {"tff": "lev_money", "disaggregated": "m_money",
+                    "legacy": "noncommercial"}
+
+
+def default_category(params: dict, dataset: str | None,
+                     strategy_cls: type | None = None) -> dict:
+    if "category" in params or not dataset:
+        return params
+    # buy_and_hold and other price-only strategies take no category.
+    if strategy_cls is not None:
+        import inspect
+
+        if "category" not in inspect.signature(strategy_cls.__init__).parameters:
+            return params
+    category = DEFAULT_CATEGORY.get(dataset)
+    return {**params, "category": category} if category else params
+
+
 def _coerce(raw: str):
     low = raw.lower()
     if low in ("true", "false"):
@@ -108,13 +130,16 @@ def cmd_run(args) -> int:
     from oakbt.config import ExecutionConfig, RunConfig
     from oakbt.engine.runner import run_backtest
     from oakbt.persist.writer import persist
+    from oakbt.strategies import get_strategy
 
     target = resolve_target(args.market, args.ticker)
     execution = ExecutionConfig(
         signal_lag=args.signal_lag,
         commission_bps=args.commission_bps,
         slippage_bps=args.slippage_bps,
-        target_vol=args.target_vol,
+        # 0 (or negative) disables vol targeting, so a full-notional control run
+        # is expressible: --target-vol 0.
+        target_vol=args.target_vol if args.target_vol and args.target_vol > 0 else None,
         max_leverage=args.max_leverage,
         stop_pct=args.stop_pct,
         stop_atr_mult=args.stop_atr_mult,
@@ -126,7 +151,9 @@ def cmd_run(args) -> int:
         market_code=target.market_code,
         dataset=target.dataset,
         proxy_quality=target.proxy_quality,
-        params=parse_params(args.param),
+        params=default_category(
+            parse_params(args.param), target.dataset, get_strategy(args.strategy)
+        ),
         start=date.fromisoformat(args.start) if args.start else None,
         end=date.fromisoformat(args.end) if args.end else None,
         execution=execution,

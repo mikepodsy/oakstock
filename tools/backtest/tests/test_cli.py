@@ -87,3 +87,31 @@ def test_parse_params_rejects_malformed_input():
 
     with pytest.raises(SystemExit):
         parse_params(["no_equals_sign"])
+
+
+def test_default_category_follows_the_dataset():
+    from oakbt.cli import default_category
+    from oakbt.strategies import get_strategy
+
+    cot = get_strategy("cot_index_reversal")
+    # TFF names the speculator cohort Leveraged Funds; disaggregated calls it
+    # Managed Money. Asking for the wrong one yields no column at all.
+    assert default_category({}, "tff", cot)["category"] == "lev_money"
+    assert default_category({}, "disaggregated", cot)["category"] == "m_money"
+    assert default_category({}, "legacy", cot)["category"] == "noncommercial"
+
+
+def test_explicit_category_is_never_overridden():
+    from oakbt.cli import default_category
+    from oakbt.strategies import get_strategy
+
+    params = {"category": "dealer"}
+    out = default_category(params, "disaggregated", get_strategy("cot_index_reversal"))
+    assert out["category"] == "dealer"
+
+
+def test_price_only_strategies_get_no_category():
+    from oakbt.cli import default_category
+    from oakbt.strategies import get_strategy
+
+    assert "category" not in default_category({}, "tff", get_strategy("buy_and_hold"))

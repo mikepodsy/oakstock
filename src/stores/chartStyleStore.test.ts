@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_CHART_STYLE,
+  gridLineColor,
   resetStyle,
   setBackground,
   setBarColor,
@@ -79,5 +80,18 @@ describe("withAlpha", () => {
   it("clamps alpha and passes unparseable input through untouched", () => {
     expect(withAlpha("#22C55E", 5)).toBe("rgba(34, 197, 94, 1)");
     expect(withAlpha("not-a-hex", 1)).toBe("not-a-hex");
+  });
+});
+
+describe("gridLineColor", () => {
+  it("lifts the grid off a dark canvas and shades it on a light one", () => {
+    expect(gridLineColor("#000000")).toBe("rgba(255, 255, 255, 0.06)");
+    expect(gridLineColor("#151512")).toBe("rgba(255, 255, 255, 0.06)");
+    expect(gridLineColor("#FFFFFF")).toBe("rgba(0, 0, 0, 0.07)");
+    expect(gridLineColor("#FAF8F5")).toBe("rgba(0, 0, 0, 0.07)");
+  });
+
+  it("falls back to the dark-canvas tint for unparseable input", () => {
+    expect(gridLineColor("not-a-hex")).toBe("rgba(255, 255, 255, 0.06)");
   });
 });

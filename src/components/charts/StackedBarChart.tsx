@@ -94,7 +94,7 @@ function ChartContent({
         stacked
         xDataKey="date"
       >
-        <Grid horizontal />
+        <Grid horizontal strokeOpacity={0.45} strokeWidth={0.5} />
         <Bar dataKey="series1" fill={series1Color} />
         <Bar dataKey="series2" fill={series2Color} />
         <BarXAxis formatLabel={tickLabel} />

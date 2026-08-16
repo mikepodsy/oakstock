@@ -82,6 +82,8 @@ function ChartContent({
         <CartesianGrid
           strokeDasharray="3 3"
           stroke="var(--border-primary)"
+          strokeOpacity={0.45}
+          strokeWidth={0.5}
           vertical={false}
         />
         <XAxis

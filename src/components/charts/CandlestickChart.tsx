@@ -51,7 +51,7 @@ import { fetchQuestradeCandles, fetchOptionStrikes } from "@/services/questrade"
 import { QUESTRADE_INTERVALS } from "@/utils/constants";
 import { formatCurrency, formatPercent } from "@/utils/formatters";
 import { useThemeStore } from "@/stores/themeStore";
-import { withAlpha } from "@/stores/chartStyleStore";
+import { gridLineColor, withAlpha } from "@/stores/chartStyleStore";
 import { useChartStyle, useIndicators } from "./ChartConfigContext";
 import {
   useDrawingStore,
@@ -485,11 +485,17 @@ export function CandlestickChart({
     const text = cssVar("--text-tertiary", "#8b8b8b");
     const bg = withAlpha(style.background, style.backgroundOpacity);
     const grid = cssVar("--border-primary", "#222222");
+    // Background chrome: faint, dotted lines tinted off the canvas itself so
+    // they sit behind the candles instead of competing with them.
+    const gridLine = gridLineColor(style.background);
 
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: { textColor: text, background: { type: ColorType.Solid, color: bg } },
-      grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+      grid: {
+        vertLines: { color: gridLine, style: LineStyle.Dotted },
+        horzLines: { color: gridLine, style: LineStyle.Dotted },
+      },
       // Free-moving crosshair (don't snap to candle OHLC), so the cursor can
       // wander into empty space above/below/beside the candles.
       crosshair: { mode: CrosshairMode.Normal },
@@ -575,12 +581,19 @@ export function CandlestickChart({
     const barUp = withAlpha(chartStyle.bar.up, chartStyle.candleUpOpacity);
     const barDown = withAlpha(chartStyle.bar.down, chartStyle.candleDownOpacity);
 
+    const gridLine = gridLineColor(chartStyle.background);
     chart.applyOptions({
       layout: {
         background: {
           type: ColorType.Solid,
           color: withAlpha(chartStyle.background, chartStyle.backgroundOpacity),
         },
+      },
+      // Re-tint the grid with the background so it stays faint against a
+      // repainted canvas rather than flipping to a heavy line.
+      grid: {
+        vertLines: { color: gridLine, style: LineStyle.Dotted },
+        horzLines: { color: gridLine, style: LineStyle.Dotted },
       },
     });
 

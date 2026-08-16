@@ -67,6 +67,22 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+// Grid lines read as background chrome, so they're tinted off the chart's own
+// background rather than the theme: a faint lift on a dark canvas, a faint
+// shade on a light one. A fixed theme color would fight the user's background
+// choice (the default canvas is black in both themes) and print far too strong.
+export function gridLineColor(background: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(background.trim());
+  if (!m) return "rgba(255, 255, 255, 0.06)";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  // Perceived brightness (ITU-R BT.601), enough to pick a direction.
+  const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luma > 0.5 ? "rgba(0, 0, 0, 0.07)" : "rgba(255, 255, 255, 0.06)";
+}
+
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 // ---------------------------------------------------------------------------

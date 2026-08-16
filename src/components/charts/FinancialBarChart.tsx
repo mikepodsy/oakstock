@@ -76,7 +76,7 @@ function ChartContent({
       margin={{ top: 16, right: 8, bottom: 24, left: 56 }}
       xDataKey="date"
     >
-      <Grid horizontal />
+      <Grid horizontal strokeOpacity={0.45} strokeWidth={0.5} />
       <Bar dataKey="value" fill={color} />
       <BarXAxis formatLabel={tickLabel} />
       <YAxis formatValue={fmt} />

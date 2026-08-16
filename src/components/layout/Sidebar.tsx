@@ -14,6 +14,7 @@ import {
   CalendarDays,
   TrendingUp,
   Calculator,
+  FlaskConical,
   Globe,
   Newspaper,
   PanelLeftClose,
@@ -46,6 +47,7 @@ const NAV_LINKS = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/economic", label: "Economic", icon: TrendingUp },
   { href: "/cot", label: "COT Report", icon: BarChart2 },
+  { href: "/backtesting", label: "Backtesting", icon: FlaskConical },
   { href: "/dcf", label: "DCF", icon: Calculator },
   { href: "/experts", label: "Superinvestors", icon: Users },
 ];

@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type { ISeriesApi, SeriesType } from "lightweight-charts";
 import type { OptionStrikeRow, StrikeView } from "@/types";
-import { formatCompactNumber } from "@/utils/formatters";
+import {
+  formatCompactNumber,
+  formatContracts,
+  formatSignedContracts,
+} from "@/utils/formatters";
 import { niceTicks } from "@/utils/ticks";
+import { findHoveredStrike } from "@/utils/strikeHover";
+import { StrikeTooltip } from "./StrikeTooltip";
 
 // Calls/puts colors, matching the green-up / red-down convention used for the
 // volume bars elsewhere in the chart.
@@ -13,7 +25,17 @@ const PUT_COLOR = "#EF4444";
 const ZERO_LINE = "rgba(148,163,184,0.35)";
 const AXIS_COLOR = "rgba(148,163,184,0.7)";
 const SPOT_COLOR = "rgba(226,232,240,0.85)"; // current spot price line
+const HOVER_BAND = "rgba(148,163,184,0.16)"; // row highlight under the cursor
+const HOVER_LINE = "rgba(226,232,240,0.55)";
 const AXIS_H = 16; // bottom strip reserved for the value axis labels
+
+/** A bar's price level plus the values behind it, kept for hit-testing. */
+interface PlacedBar {
+  y: number;
+  strike: number;
+  call: number;
+  put: number;
+}
 
 interface StrikeHistogramProps {
   /** The candle series — used to map a strike price to a y pixel coordinate. */
@@ -48,6 +70,17 @@ export function StrikeHistogram({
   className,
 }: StrikeHistogramProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Latest painted geometry, read by the pointer handler to hit-test rows.
+  const placedRef = useRef<PlacedBar[]>([]);
+  const barHRef = useRef(6);
+  const hoverRef = useRef<number | null>(null); // hovered strike price
+  const [hover, setHover] = useState<{
+    strike: number;
+    x: number;
+    y: number;
+    panelW: number;
+    panelH: number;
+  } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -79,16 +112,24 @@ export function StrikeHistogram({
       }
       const plotH = cssH - AXIS_H; // keep bars out of the axis strip
 
-      const placed: Array<{ y: number; call: number; put: number }> = [];
+      const placed: PlacedBar[] = [];
       for (const r of rows) {
         const y = series.priceToCoordinate(r.strike);
         if (y === null || y > plotH) continue;
-        placed.push({ y, call: callOf(r), put: putOf(r) });
+        placed.push({ y, strike: r.strike, call: callOf(r), put: putOf(r) });
       }
+      placedRef.current = placed;
       const spotY = spot != null ? series.priceToCoordinate(spot) : null;
+      // Re-resolve the hovered strike's y each frame so the highlight tracks
+      // zoom, pan and data refreshes instead of sticking where it was drawn.
+      const hoveredStrike = hoverRef.current;
+      const hoveredY =
+        hoveredStrike === null
+          ? null
+          : placed.find((p) => p.strike === hoveredStrike)?.y ?? null;
 
       const sig =
-        `${cssW}x${cssH}x${dpr}|${metric}|${view}|${maxTotal}|${spotY}|` +
+        `${cssW}x${cssH}x${dpr}|${metric}|${view}|${maxTotal}|${spotY}|${hoveredY}|` +
         placed.map((p) => `${Math.round(p.y)}:${p.call}:${p.put}`).join(",");
       if (sig === lastSig) {
         raf = requestAnimationFrame(paint);
@@ -107,6 +148,31 @@ export function StrikeHistogram({
       const cx = Math.round(cssW / 2); // net: center zero line
       const halfW = cx - 3;
 
+      // Bar thickness: the tightest strike spacing, clamped so sparse windows
+      // don't grow slabs and dense ones stay readable.
+      let barH = 6;
+      if (placed.length > 0) {
+        const ys = placed.map((p) => p.y).sort((a, b) => a - b);
+        let gap = plotH;
+        for (let i = 1; i < ys.length; i++) gap = Math.min(gap, ys[i] - ys[i - 1]);
+        barH = Math.max(1.5, Math.min(gap * 0.7, 10));
+      }
+      barHRef.current = barH;
+
+      // Hovered row: a highlight band across the panel so the price level under
+      // the cursor is unmistakable.
+      if (hoveredY !== null && hoveredY <= plotH) {
+        const bandH = Math.max(barH + 4, 9);
+        ctx.fillStyle = HOVER_BAND;
+        ctx.fillRect(0, hoveredY - bandH / 2, cssW, bandH);
+        ctx.strokeStyle = HOVER_LINE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(hoveredY) + 0.5);
+        ctx.lineTo(cssW, Math.round(hoveredY) + 0.5);
+        ctx.stroke();
+      }
+
       // Net mode: center zero line (call-heavy left, put-heavy right).
       if (net) {
         ctx.strokeStyle = ZERO_LINE;
@@ -119,11 +185,6 @@ export function StrikeHistogram({
 
       // Bars.
       if (placed.length > 0) {
-        const ys = placed.map((p) => p.y).sort((a, b) => a - b);
-        let gap = plotH;
-        for (let i = 1; i < ys.length; i++) gap = Math.min(gap, ys[i] - ys[i - 1]);
-        const barH = Math.max(1.5, Math.min(gap * 0.7, 10));
-
         for (const p of placed) {
           const top = p.y - barH / 2;
           if (net) {
@@ -198,6 +259,37 @@ export function StrikeHistogram({
     return () => cancelAnimationFrame(raf);
   }, [series, rows, metric, view, spot, epoch]);
 
+  const handlePointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    // Rows sit close together, so hit-test on y alone within half a bar's
+    // reach — anywhere on a strike's row counts as hovering it.
+    const tolerance = Math.max(barHRef.current / 2 + 3, 6);
+    const bar =
+      y <= rect.height - AXIS_H
+        ? findHoveredStrike(placedRef.current, y, tolerance)
+        : null;
+
+    hoverRef.current = bar?.strike ?? null;
+    setHover(
+      bar
+        ? {
+            strike: bar.strike,
+            x,
+            y: bar.y,
+            panelW: rect.width,
+            panelH: rect.height,
+          }
+        : null
+    );
+  }, []);
+
+  const handlePointerLeave = useCallback(() => {
+    hoverRef.current = null;
+    setHover(null);
+  }, []);
+
   const callTotal = rows.reduce(
     (s, r) => s + (metric === "oi" ? r.callOI : r.callVol),
     0
@@ -207,9 +299,56 @@ export function StrikeHistogram({
     0
   );
 
+  const label = metric === "oi" ? "OI" : "Vol";
+  const hoveredRow = hover ? rows.find((r) => r.strike === hover.strike) : undefined;
+  const hoveredCall = hoveredRow
+    ? metric === "oi"
+      ? hoveredRow.callOI
+      : hoveredRow.callVol
+    : 0;
+  const hoveredPut = hoveredRow
+    ? metric === "oi"
+      ? hoveredRow.putOI
+      : hoveredRow.putVol
+    : 0;
+
   return (
-    <div className={`relative ${className ?? ""}`}>
+    <div
+      className={`relative ${className ?? ""}`}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+    >
       <canvas ref={canvasRef} className="h-full w-full" />
+      {hover && hoveredRow && (
+        <StrikeTooltip
+          strike={hover.strike}
+          x={hover.x}
+          y={hover.y}
+          panelW={hover.panelW}
+          panelH={hover.panelH}
+          rows={[
+            {
+              label: `Call ${label}`,
+              value: formatContracts(hoveredCall),
+              color: CALL_COLOR,
+            },
+            {
+              label: `Put ${label}`,
+              value: formatContracts(hoveredPut),
+              color: PUT_COLOR,
+            },
+            view === "net"
+              ? {
+                  label: "Net",
+                  value: formatSignedContracts(hoveredCall - hoveredPut),
+                }
+              : {
+                  label: "Total",
+                  value: formatContracts(hoveredCall + hoveredPut),
+                },
+          ]}
+        />
+      )}
       {/* Title + total contracts for the active metric. */}
       <div className="absolute top-1 left-1 rounded bg-bg-elevated/70 px-1.5 py-0.5 backdrop-blur">
         <div className="text-[10px] font-semibold text-text-primary">

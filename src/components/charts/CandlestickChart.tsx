@@ -309,6 +309,17 @@ export function CandlestickChart({
     });
   }, [autoscaleProvider]);
 
+  // Put the price axis back to plain autoscale. Clearing the pan offset isn't
+  // enough on its own: dragging/scrolling the price axis puts lightweight-charts
+  // into manual mode with a fixed price range, and that range is meaningless for
+  // another symbol (a $40 stock left on a $400 range renders off-screen), so
+  // re-enable autoScale before re-running the fit.
+  const resetPriceScale = useCallback(() => {
+    priceOffsetRef.current = 0;
+    candleSeriesRef.current?.priceScale().applyOptions({ autoScale: true });
+    forceRefit();
+  }, [forceRefit]);
+
   // Scrolling the wheel over an options panel pans the shared price axis (and
   // thus the price-aligned strike bars) up/down, reusing the same vertical
   // offset as the chart's drag-to-pan. Scroll up reveals higher strikes.
@@ -396,10 +407,9 @@ export function CandlestickChart({
   // Jump back to the most recent candle: scroll to real time and clear any
   // vertical price pan so the latest candle re-centers in the frame.
   const goToLatest = useCallback(() => {
-    priceOffsetRef.current = 0;
-    forceRefit();
+    resetPriceScale();
     chartRef.current?.timeScale().scrollToRealTime();
-  }, [forceRefit]);
+  }, [resetPriceScale]);
 
   // Lazily fetch the options strike breakdown — only while fullscreen, and
   // re-fetch on ticker/window change. Keeps the embedded chart off the options
@@ -1301,8 +1311,7 @@ export function CandlestickChart({
       const rect = containerRef.current?.getBoundingClientRect();
       const axisW = chartRef.current?.priceScale("right").width() ?? 0;
       if (rect && e.clientX - rect.left > rect.width - axisW) {
-        priceOffsetRef.current = 0;
-        forceRefit();
+        resetPriceScale();
         return;
       }
 
@@ -1310,13 +1319,13 @@ export function CandlestickChart({
       if (price == null) return;
       addLine(ticker, roundPrice(price));
     },
-    [activeTool, addLine, relativeY, ticker, forceRefit]
+    [activeTool, addLine, relativeY, ticker, resetPriceScale]
   );
 
   // A fresh symbol or timeframe should start from a clean autoscale.
   useEffect(() => {
-    priceOffsetRef.current = 0;
-  }, [ticker, interval]);
+    resetPriceScale();
+  }, [ticker, interval, resetPriceScale]);
 
   // Total drawings for this ticker — shown as the Draw button's badge.
   const drawingCount = lines.length + trendlines.length;

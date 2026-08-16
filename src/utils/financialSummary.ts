@@ -1,5 +1,5 @@
 import { formatCompactNumber, formatFiscalPeriod } from "@/utils/formatters";
-import type { FinancialStatement } from "@/types";
+import type { FinancialStatement, StatementPeriod } from "@/types";
 
 const usd = (v: number | null) =>
   v == null ? "—" : `$${formatCompactNumber(Math.abs(v))}`;
@@ -55,6 +55,20 @@ export function latestPeriods(
   count: number
 ): FinancialStatement[] {
   return statements.slice(-count).reverse();
+}
+
+/**
+ * The period to actually render: the requested one when it has data, otherwise
+ * whichever series does. Null when neither does, so the section can bow out.
+ */
+export function resolvePeriod(
+  series: { quarterly: FinancialStatement[]; annual: FinancialStatement[] },
+  requested: StatementPeriod
+): StatementPeriod | null {
+  if (series[requested].length > 0) return requested;
+  const other: StatementPeriod =
+    requested === "quarterly" ? "annual" : "quarterly";
+  return series[other].length > 0 ? other : null;
 }
 
 /** `FY 2025`, read in UTC so a midnight period-end doesn't slip a year. */

@@ -211,6 +211,9 @@ export interface FundamentalsData {
   annual: FinancialStatement[];
 }
 
+/** Which statement series a financials section is showing. */
+export type StatementPeriod = "quarterly" | "annual";
+
 // ─── Calendar ───────────────────────────────────────
 export type CalendarType = 'earnings' | 'dividends' | 'economic' | 'ipo';
 

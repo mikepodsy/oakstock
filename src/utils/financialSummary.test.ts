@@ -4,6 +4,7 @@ import {
   annualLabel,
   latestPeriods,
   quarterlyLabel,
+  resolvePeriod,
 } from "./financialSummary";
 import type { FinancialStatement } from "@/types";
 
@@ -100,6 +101,26 @@ describe("period labels", () => {
 
   it("reads the quarter month in UTC", () => {
     expect(quarterlyLabel(statement("2025-10-01T00:00:00.000Z"))).toBe("Oct '25");
+  });
+});
+
+describe("resolvePeriod", () => {
+  const one = [statement("2025-12-31T00:00:00.000Z")];
+
+  it("honours the requested period when that series has data", () => {
+    expect(resolvePeriod({ quarterly: one, annual: one }, "quarterly")).toBe("quarterly");
+    expect(resolvePeriod({ quarterly: one, annual: one }, "annual")).toBe("annual");
+  });
+
+  it("falls back to the series that has data", () => {
+    // Tickers exist with quarters but no filed annuals, and vice versa —
+    // the toggle should not strand the user on an empty table.
+    expect(resolvePeriod({ quarterly: [], annual: one }, "quarterly")).toBe("annual");
+    expect(resolvePeriod({ quarterly: one, annual: [] }, "annual")).toBe("quarterly");
+  });
+
+  it("returns null when neither series has data", () => {
+    expect(resolvePeriod({ quarterly: [], annual: [] }, "quarterly")).toBeNull();
   });
 });
 

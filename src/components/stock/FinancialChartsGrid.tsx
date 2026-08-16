@@ -4,20 +4,19 @@ import { useState } from "react";
 import { FinancialBarChart } from "@/components/charts/FinancialBarChart";
 import { StackedBarChart } from "@/components/charts/StackedBarChart";
 import { MarginLineChart } from "@/components/charts/MarginLineChart";
-import type { FundamentalsData } from "@/types";
+import { PeriodToggle } from "@/components/stock/PeriodToggle";
+import type { FundamentalsData, StatementPeriod } from "@/types";
 
 interface FinancialChartsGridProps {
   data: FundamentalsData;
   loading?: boolean;
 }
 
-type Period = "quarterly" | "annual";
-
 export function FinancialChartsGrid({
   data,
   loading,
 }: FinancialChartsGridProps) {
-  const [period, setPeriod] = useState<Period>("quarterly");
+  const [period, setPeriod] = useState<StatementPeriod>("quarterly");
 
   const statements = period === "quarterly" ? data.quarterly : data.annual;
 
@@ -48,28 +47,7 @@ export function FinancialChartsGrid({
         <h2 className="text-lg font-display font-semibold text-text-primary">
           Financials
         </h2>
-        <div className="flex rounded-lg border border-border-primary overflow-hidden">
-          <button
-            onClick={() => setPeriod("quarterly")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              period === "quarterly"
-                ? "bg-green-primary text-white"
-                : "bg-bg-secondary text-text-secondary hover:bg-bg-tertiary"
-            }`}
-          >
-            Quarterly
-          </button>
-          <button
-            onClick={() => setPeriod("annual")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              period === "annual"
-                ? "bg-green-primary text-white"
-                : "bg-bg-secondary text-text-secondary hover:bg-bg-tertiary"
-            }`}
-          >
-            Annual
-          </button>
-        </div>
+        <PeriodToggle value={period} onChange={setPeriod} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

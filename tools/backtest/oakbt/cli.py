@@ -175,6 +175,125 @@ def cmd_run(args) -> int:
     return 0
 
 
+def ensure_data(market_code: str | None, ticker: str, dataset: str | None,
+                years: int = 4, log=print) -> None:
+    """Backfill anything this run needs that isn't stored yet.
+
+    The loaders are idempotent upserts, so this is safe to call on every run —
+    it's a no-op once the market has history.
+    """
+    from oakbt.data.universe import get_market
+
+    since = cftc.years_ago(years)
+
+    if store.latest_price_date(ticker) is None:
+        log(f"  backfilling prices for {ticker}…")
+        store.upsert_prices(prices.fetch_daily(ticker, since))
+
+    if market_code and dataset:
+        market = get_market(market_code)
+        if store.latest_cot_report_date(market_code, dataset) is None:
+            log(f"  backfilling {dataset} COT for {market_code}…")
+            store.upsert_cot(cftc.fetch_market(market, dataset, since))
+
+
+def cmd_run_spec(args) -> int:
+    """Run a rule spec supplied as JSON on stdin.
+
+    Stdin rather than argv on purpose: the spec originates from a text box, and
+    nothing user-authored should ever be assembled into a command line.
+    """
+    import json
+
+    from oakbt.config import ExecutionConfig, RunConfig
+    from oakbt.engine.rules import RuleSpecError, validate_spec
+    from oakbt.engine.runner import run_backtest
+    from oakbt.persist.writer import persist
+
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return _emit_error(f"invalid JSON on stdin: {exc}")
+
+    spec = payload.get("spec") or payload
+    prompt = payload.get("prompt")
+
+    try:
+        validate_spec(spec)
+    except (RuleSpecError, Exception) as exc:  # noqa: BLE001 - reported as JSON
+        return _emit_error(str(exc))
+
+    if spec.get("unsupported"):
+        return _emit_error(f"strategy not expressible: {spec['unsupported']}")
+
+    try:
+        target = resolve_target(spec.get("market"), spec.get("ticker"))
+    except SystemExit as exc:
+        return _emit_error(str(exc))
+
+    ex = spec.get("execution") or {}
+    execution = ExecutionConfig(
+        signal_lag=int(ex.get("signal_lag", 1)),
+        commission_bps=float(ex.get("commission_bps", 1.0)),
+        slippage_bps=float(ex.get("slippage_bps", 2.0)),
+        target_vol=ex.get("target_vol", 0.15),
+        max_leverage=float(ex.get("max_leverage", 2.0)),
+        stop_pct=ex.get("stop_pct"),
+        stop_atr_mult=ex.get("stop_atr_mult"),
+        trailing_stop=bool(ex.get("trailing_stop", False)),
+    )
+
+    cfg = RunConfig(
+        strategy="rule",
+        ticker=target.ticker,
+        market_code=target.market_code,
+        dataset=target.dataset,
+        proxy_quality=target.proxy_quality,
+        params={"spec": spec},
+        start=date.fromisoformat(spec["start"]) if spec.get("start") else None,
+        end=date.fromisoformat(spec["end"]) if spec.get("end") else None,
+        execution=execution,
+    )
+
+    try:
+        if not args.no_backfill:
+            ensure_data(target.market_code, target.ticker, target.dataset,
+                        years=args.years, log=lambda m: print(m, file=sys.stderr))
+        result = run_backtest(cfg)
+        run_id = persist(result, prompt=prompt, spec=spec)
+    except Exception as exc:  # noqa: BLE001 - the bridge needs a JSON error
+        return _emit_error(str(exc))
+
+    print(json.dumps({
+        "ok": True,
+        "run_id": run_id,
+        "ticker": cfg.ticker,
+        "market_code": cfg.market_code,
+        "metrics": _json_safe(result.metrics),
+    }))
+    return 0
+
+
+def _emit_error(message: str) -> int:
+    import json
+
+    print(json.dumps({"ok": False, "error": message}))
+    return 1
+
+
+def _json_safe(value):
+    import math
+
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
+
+
 def cmd_list(args) -> int:
     res = (
         store.client()
@@ -226,6 +345,15 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--stop-atr-mult", type=float)
     r.add_argument("--trailing-stop", action="store_true")
 
+    rs = sub.add_parser(
+        "run-spec",
+        help="run a rule spec supplied as JSON on stdin (used by /backtesting)",
+    )
+    rs.add_argument("--no-backfill", action="store_true",
+                    help="fail instead of fetching missing history")
+    rs.add_argument("--years", type=int, default=4,
+                    help="depth to backfill when data is missing")
+
     lst = sub.add_parser("list", help="list saved runs")
     lst.add_argument("--limit", type=int, default=20)
 
@@ -237,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     return {
         "backfill": cmd_backfill,
         "run": cmd_run,
+        "run-spec": cmd_run_spec,
         "list": cmd_list,
     }[args.command](args)
 

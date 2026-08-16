@@ -17,7 +17,7 @@ export const GET = apiHandler("backtest-runs", async () => {
     .from("backtest_runs")
     .select(
       "id,created_at,strategy,params,ticker,market_code,proxy_quality," +
-        "start_date,end_date,status,error,code_version,metrics"
+        "start_date,end_date,status,error,code_version,metrics,prompt,spec"
     )
     .order("created_at", { ascending: false })
     .limit(LIMIT);

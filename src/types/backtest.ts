@@ -61,6 +61,9 @@ export interface BacktestRun {
   code_version: string | null;
   metrics: BacktestMetrics | null;
   config?: BacktestRunConfig;
+  /** Set on composed runs: what the user typed and what it compiled to. */
+  prompt?: string | null;
+  spec?: Record<string, unknown> | null;
 }
 
 export interface EquityPoint {

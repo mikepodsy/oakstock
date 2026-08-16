@@ -1,15 +1,18 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BacktestLoadingSkeleton } from "@/components/backtesting/BacktestLoadingSkeleton";
 import { DrawdownChart } from "@/components/backtesting/DrawdownChart";
 import { EquityCurveChart } from "@/components/backtesting/EquityCurveChart";
 import { MetricsGrid } from "@/components/backtesting/MetricsGrid";
+import { RuleSpecView } from "@/components/backtesting/RuleSpecView";
 import { RunList } from "@/components/backtesting/RunList";
+import { StrategyComposer } from "@/components/backtesting/StrategyComposer";
 import { TradeLogTable } from "@/components/backtesting/TradeLogTable";
 import { useBacktestRun } from "@/hooks/useBacktestRun";
 import { useBacktestRuns } from "@/hooks/useBacktestRuns";
+import type { RuleSpec } from "@/lib/strategySpec";
 import {
   formatDate,
   formatParams,
@@ -21,6 +24,28 @@ const CARD = "rounded-xl border border-border-primary bg-bg-secondary p-4";
 export default function BacktestingPage() {
   const { data: runs, loading, error, refetch } = useBacktestRuns();
   const [chosenId, setChosenId] = useState<string | null>(null);
+  const [composerEnabled, setComposerEnabled] = useState(false);
+
+  // The composer needs a local Python process, so the server tells us whether
+  // to render it at all.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/backtest/capabilities", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((caps) => setComposerEnabled(Boolean(caps?.composer)))
+      .catch(() => {
+        /* capability probe failing just means no composer */
+      });
+    return () => controller.abort();
+  }, []);
+
+  const handleRunComplete = useCallback(
+    (runId: string) => {
+      setChosenId(runId);
+      refetch();
+    },
+    [refetch]
+  );
 
   // Derived rather than synced through an effect: until the user picks a run,
   // show the newest one. Setting state from an effect here would cause a
@@ -39,6 +64,12 @@ export default function BacktestingPage() {
       <p className="mt-1 text-sm text-text-secondary">
         Saved strategy runs over point-in-time COT positioning and daily prices.
       </p>
+
+      {composerEnabled && (
+        <div className="mt-6">
+          <StrategyComposer onRunComplete={handleRunComplete} />
+        </div>
+      )}
 
       {loading && (
         <div className="mt-6">
@@ -103,9 +134,20 @@ python -m oakbt.cli run --strategy cot_index_reversal --market SP500`}
                       {detail.run.code_version && ` · ${detail.run.code_version}`}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-text-secondary">
-                    {formatParams(detail.run.params)}
-                  </p>
+                  {/* A composed run shows its rule tree instead of raw params,
+                      so the strategy behind the chart is always legible. */}
+                  {detail.run.spec ? (
+                    <div className="mt-2">
+                      <RuleSpecView
+                        prompt={detail.run.prompt}
+                        spec={detail.run.spec as unknown as RuleSpec}
+                      />
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-text-secondary">
+                      {formatParams(detail.run.params)}
+                    </p>
+                  )}
 
                   {detail.run.proxy_quality === "degraded" && (
                     <p className="mt-3 flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs text-amber-500">

@@ -55,6 +55,27 @@ def test_zscore_of_a_flat_series_is_zero_not_inf():
 
 # ── Registry ──────────────────────────────────────────────────────────────────
 
+def test_feature_registry_matches_the_typescript_catalog():
+    """The composer's schema hardcodes this list in src/lib/strategySpec.ts.
+
+    If a provider is added here without updating that file, Claude never learns
+    the new feature exists — and a spec naming it would be rejected client-side.
+    This test is the tripwire; update both together.
+    """
+    categories = [
+        "lev_money", "asset_mgr", "dealer", "m_money",
+        "swap", "prod_merc", "commercial", "noncommercial",
+    ]
+    expected = sorted(
+        [f"cot_index_{c}" for c in categories]
+        + [f"cot_z_{c}" for c in categories]
+        + ["cot_oi_index"]
+    )
+    assert features.available_features() == expected, (
+        "feature registry drifted — update FEATURES in src/lib/strategySpec.ts"
+    )
+
+
 def test_registry_exposes_cot_features():
     available = features.available_features()
     assert "cot_index_lev_money" in available

@@ -49,7 +49,8 @@ def _config_json(cfg: RunConfig) -> dict:
 
 
 def create_run(cfg: RunConfig, start: date | None, end: date | None,
-               version: str | None) -> str:
+               version: str | None, prompt: str | None = None,
+               spec: dict | None = None) -> str:
     row = {
         "strategy": cfg.strategy,
         "params": _clean(cfg.params),
@@ -62,6 +63,12 @@ def create_run(cfg: RunConfig, start: date | None, end: date | None,
         "code_version": version,
         "status": "running",
     }
+    # Composed runs carry what the user typed and what it compiled to, so a
+    # chart is always traceable to the request behind it.
+    if prompt is not None:
+        row["prompt"] = prompt
+    if spec is not None:
+        row["spec"] = _clean(spec)
     res = store.client().table("backtest_runs").insert(row).execute()
     return res.data[0]["id"]
 
@@ -120,11 +127,13 @@ def _trade_rows(run_id: str, result: RunResult) -> list[dict]:
     ]
 
 
-def persist(result: RunResult) -> str:
+def persist(result: RunResult, prompt: str | None = None,
+            spec: dict | None = None) -> str:
     """Save a completed run. Returns the run id."""
     start = result.equity.index[0].date() if len(result.equity) else None
     end = result.equity.index[-1].date() if len(result.equity) else None
-    run_id = create_run(result.config, start, end, result.code_version)
+    run_id = create_run(result.config, start, end, result.code_version,
+                        prompt=prompt, spec=spec)
 
     try:
         client = store.client()

@@ -153,9 +153,20 @@ def parse_13f_xml(xml_text: str) -> list[dict]:
         except (ValueError, AttributeError):
             shares = 0
 
+        cusip = txt("cusip")
+        issuer = txt("nameOfIssuer")
+
+        # A manager holding nothing this quarter still has to file, and does so with
+        # a placeholder infoTable — issuer "NA", an all-zero CUSIP and no value or
+        # shares (e.g. Thiel Macro Q4 2025). Skip it, or the UI renders a 0% position.
+        if not shares and not value_raw_num and (
+            issuer.upper() in ("NA", "N/A", "NONE") or set(cusip) <= {"0"}
+        ):
+            continue
+
         holdings.append({
-            "cusip":        txt("cusip"),
-            "company_name": txt("nameOfIssuer"),
+            "cusip":        cusip,
+            "company_name": issuer,
             "value_raw":    value_raw_num,   # scaled to dollars below once unit is known
             "shares":       shares,
             "share_class":  txt("sshPrnamtType"),

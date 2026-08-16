@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { ManagerLogo } from "@/components/shared/ManagerLogo";
+import { matchesQuery, searchTerms } from "@/lib/expertSearch";
 import { MarketSummary } from "./MarketSummary";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -191,29 +192,27 @@ export default function ExpertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  function loadManagers() {
-    setLoading(true);
+  // `loading` starts true, so the fetch never has to set it synchronously here.
+  useEffect(() => {
+    let cancelled = false;
     fetch("/api/experts")
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         setManagers(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((e) => {
+        if (cancelled) return;
         setError(e.message);
         setLoading(false);
       });
-  }
+    return () => { cancelled = true; };
+  }, []);
 
-  useEffect(() => { loadManagers(); }, []);
-
-  const q = query.trim().toLowerCase();
-  const filteredManagers = q
-    ? managers.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.fund.toLowerCase().includes(q)
-      )
+  const terms = searchTerms(query);
+  const filteredManagers = terms.length
+    ? managers.filter((m) => matchesQuery(m, terms))
     : managers;
 
   return (
@@ -234,7 +233,7 @@ export default function ExpertsPage() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search funds…"
+                placeholder="Search investors or funds…"
                 className="w-full pl-9 pr-3 py-2 rounded-lg bg-bg-tertiary border border-border-primary text-text-primary text-sm placeholder:text-text-tertiary focus:outline-none focus:border-green-primary/40 transition-colors"
               />
             </div>
@@ -264,7 +263,7 @@ export default function ExpertsPage() {
           </div>
         ) : filteredManagers.length === 0 ? (
           <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
-            No funds match &ldquo;{query}&rdquo;
+            No investors or funds match &ldquo;{query}&rdquo;
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

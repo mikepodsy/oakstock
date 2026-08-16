@@ -48,12 +48,14 @@ function defaultFormat(v: number, prefix: string): string {
 }
 
 function ChartContent({
+  title,
   data,
   color,
   valuePrefix = "$",
   formatValue,
   heightClass,
 }: {
+  title: string;
   data: BarDatum[];
   color: string;
   valuePrefix?: string;
@@ -81,10 +83,13 @@ function ChartContent({
       <BarXAxis formatLabel={tickLabel} />
       <YAxis formatValue={fmt} />
       <ChartTooltip
+        // Without this the heading falls back to the raw `date` key — a full
+        // ISO timestamp — while the axis below shows the period label.
+        formatTitle={tickLabel}
         rows={(point) => [
           {
             color,
-            label: tickLabel(String(point.date)),
+            label: title,
             value: fmt(Number(point.value)),
           },
         ]}
@@ -132,6 +137,7 @@ export function FinancialBarChart({
               // Scales with the viewport so the expanded view actually fills the
               // screen, with a ceiling so it stays readable on very tall displays.
               heightClass="h-[min(72vh,760px)]"
+              title={title}
               valuePrefix={valuePrefix}
             />
           </DialogContent>
@@ -142,6 +148,7 @@ export function FinancialBarChart({
         data={data}
         formatValue={formatValue}
         heightClass="h-[160px]"
+        title={title}
         valuePrefix={valuePrefix}
       />
     </div>

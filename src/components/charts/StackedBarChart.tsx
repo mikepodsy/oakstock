@@ -100,6 +100,9 @@ function ChartContent({
         <BarXAxis formatLabel={tickLabel} />
         <YAxis formatValue={fmt} />
         <ChartTooltip
+          // Without this the heading falls back to the raw `date` key — a full
+          // ISO timestamp — while the axis below shows the period label.
+          formatTitle={tickLabel}
           rows={(point) => [
             {
               color: series1Color,

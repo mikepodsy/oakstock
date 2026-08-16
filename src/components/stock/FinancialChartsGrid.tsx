@@ -21,7 +21,6 @@ export function FinancialChartsGrid({
   const statements = period === "quarterly" ? data.quarterly : data.annual;
 
   const revenueData = statements.map((s) => ({ date: s.date, value: s.revenue }));
-  const ebitdaData = statements.map((s) => ({ date: s.date, value: s.ebitda }));
   const fcfData = statements.map((s) => ({ date: s.date, value: s.freeCashFlow }));
   const ocfData = statements.map((s) => ({ date: s.date, value: s.operatingCashFlow }));
   const capexData = statements.map((s) => ({ date: s.date, value: s.capex }));
@@ -58,9 +57,9 @@ export function FinancialChartsGrid({
           loading={loading}
         />
         <FinancialBarChart
-          title="EBITDA"
-          data={ebitdaData}
-          color="#3b82f6"
+          title="Net Income"
+          data={netIncomeData}
+          color="#a855f7"
           loading={loading}
         />
         <FinancialBarChart
@@ -79,12 +78,6 @@ export function FinancialChartsGrid({
           title="Capital Expenditure"
           data={capexData}
           color="#64748b"
-          loading={loading}
-        />
-        <FinancialBarChart
-          title="Net Income"
-          data={netIncomeData}
-          color="#a855f7"
           loading={loading}
         />
         <FinancialBarChart

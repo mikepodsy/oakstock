@@ -202,6 +202,9 @@ export function CotHistoryChart({
         <BarXAxis formatLabel={formatAxisDate} maxLabels={10} />
         <YAxis formatValue={formatCompactNumber} />
         <ChartTooltip
+          // Without this the heading falls back to the raw `date` key while the
+          // axis below shows the formatted one.
+          formatTitle={formatAxisDate}
           rows={(point) =>
             (isNet
               ? categoryNames.map((name) => ({

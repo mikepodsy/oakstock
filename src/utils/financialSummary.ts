@@ -31,7 +31,6 @@ export const SUMMARY_ROWS: SummaryRow[] = [
   { label: "Gross Profit", fmt: (s) => usd(s.grossProfit) },
   { label: "Gross Margin", fmt: (s) => per(marginPct(s.grossProfit, s.revenue)) },
   { label: "Operating Income", fmt: (s) => usd(s.operatingIncome) },
-  { label: "EBITDA", fmt: (s) => usd(s.ebitda) },
   { label: "Net Income", fmt: (s) => usd(s.netIncome) },
   { label: "Net Margin", fmt: (s) => per(marginPct(s.netIncome, s.revenue)) },
   { label: "EPS (Diluted)", fmt: (s) => num(s.eps) },

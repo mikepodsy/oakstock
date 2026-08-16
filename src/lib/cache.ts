@@ -1,3 +1,5 @@
+import type { FinancialData } from "@/types";
+
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
@@ -68,7 +70,16 @@ function getOrCreateCache<T>(
 
 export const quoteCache = getOrCreateCache<Record<string, unknown>>("quotes", 300);
 export const historyCache = getOrCreateCache<Array<{ date: string; close: number }>>("history", 1800);
-export const financialsCache = getOrCreateCache<Record<string, unknown>>("financials", 1800);
+export const financialsCache = getOrCreateCache<FinancialData>("financials", 1800);
+// Separate namespace from financialsCache: the batch dividend route is keyed by
+// the same tickers but stores a narrower shape, so sharing one cache let
+// whichever route ran first blank out the other's fields.
+export const dividendBatchCache = getOrCreateCache<{
+  ticker: string;
+  dividendYield: number | null;
+  dividendRate: number | null;
+  currentPrice: number | null;
+}>("dividend-batch", 1800);
 export const fundamentalsCache = getOrCreateCache<Record<string, unknown>>("fundamentals-ts", 3600);
 export const calendarCache = getOrCreateCache<unknown[]>("calendar", 3600);
 export const economicCache = getOrCreateCache<unknown>("economic", 3600);

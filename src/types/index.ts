@@ -93,8 +93,13 @@ export interface QuoteData {
 export interface FinancialData {
   ticker: string;
   peRatio: number | null;
+  forwardPE: number | null;
   eps: number | null;
   revenue: number | null;
+  /** Quarterly revenue growth, year-over-year, as a decimal (0.164 = +16.4%). */
+  revenueGrowth: number | null;
+  /** Quarterly earnings growth, year-over-year, as a decimal. */
+  earningsGrowth: number | null;
   profitMargin: number | null;
   debtToEquity: number | null;
   dividendYield: number | null;

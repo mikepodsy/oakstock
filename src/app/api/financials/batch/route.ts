@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
-import { financialsCache } from "@/lib/cache";
+import { dividendBatchCache } from "@/lib/cache";
 
 const yf = new YahooFinance();
 
@@ -24,26 +24,24 @@ interface BatchResult {
 }
 
 async function fetchOne(ticker: string): Promise<BatchResult> {
-  const cached = financialsCache.get(ticker) as Record<string, unknown> | undefined;
+  const cached = dividendBatchCache.get(ticker);
   if (cached) {
-    return {
-      ticker,
-      dividendYield: (cached.dividendYield as number) ?? null,
-      dividendRate: (cached.dividendRate as number) ?? null,
-      currentPrice: (cached.currentPrice as number) ?? null,
-    };
+    return cached;
   }
 
   try {
     const summary = await yf.quoteSummary(ticker, {
-      modules: ["defaultKeyStatistics", "price"],
+      modules: ["summaryDetail", "price"],
     });
 
-    const stats = summary.defaultKeyStatistics;
+    // Dividend figures come from summaryDetail — defaultKeyStatistics carries
+    // neither dividendYield nor dividendRate, so reading them there was
+    // silently nulling every row.
+    const detail = summary.summaryDetail;
     const price = summary.price;
 
-    const yieldVal = stats?.dividendYield;
-    const rateVal = stats?.dividendRate;
+    const yieldVal = detail?.dividendYield;
+    const rateVal = detail?.dividendRate;
     const priceVal = price?.regularMarketPrice;
 
     const result: BatchResult = {
@@ -53,7 +51,7 @@ async function fetchOne(ticker: string): Promise<BatchResult> {
       currentPrice: typeof priceVal === "number" ? priceVal : null,
     };
 
-    financialsCache.set(ticker, result as unknown as Record<string, unknown>);
+    dividendBatchCache.set(ticker, result);
     return result;
   } catch {
     return { ticker, dividendYield: null, dividendRate: null, currentPrice: null, error: true };

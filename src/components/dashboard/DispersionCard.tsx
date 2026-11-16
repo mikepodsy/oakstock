@@ -22,44 +22,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import {
+  classifyDispersion,
+  WATCH_THRESHOLD,
+  ELEVATED_THRESHOLD,
+} from "@/lib/dispersion";
 import type { EconomicDataPoint } from "@/types";
-
-// VIXEQ − VIX spread bands. Higher spread = more single-stock dispersion, the
-// alarming state → red. Tune these once live values are observed.
-const YELLOW_THRESHOLD = 1.0;
-const RED_THRESHOLD = 3.0;
-
-type Band = {
-  label: string;
-  dot: string;
-  value: string;
-  ring: string;
-};
-
-function classify(spread: number): Band {
-  if (spread >= RED_THRESHOLD) {
-    return {
-      label: "Elevated",
-      dot: "bg-red-primary",
-      value: "text-red-primary",
-      ring: "border-red-primary/30 bg-red-primary/10",
-    };
-  }
-  if (spread >= YELLOW_THRESHOLD) {
-    return {
-      label: "Watch",
-      dot: "bg-yellow-500",
-      value: "text-yellow-500",
-      ring: "border-yellow-500/30 bg-yellow-500/10",
-    };
-  }
-  return {
-    label: "Calm",
-    dot: "bg-green-primary",
-    value: "text-green-primary",
-    ring: "border-green-primary/30 bg-green-primary/10",
-  };
-}
 
 const TIMEFRAMES = [
   { value: "1d", label: "Daily" },
@@ -123,13 +91,13 @@ function SpreadChart({
         <Tooltip content={<SpreadTooltip timeframe={timeframe} />} />
         {/* Band boundaries, so the line can be read against the card's colour. */}
         <ReferenceLine
-          y={YELLOW_THRESHOLD}
+          y={WATCH_THRESHOLD}
           stroke="#EAB308"
           strokeDasharray="4 4"
           strokeOpacity={0.6}
         />
         <ReferenceLine
-          y={RED_THRESHOLD}
+          y={ELEVATED_THRESHOLD}
           stroke="var(--red-primary)"
           strokeDasharray="4 4"
           strokeOpacity={0.6}
@@ -199,7 +167,7 @@ export function DispersionCard() {
     );
   }
 
-  const band = spread !== null ? classify(spread) : null;
+  const band = spread !== null ? classifyDispersion(spread) : null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

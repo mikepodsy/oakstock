@@ -14,6 +14,7 @@ import { ChartGrid } from "@/components/dashboard/grid/ChartGrid";
 
 export default function DashboardPage() {
   const portfolios = usePortfolioStore((s) => s.portfolios);
+  const hasPortfolios = portfolios.length > 0;
 
   // Collect all unique tickers across all portfolios
   const allTickers = useMemo(() => {
@@ -37,12 +38,26 @@ export default function DashboardPage() {
     return portfolioTotals(allHoldings);
   }, [portfolios, quotes, allTickers.length]);
 
-  // Charts don't depend on owning a portfolio, so the workspace renders in the
-  // empty state too — just without the portfolio-derived cards.
-  if (portfolios.length === 0) {
-    return (
-      <div className="p-6">
-        <div className="mx-auto max-w-7xl">
+  return (
+    <div className="p-6">
+      <div className="mx-auto max-w-7xl">
+        {hasPortfolios ? (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="font-display text-2xl text-text-primary">
+                Dashboard
+              </h1>
+              <CreatePortfolioDialog>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Portfolio
+                </Button>
+              </CreatePortfolioDialog>
+            </div>
+
+            <PortfolioSummaryCards data={summary} loading={loading} />
+          </>
+        ) : (
           <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
             <TreeDeciduous className="h-16 w-16 text-oak-300 mb-4 opacity-60" />
             <h1 className="font-display text-2xl text-text-primary mb-2">
@@ -58,31 +73,16 @@ export default function DashboardPage() {
               </Button>
             </CreatePortfolioDialog>
           </div>
-        </div>
+        )}
 
-        <ChartGrid />
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="font-display text-2xl text-text-primary">Dashboard</h1>
-          <CreatePortfolioDialog>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              New Portfolio
-            </Button>
-          </CreatePortfolioDialog>
-        </div>
-
-        <PortfolioSummaryCards data={summary} loading={loading} />
-
+        {/* Market data — the VIXEQ−VIX dispersion signal, VIX and breadth — is
+            portfolio-independent, so it renders in the empty state too. It used
+            to sit inside the has-a-portfolio branch, which meant a failed
+            /api/portfolios call took the whole overview down with it. */}
         <MarketOverview />
 
-        <DailyBrief />
+        {/* The brief is written off the user's holdings and watchlists. */}
+        {hasPortfolios && <DailyBrief />}
       </div>
 
       {/* Full-bleed: the grid wants the whole viewport width, not the 7xl column. */}

@@ -196,10 +196,20 @@ export default function ExpertsPage() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/experts")
-      .then((r) => r.json())
+      .then(async (r) => {
+        // A failed route still answers with JSON (`{ error }`), so without the
+        // status check the body parses fine, lands as a non-array, and the page
+        // reports "no investors match" for what is actually a server error.
+        const body = await r.json().catch(() => null);
+        if (!r.ok) {
+          throw new Error(body?.error ?? `Request failed (${r.status})`);
+        }
+        if (!Array.isArray(body)) throw new Error("Unexpected response shape");
+        return body as ExpertManager[];
+      })
       .then((data) => {
         if (cancelled) return;
-        setManagers(Array.isArray(data) ? data : []);
+        setManagers(data);
         setLoading(false);
       })
       .catch((e) => {
@@ -263,7 +273,9 @@ export default function ExpertsPage() {
           </div>
         ) : filteredManagers.length === 0 ? (
           <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
-            No investors or funds match &ldquo;{query}&rdquo;
+            {terms.length
+              ? `No investors or funds match \u201C${query}\u201D`
+              : "No managers on file yet."}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

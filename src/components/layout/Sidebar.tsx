@@ -23,6 +23,7 @@ import {
   BarChart2,
   LineChart,
   Bell,
+  Scale,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
@@ -49,6 +50,7 @@ const NAV_LINKS = [
   { href: "/cot", label: "COT Report", icon: BarChart2 },
   { href: "/backtesting", label: "Backtesting", icon: FlaskConical },
   { href: "/dcf", label: "DCF", icon: Calculator },
+  { href: "/comparisons", label: "Comparisons", icon: Scale },
   { href: "/experts", label: "Superinvestors", icon: Users },
 ];
 

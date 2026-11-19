@@ -124,3 +124,7 @@ export const volatilityCache = getOrCreateCache<unknown>("volatility", 1800);
 // Analyst consensus, price targets and EPS estimates. Keyed TICKER; 30-min TTL
 // — sell-side revisions land daily at most, so this is generous but harmless.
 export const analystCache = getOrCreateCache<unknown>("analyst", 1800);
+// Comparisons page: one computed comps row per ticker, and the 5-year monthly
+// P/E series that feeds the historical-multiple chart.
+export const compRowCache = getOrCreateCache<unknown>("comp-rows", 900);
+export const compHistoryCache = getOrCreateCache<unknown>("comp-history", 21600);
